@@ -54,24 +54,9 @@ internal static class KitchenBoardCursorPolicy
         IOperationalQueueCursor cursor,
         string filterHash,
         string stream,
-        string mode,
-        long upper,
-        long lower,
-        string? position,
-        Guid? positionId,
-        int page,
-        int pageSize,
-        int totalCount) => cursor.Protect(new OperationalQueueCursorRequest
+        OperationalQueueCursorRequest request) => cursor.Protect(request with
         {
-            Mode = mode,
             FilterHash = BindStream(filterHash, stream),
-            UpperSequence = upper,
-            LowerSequence = lower,
-            Position = position,
-            PositionId = positionId,
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = totalCount,
         });
 
     internal static BadRequestException InvalidCursor() => new(

@@ -69,6 +69,33 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Completion_requires_a_present_positive_order_version()
+    {
+        var orderId = await SeedOrderAsync(OrderStatus.Ready, DevicePrintStatus.NotConfigured);
+        var endpoint = $"/api/staff/kitchen-board/orders/{orderId}/work-items/{orderId}/complete";
+        AuthenticateAsRole(UserRole.KitchenStaff);
+
+        var missingVersion = await Client.PostAsJsonAsync(endpoint, new
+        {
+            kind = "InitialOrder",
+            expectedAccountRevision = (long?)null,
+        });
+        missingVersion.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var zeroVersion = await Client.PostAsJsonAsync(endpoint, new
+        {
+            kind = "InitialOrder",
+            expectedOrderVersion = 0,
+            expectedAccountRevision = (long?)null,
+        });
+        zeroVersion.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.KitchenBoardWorkCompletions.AnyAsync(value => value.OrderId == orderId))
+            .Should().BeFalse("invalid optimistic versions must not persist a board acknowledgement");
+    }
+
+    [Fact]
     public async Task Direct_status_handover_requires_base_work_and_every_active_correction()
     {
         var orderId = await SeedOrderAsync(OrderStatus.Ready, DevicePrintStatus.NotConfigured);
@@ -411,6 +438,94 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
         var watermarkPage = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(watermarkResponse))!.Data!;
         watermarkPage.Orders.Items.Should().BeEmpty();
         watermarkPage.Orders.HasMore.Should().BeFalse();
+
+        using var scope = Factory.Services.CreateScope();
+        var cursor = scope.ServiceProvider.GetRequiredService<IOperationalQueueCursor>();
+        cursor.Read(watermarkPage.Orders.NextCursor).Page.Should().Be(1);
+        cursor.Read(watermarkPage.Corrections.NextCursor).Page.Should().Be(1);
+        cursor.Read(watermarkPage.Completions.NextCursor).Page.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Order_projection_loads_direct_and_menu_backed_recipe_graphs()
+    {
+        var orderId = Guid.NewGuid();
+        var product = NewRecipeProduct("Kitchen product");
+        var addOn = NewRecipeIngredient(product.Id, "Selected sauce", isIncludedInBasePrice: false);
+        product.DetailedIngredients.Add(addOn);
+
+        var menuProduct = NewRecipeProduct("Menu recipe product");
+        var removedBase = NewRecipeIngredient(menuProduct.Id, "Removed cheese", isIncludedInBasePrice: true);
+        menuProduct.DetailedIngredients.Add(removedBase);
+        var menu = new Menu
+        {
+            Id = Guid.NewGuid(),
+            Name = "Kitchen menu",
+            Date = DateOnly.FromDateTime(TestNow),
+            BasePrice = 18m,
+            CreatedAt = TestNow,
+            CreatedBy = nameof(KitchenBoardWorkflowTests),
+        };
+        menu.MenuItems.Add(new MenuItem
+        {
+            Id = Guid.NewGuid(),
+            MenuId = menu.Id,
+            ProductId = menuProduct.Id,
+            Quantity = 1,
+            CreatedAt = TestNow,
+            CreatedBy = nameof(KitchenBoardWorkflowTests),
+        });
+
+        var order = NewOrder(orderId, OrderStatus.Ready);
+        order.RoutingStates.Add(NewRoute(orderId, DevicePrintStatus.NotConfigured));
+        order.Items.Add(new OrderItem
+        {
+            Id = Guid.NewGuid(),
+            OrderId = orderId,
+            ProductId = product.Id,
+            ProductName = product.Name,
+            Quantity = 1,
+            UnitPrice = 10m,
+            ItemTotal = 10m,
+            IngredientQuantitiesJson = System.Text.Json.JsonSerializer.Serialize(
+                new Dictionary<Guid, int> { [addOn.Id] = 1 }),
+            CreatedAt = TestNow,
+            CreatedBy = nameof(KitchenBoardWorkflowTests),
+        });
+        order.Items.Add(new OrderItem
+        {
+            Id = Guid.NewGuid(),
+            OrderId = orderId,
+            MenuId = menu.Id,
+            ProductName = menu.Name,
+            Quantity = 1,
+            UnitPrice = 18m,
+            ItemTotal = 18m,
+            IngredientQuantitiesJson = System.Text.Json.JsonSerializer.Serialize(
+                new Dictionary<Guid, int> { [removedBase.Id] = 0 }),
+            CreatedAt = TestNow,
+            CreatedBy = nameof(KitchenBoardWorkflowTests),
+        });
+
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            context.AddRange(product, menuProduct, menu, order);
+            await context.SaveChangesAsync();
+        }
+
+        AuthenticateAsRole(UserRole.KitchenStaff);
+        var feed = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(
+            await Client.GetAsync("/api/staff/kitchen-board/work?pageSize=10")))!.Data!;
+        var projected = feed.Orders.Items.Single(item => item.OrderId == orderId);
+        var productItem = projected.Items.Single(item => item.ProductName == product.Name);
+        var menuItem = projected.Items.Single(item => item.ProductName == menu.Name);
+
+        productItem.Ingredients.Should().ContainSingle(item => item.IngredientId == addOn.Id)
+            .Which.Should().BeEquivalentTo(new KitchenBoardIngredientDto(
+                addOn.Id, addOn.Name, 1, false, true));
+        menuItem.Ingredients.Should().ContainSingle(item => item.IngredientId == removedBase.Id)
+            .Which.Should().BeEquivalentTo(new KitchenBoardIngredientDto(
+                removedBase.Id, removedBase.Name, 0, true, false));
     }
 
     private static string BuildWorkFeedUrl(KitchenBoardWorkFeedDto feed)
@@ -1052,6 +1167,36 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
         OrderDate = TestNow,
         CreatedBy = nameof(KitchenBoardWorkflowTests),
     };
+
+    private static Product NewRecipeProduct(string name) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = name,
+        BasePrice = 10m,
+        Type = ProductType.MainItem,
+        KitchenType = KitchenType.BackKitchen,
+        Ingredients = [],
+        Allergens = [],
+        IsActive = true,
+        IsAvailable = true,
+        CreatedAt = TestNow,
+        CreatedBy = nameof(KitchenBoardWorkflowTests),
+    };
+
+    private static ProductIngredient NewRecipeIngredient(
+        Guid productId, string name, bool isIncludedInBasePrice) => new()
+        {
+            Id = Guid.NewGuid(),
+            ProductId = productId,
+            Name = name,
+            IsOptional = true,
+            IsIncludedInBasePrice = isIncludedInBasePrice,
+            Price = isIncludedInBasePrice ? 0m : 1m,
+            MaxQuantity = 2,
+            IsActive = true,
+            CreatedAt = TestNow,
+            CreatedBy = nameof(KitchenBoardWorkflowTests),
+        };
 
     private static OrderRoutingState NewRoute(Guid orderId, DevicePrintStatus status) => new()
     {

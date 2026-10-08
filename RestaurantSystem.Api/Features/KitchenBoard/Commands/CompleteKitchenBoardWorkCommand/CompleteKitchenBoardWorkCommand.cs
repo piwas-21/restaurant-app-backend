@@ -95,7 +95,7 @@ public sealed class CompleteKitchenBoardWorkCommandHandler(
         return ApiResponse<KitchenBoardWorkCompletionDto>.SuccessWithData(ToDto(completion));
     }
 
-    private Task ValidateReplayIdentityAsync(
+    private static Task ValidateReplayIdentityAsync(
         CompleteKitchenBoardWorkCommand command,
         KitchenBoardWorkKind kind,
         KitchenBoardWorkCompletion existing)

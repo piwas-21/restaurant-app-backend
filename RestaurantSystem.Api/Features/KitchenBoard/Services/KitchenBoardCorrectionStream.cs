@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.KitchenBoard.Dtos;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -14,46 +15,37 @@ internal static class KitchenBoardCorrectionStream
     private const string StreamName = "corrections";
 
     internal static async Task<KitchenBoardPageDto<KitchenBoardCorrectionDto>> ReadAsync(
-        ApplicationDbContext context,
-        IOperationalQueueCursor cursor,
-        string filterHash,
-        string? cursorValue,
-        int pageSize,
-        long currentWatermark,
-        ILogger logger,
-        CancellationToken cancellationToken)
+        KitchenBoardStreamReadContext request)
     {
-        if (string.IsNullOrWhiteSpace(cursorValue))
+        var context = request.Context;
+        var cancellationToken = request.CancellationToken;
+        if (string.IsNullOrWhiteSpace(request.CursorValue))
         {
-            var total = await KitchenNotes(context, currentWatermark).CountAsync(cancellationToken);
-            return await SnapshotAsync(context, cursor, filterHash, currentWatermark,
-                pageSize, total, null, logger, cancellationToken);
+            var total = await KitchenNotes(context, request.CurrentWatermark).CountAsync(cancellationToken);
+            return await SnapshotAsync(request, request.CurrentWatermark, total, null);
         }
 
-        var payload = KitchenBoardCursorPolicy.Read(cursor, cursorValue, filterHash, StreamName, pageSize);
+        var payload = KitchenBoardCursorPolicy.Read(
+            request.Cursor, request.CursorValue, request.FilterHash, StreamName, request.PageSize);
         if (payload.Mode == OperationalQueueSyncModes.Snapshot)
         {
-            return await SnapshotAsync(context, cursor, filterHash, payload.UpperSequence,
-                pageSize, payload.TotalCount, payload.PositionId, logger, cancellationToken,
-                payload.Page);
+            return await SnapshotAsync(
+                request, payload.UpperSequence, payload.TotalCount, payload.PositionId, payload.Page);
         }
 
-        return await ChangesAsync(context, cursor, filterHash, payload, pageSize,
-            currentWatermark, logger, cancellationToken);
+        return await ChangesAsync(request, payload);
     }
 
     private static async Task<KitchenBoardPageDto<KitchenBoardCorrectionDto>> SnapshotAsync(
-        ApplicationDbContext context,
-        IOperationalQueueCursor cursor,
-        string filterHash,
+        KitchenBoardStreamReadContext request,
         long upper,
-        int pageSize,
         int totalCount,
         Guid? afterId,
-        ILogger logger,
-        CancellationToken cancellationToken,
         int page = 1)
     {
+        var context = request.Context;
+        var pageSize = request.PageSize;
+        var cancellationToken = request.CancellationToken;
         var query = KitchenNotes(context, upper);
         if (afterId.HasValue)
         {
@@ -62,28 +54,34 @@ internal static class KitchenBoardCorrectionStream
 
         var rows = await query.OrderBy(note => note.Id)
             .Take(pageSize + 1).ToListAsync(cancellationToken);
-        var items = await ProjectAsync(context, rows.Take(pageSize).ToList(), logger, cancellationToken);
+        var items = await ProjectAsync(request, rows.Take(pageSize).ToList());
         var hasMore = rows.Count > pageSize;
         var next = hasMore && items.Count > 0
-            ? KitchenBoardCursorPolicy.Protect(cursor, filterHash, StreamName,
-                OperationalQueueSyncModes.Snapshot, upper, 0,
-                items[^1].WorkItemId.ToString("D"), items[^1].WorkItemId,
-                page + 1, pageSize, totalCount)
-            : WatermarkCursor(cursor, filterHash, upper, pageSize, totalCount);
+            ? KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
+                new OperationalQueueCursorRequest
+                {
+                    Mode = OperationalQueueSyncModes.Snapshot,
+                    FilterHash = request.FilterHash,
+                    UpperSequence = upper,
+                    Position = items[^1].WorkItemId.ToString("D"),
+                    PositionId = items[^1].WorkItemId,
+                    Page = page + 1,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                })
+            : WatermarkCursor(request, upper, totalCount);
         return new KitchenBoardPageDto<KitchenBoardCorrectionDto>(
             items, totalCount, hasMore, [], next, upper, OperationalQueueSyncModes.Snapshot);
     }
 
     private static async Task<KitchenBoardPageDto<KitchenBoardCorrectionDto>> ChangesAsync(
-        ApplicationDbContext context,
-        IOperationalQueueCursor cursor,
-        string filterHash,
-        OperationalQueueCursorPayload payload,
-        int pageSize,
-        long currentWatermark,
-        ILogger logger,
-        CancellationToken cancellationToken)
+        KitchenBoardStreamReadContext request,
+        OperationalQueueCursorPayload payload)
     {
+        var context = request.Context;
+        var pageSize = request.PageSize;
+        var currentWatermark = request.CurrentWatermark;
+        var cancellationToken = request.CancellationToken;
         var lower = payload.Mode == OperationalQueueSyncModes.Watermark
             ? payload.UpperSequence : payload.LowerSequence;
         var upper = payload.Mode == OperationalQueueSyncModes.Watermark
@@ -102,7 +100,7 @@ internal static class KitchenBoardCorrectionStream
         var rows = await notes.OrderBy(note => note.KitchenBoardSequence)
             .Take(pageSize + 1).ToListAsync(cancellationToken);
         var pageRows = rows.Take(pageSize).ToList();
-        var projected = await ProjectAsync(context, pageRows, logger, cancellationToken);
+        var projected = await ProjectAsync(request, pageRows);
         var projectedById = projected.ToDictionary(item => item.WorkItemId);
         var rowIds = pageRows.Select(note => note.Id).ToArray();
         var activeIds = await KitchenBoardWorkRules.ActiveCorrections(context)
@@ -118,11 +116,19 @@ internal static class KitchenBoardCorrectionStream
         var count = await KitchenBoardWorkRules.ActiveCorrections(context).CountAsync(cancellationToken);
         var hasMore = rows.Count > pageSize;
         var next = hasMore
-            ? KitchenBoardCursorPolicy.Protect(cursor, filterHash, StreamName,
-                OperationalQueueSyncModes.Changes, upper, lower,
-                rows[pageSize - 1].KitchenBoardSequence.ToString(CultureInfo.InvariantCulture),
-                null, payload.Page + 1, pageSize, count)
-            : WatermarkCursor(cursor, filterHash, upper, pageSize, count);
+            ? KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
+                new OperationalQueueCursorRequest
+                {
+                    Mode = OperationalQueueSyncModes.Changes,
+                    FilterHash = request.FilterHash,
+                    UpperSequence = upper,
+                    LowerSequence = lower,
+                    Position = rows[pageSize - 1].KitchenBoardSequence.ToString(CultureInfo.InvariantCulture),
+                    Page = payload.Page + 1,
+                    PageSize = pageSize,
+                    TotalCount = count,
+                })
+            : WatermarkCursor(request, upper, count);
         return new KitchenBoardPageDto<KitchenBoardCorrectionDto>(
             items, count, hasMore, removed, next, upper,
             hasMore ? OperationalQueueSyncModes.Changes : OperationalQueueSyncModes.Watermark);
@@ -139,11 +145,11 @@ internal static class KitchenBoardCorrectionStream
             && note.KitchenBoardSequence > lower && note.KitchenBoardSequence <= upper);
 
     private static async Task<List<KitchenBoardCorrectionDto>> ProjectAsync(
-        ApplicationDbContext context,
-        List<OrderOperationalNote> notes,
-        ILogger logger,
-        CancellationToken cancellationToken)
+        KitchenBoardStreamReadContext request,
+        List<OrderOperationalNote> notes)
     {
+        var context = request.Context;
+        var cancellationToken = request.CancellationToken;
         if (notes.Count == 0) return [];
         var orderIds = notes.Select(note => note.OrderId).Distinct().ToArray();
         var orders = await context.Orders.AsNoTracking()
@@ -173,42 +179,48 @@ internal static class KitchenBoardCorrectionStream
         var printedKeys = printed.Select(receipt => (
             receipt.OrderId, receipt.JobId, receipt.Target, receipt.DeviceId)).ToHashSet();
 
-        return visibleNotes.Select(note =>
-        {
-            var order = orders[note.OrderId];
-            completions.TryGetValue(note.Id, out var completion);
-            var target = note.KitchenTarget;
-            var route = target.HasValue
-                ? order.RoutingStates.FirstOrDefault(state => state.IsRequired
-                    && state.Target == target.Value)
-                : null;
-            var withdrawn = note.WithdrawnAt.HasValue;
-            var printerCompleted = target.HasValue && route?.DeviceId is { } deviceId
-                && printedKeys.Contains((note.OrderId, note.Id, target.Value, deviceId));
-            var completed = withdrawn || completion is not null || printerCompleted;
-            var changes = withdrawn ? [] : MapChanges(note.KitchenChangesJson);
-            return new KitchenBoardCorrectionDto(
-                note.Id,
-                note.OrderId,
-                order.OrderNumber,
-                order.Status.ToString(),
-                order.Version,
-                order.TableId,
-                order.TableLabel,
-                order.TableNumber,
-                order.ServiceSessionId,
-                note.AmendmentId,
-                note.AccountRevision,
-                target?.ToString(),
-                withdrawn ? string.Empty : note.Text,
-                withdrawn,
-                completed,
-                !completed && route?.Status == DevicePrintStatus.NotConfigured
-                    && route.DeviceId is null,
-                !target.HasValue ? "Unrouted" : route?.Status.ToString() ?? "Unrouted",
-                note.CreatedAt,
-                changes);
-        }).ToList();
+        return visibleNotes.Select(note => ProjectNote(note, orders, completions, printedKeys)).ToList();
+    }
+
+    private static KitchenBoardCorrectionDto ProjectNote(
+        OrderOperationalNote note,
+        Dictionary<Guid, Order> orders,
+        Dictionary<Guid, KitchenBoardWorkCompletion> completions,
+        HashSet<(Guid OrderId, Guid JobId, DevicePrintTarget Target, string DeviceId)> printedKeys)
+    {
+        var order = orders[note.OrderId];
+        completions.TryGetValue(note.Id, out var completion);
+        var target = note.KitchenTarget;
+        var route = target.HasValue
+            ? order.RoutingStates.FirstOrDefault(state => state.IsRequired
+                && state.Target == target.Value)
+            : null;
+        var withdrawn = note.WithdrawnAt.HasValue;
+        var printerCompleted = target.HasValue && route?.DeviceId is { } deviceId
+            && printedKeys.Contains((note.OrderId, note.Id, target.Value, deviceId));
+        var completed = withdrawn || completion is not null || printerCompleted;
+        var changes = withdrawn ? [] : MapChanges(note.KitchenChangesJson);
+        return new KitchenBoardCorrectionDto(
+            note.Id,
+            note.OrderId,
+            order.OrderNumber,
+            order.Status.ToString(),
+            order.Version,
+            order.TableId,
+            order.TableLabel,
+            order.TableNumber,
+            order.ServiceSessionId,
+            note.AmendmentId,
+            note.AccountRevision,
+            target?.ToString(),
+            withdrawn ? string.Empty : note.Text,
+            withdrawn,
+            completed,
+            !completed && route?.Status == DevicePrintStatus.NotConfigured
+                && route.DeviceId is null,
+            !target.HasValue ? "Unrouted" : route?.Status.ToString() ?? "Unrouted",
+            note.CreatedAt,
+            changes);
     }
 
     private static List<KitchenBoardChangeDto> MapChanges(string? json) =>
@@ -227,7 +239,15 @@ internal static class KitchenBoardCorrectionStream
             (item.SideItems ?? []).Select(child => MapItem(child)!).ToList());
 
     private static string WatermarkCursor(
-        IOperationalQueueCursor cursor, string filterHash, long upper, int pageSize, int totalCount) =>
-        KitchenBoardCursorPolicy.Protect(cursor, filterHash, StreamName,
-            OperationalQueueSyncModes.Watermark, upper, 0, null, null, 1, pageSize, totalCount);
+        KitchenBoardStreamReadContext request, long upper, int totalCount) =>
+        KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
+            new OperationalQueueCursorRequest
+            {
+                Mode = OperationalQueueSyncModes.Watermark,
+                FilterHash = request.FilterHash,
+                UpperSequence = upper,
+                Page = 1,
+                PageSize = request.PageSize,
+                TotalCount = totalCount,
+            });
 }

@@ -103,37 +103,8 @@ public sealed partial class CloseTableServiceSessionCommandHandler
             var kitchenCorrectionFailure = await CheckKitchenBoardCloseAsync(session, cancellationToken);
             if (kitchenCorrectionFailure is not null) return kitchenCorrectionFailure;
 
-            var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
-                _context.Orders, session.TableId, session.TableNumber);
-            var legacyOrders = await legacyQuery
-                .Where(order => !order.IsDeleted
-                    && order.Type == OrderType.DineIn
-                    && order.ServiceSessionId == null)
-                .SelectCloseCharges()
-                .ToListAsync(cancellationToken);
-            var memberRows = await _context.Orders
-                .Where(order => !order.IsDeleted && order.ServiceSessionId == session.Id)
-                .SelectCloseCharges()
-                .ToListAsync(cancellationToken);
-            var memberStates = memberRows.Select(order => order.ToState()).ToList();
-            var legacyStates = legacyOrders.Select(order => order.ToState()).ToList();
-            var assessment = TableServiceSessionCloseRules.Assess(
-                memberStates,
-                legacyStates,
-                _paymentTolerance);
-            if (assessment.LegacyActiveOrderCount > 0)
-            {
-                return Ambiguous();
-            }
-
-            var unresolved = memberRows.Zip(memberStates)
-                .Where(pair => TableServiceSessionCloseRules.IsUnresolvedMemberOrder(pair.Second))
-                .Select(pair => pair.First.OrderNumber)
-                .ToList();
-            if (assessment.Outstanding > _paymentTolerance || unresolved.Count > 0)
-            {
-                return Unresolved(assessment.Outstanding, unresolved);
-            }
+            var orderFailure = await CheckOrderBalancesAsync(session, cancellationToken);
+            if (orderFailure is not null) return orderFailure;
 
             await _guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
             if (lockedRows.Table is not null)

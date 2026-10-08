@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.KitchenBoard.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -13,43 +14,37 @@ internal static class KitchenBoardCompletionStream
     private const string StreamName = "completions";
 
     internal static async Task<KitchenBoardPageDto<KitchenBoardCompletionDto>> ReadAsync(
-        ApplicationDbContext context,
-        IOperationalQueueCursor cursor,
-        string filterHash,
-        string? cursorValue,
-        int pageSize,
-        long currentWatermark,
-        CancellationToken cancellationToken)
+        KitchenBoardStreamReadContext request)
     {
-        if (string.IsNullOrWhiteSpace(cursorValue))
+        var context = request.Context;
+        var cancellationToken = request.CancellationToken;
+        if (string.IsNullOrWhiteSpace(request.CursorValue))
         {
             var count = await ActiveInitialCompletions(context).CountAsync(cancellationToken);
-            return await SnapshotAsync(context, cursor, filterHash, currentWatermark,
-                pageSize, count, null, cancellationToken);
+            return await SnapshotAsync(request, request.CurrentWatermark, count, null);
         }
 
-        var payload = KitchenBoardCursorPolicy.Read(cursor, cursorValue, filterHash, StreamName, pageSize);
+        var payload = KitchenBoardCursorPolicy.Read(
+            request.Cursor, request.CursorValue, request.FilterHash, StreamName, request.PageSize);
         if (payload.Mode == OperationalQueueSyncModes.Snapshot)
         {
-            return await SnapshotAsync(context, cursor, filterHash, payload.UpperSequence,
-                pageSize, payload.TotalCount, payload.Position, cancellationToken, payload.Page);
+            return await SnapshotAsync(
+                request, payload.UpperSequence, payload.TotalCount, payload.Position, payload.Page);
         }
 
-        return await ChangesAsync(context, cursor, filterHash, payload, pageSize,
-            currentWatermark, cancellationToken);
+        return await ChangesAsync(request, payload);
     }
 
     private static async Task<KitchenBoardPageDto<KitchenBoardCompletionDto>> SnapshotAsync(
-        ApplicationDbContext context,
-        IOperationalQueueCursor cursor,
-        string filterHash,
+        KitchenBoardStreamReadContext request,
         long upper,
-        int pageSize,
         int totalCount,
         string? afterSequence,
-        CancellationToken cancellationToken,
         int page = 1)
     {
+        var context = request.Context;
+        var pageSize = request.PageSize;
+        var cancellationToken = request.CancellationToken;
         var query = ActiveInitialCompletions(context)
             .Where(value => value.Sequence <= upper);
         if (afterSequence is not null)
@@ -68,24 +63,31 @@ internal static class KitchenBoardCompletionStream
         var items = rows.Take(pageSize).Select(Map).ToList();
         var hasMore = rows.Count > pageSize;
         var next = hasMore && items.Count > 0
-            ? KitchenBoardCursorPolicy.Protect(cursor, filterHash, StreamName,
-                OperationalQueueSyncModes.Snapshot, upper, 0,
-                items[^1].Sequence.ToString(CultureInfo.InvariantCulture), rows[pageSize - 1].Id,
-                page + 1, pageSize, totalCount)
-            : WatermarkCursor(cursor, filterHash, upper, pageSize, totalCount);
+            ? KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
+                new OperationalQueueCursorRequest
+                {
+                    Mode = OperationalQueueSyncModes.Snapshot,
+                    FilterHash = request.FilterHash,
+                    UpperSequence = upper,
+                    Position = items[^1].Sequence.ToString(CultureInfo.InvariantCulture),
+                    PositionId = rows[pageSize - 1].Id,
+                    Page = page + 1,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                })
+            : WatermarkCursor(request, upper, totalCount);
         return new KitchenBoardPageDto<KitchenBoardCompletionDto>(
             items, totalCount, hasMore, [], next, upper, OperationalQueueSyncModes.Snapshot);
     }
 
     private static async Task<KitchenBoardPageDto<KitchenBoardCompletionDto>> ChangesAsync(
-        ApplicationDbContext context,
-        IOperationalQueueCursor cursor,
-        string filterHash,
-        OperationalQueueCursorPayload payload,
-        int pageSize,
-        long currentWatermark,
-        CancellationToken cancellationToken)
+        KitchenBoardStreamReadContext request,
+        OperationalQueueCursorPayload payload)
     {
+        var context = request.Context;
+        var pageSize = request.PageSize;
+        var currentWatermark = request.CurrentWatermark;
+        var cancellationToken = request.CancellationToken;
         var lower = payload.Mode == OperationalQueueSyncModes.Watermark
             ? payload.UpperSequence : payload.LowerSequence;
         var upper = payload.Mode == OperationalQueueSyncModes.Watermark
@@ -106,11 +108,19 @@ internal static class KitchenBoardCompletionStream
         var count = await ActiveInitialCompletions(context).CountAsync(cancellationToken);
         var hasMore = rows.Count > pageSize;
         var next = hasMore
-            ? KitchenBoardCursorPolicy.Protect(cursor, filterHash, StreamName,
-                OperationalQueueSyncModes.Changes, upper, lower,
-                rows[pageSize - 1].Sequence.ToString(CultureInfo.InvariantCulture), null,
-                payload.Page + 1, pageSize, count)
-            : WatermarkCursor(cursor, filterHash, upper, pageSize, count);
+            ? KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
+                new OperationalQueueCursorRequest
+                {
+                    Mode = OperationalQueueSyncModes.Changes,
+                    FilterHash = request.FilterHash,
+                    UpperSequence = upper,
+                    LowerSequence = lower,
+                    Position = rows[pageSize - 1].Sequence.ToString(CultureInfo.InvariantCulture),
+                    Page = payload.Page + 1,
+                    PageSize = pageSize,
+                    TotalCount = count,
+                })
+            : WatermarkCursor(request, upper, count);
         return new KitchenBoardPageDto<KitchenBoardCompletionDto>(
             items, count, hasMore, [], next, upper,
             hasMore ? OperationalQueueSyncModes.Changes : OperationalQueueSyncModes.Watermark);
@@ -133,7 +143,15 @@ internal static class KitchenBoardCompletionStream
             && !value.Order.IsDeleted && value.Order.Status == OrderStatus.Ready);
 
     private static string WatermarkCursor(
-        IOperationalQueueCursor cursor, string filterHash, long upper, int pageSize, int totalCount) =>
-        KitchenBoardCursorPolicy.Protect(cursor, filterHash, StreamName,
-            OperationalQueueSyncModes.Watermark, upper, 0, null, null, 1, pageSize, totalCount);
+        KitchenBoardStreamReadContext request, long upper, int totalCount) =>
+        KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
+            new OperationalQueueCursorRequest
+            {
+                Mode = OperationalQueueSyncModes.Watermark,
+                FilterHash = request.FilterHash,
+                UpperSequence = upper,
+                Page = 1,
+                PageSize = request.PageSize,
+                TotalCount = totalCount,
+            });
 }

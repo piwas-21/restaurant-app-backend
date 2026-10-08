@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.KitchenBoard.Dtos;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -13,79 +14,76 @@ internal static class KitchenBoardOrderStream
     private const string StreamName = "orders";
 
     internal static async Task<KitchenBoardPageDto<KitchenBoardOrderDto>> ReadAsync(
-        ApplicationDbContext context,
-        IOperationalQueueCursor cursor,
-        string filterHash,
-        string? cursorValue,
-        int pageSize,
-        long currentWatermark,
-        ILogger logger,
-        CancellationToken cancellationToken)
+        KitchenBoardStreamReadContext request)
     {
-        if (string.IsNullOrWhiteSpace(cursorValue))
+        var context = request.Context;
+        var cancellationToken = request.CancellationToken;
+        if (string.IsNullOrWhiteSpace(request.CursorValue))
         {
-            var total = await EligibleOrders(context, currentWatermark).CountAsync(cancellationToken);
-            return await SnapshotAsync(context, cursor, filterHash, currentWatermark,
-                pageSize, total, null, logger, cancellationToken);
+            var total = await EligibleOrders(context, request.CurrentWatermark).CountAsync(cancellationToken);
+            return await SnapshotAsync(request, request.CurrentWatermark, total, null);
         }
 
-        var payload = KitchenBoardCursorPolicy.Read(cursor, cursorValue, filterHash, StreamName, pageSize);
+        var payload = KitchenBoardCursorPolicy.Read(
+            request.Cursor, request.CursorValue, request.FilterHash, StreamName, request.PageSize);
         if (payload.Mode == OperationalQueueSyncModes.Snapshot)
         {
-            return await SnapshotAsync(context, cursor, filterHash, payload.UpperSequence,
-                pageSize, payload.TotalCount, payload.PositionId, logger, cancellationToken,
-                payload.Page);
+            return await SnapshotAsync(
+                request, payload.UpperSequence, payload.TotalCount, payload.PositionId, payload.Page);
         }
 
-        return await ChangesAsync(context, cursor, filterHash, payload, pageSize,
-            currentWatermark, logger, cancellationToken);
+        return await ChangesAsync(request, payload);
     }
 
     private static async Task<KitchenBoardPageDto<KitchenBoardOrderDto>> SnapshotAsync(
-        ApplicationDbContext context,
-        IOperationalQueueCursor cursor,
-        string filterHash,
+        KitchenBoardStreamReadContext request,
         long upper,
-        int pageSize,
         int totalCount,
         Guid? afterId,
-        ILogger logger,
-        CancellationToken cancellationToken,
         int page = 1)
     {
+        var context = request.Context;
+        var pageSize = request.PageSize;
+        var cancellationToken = request.CancellationToken;
         var query = EligibleOrders(context, upper);
         if (afterId.HasValue)
         {
             query = query.Where(order => order.Id.CompareTo(afterId.Value) > 0);
         }
 
-        var rows = await LoadOrderGraph(query, cancellationToken)
+        var rows = await LoadOrderGraph(query)
             .OrderBy(order => order.Id)
             .Take(pageSize + 1)
             .ToListAsync(cancellationToken);
-        var items = await ProjectAsync(context, rows.Take(pageSize).ToList(), logger, cancellationToken);
+        var items = await ProjectAsync(request, rows.Take(pageSize).ToList());
         var hasMore = rows.Count > pageSize;
         var next = hasMore && items.Count > 0
-            ? KitchenBoardCursorPolicy.Protect(cursor, filterHash, StreamName,
-                OperationalQueueSyncModes.Snapshot, upper, 0,
-                items[^1].OrderId.ToString("D"), items[^1].OrderId,
-                page + 1, pageSize, totalCount)
-            : WatermarkCursor(cursor, filterHash, upper, pageSize, totalCount);
+            ? KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
+                new OperationalQueueCursorRequest
+                {
+                    Mode = OperationalQueueSyncModes.Snapshot,
+                    FilterHash = request.FilterHash,
+                    UpperSequence = upper,
+                    Position = items[^1].OrderId.ToString("D"),
+                    PositionId = items[^1].OrderId,
+                    Page = page + 1,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                })
+            : WatermarkCursor(request, upper, totalCount);
 
         return new KitchenBoardPageDto<KitchenBoardOrderDto>(
             items, totalCount, hasMore, [], next, upper, OperationalQueueSyncModes.Snapshot);
     }
 
     private static async Task<KitchenBoardPageDto<KitchenBoardOrderDto>> ChangesAsync(
-        ApplicationDbContext context,
-        IOperationalQueueCursor cursor,
-        string filterHash,
-        OperationalQueueCursorPayload payload,
-        int pageSize,
-        long currentWatermark,
-        ILogger logger,
-        CancellationToken cancellationToken)
+        KitchenBoardStreamReadContext request,
+        OperationalQueueCursorPayload payload)
     {
+        var context = request.Context;
+        var pageSize = request.PageSize;
+        var currentWatermark = request.CurrentWatermark;
+        var cancellationToken = request.CancellationToken;
         var lower = payload.Mode == OperationalQueueSyncModes.Watermark
             ? payload.UpperSequence : payload.LowerSequence;
         var upper = payload.Mode == OperationalQueueSyncModes.Watermark
@@ -110,9 +108,9 @@ internal static class KitchenBoardOrderStream
         var current = changedIds.Length == 0
             ? []
             : await LoadOrderGraph(EligibleOrders(context, null)
-                    .Where(order => changedIds.Contains(order.Id)), cancellationToken)
+                    .Where(order => changedIds.Contains(order.Id)))
                 .ToListAsync(cancellationToken);
-        var currentById = await ProjectAsync(context, current, logger, cancellationToken);
+        var currentById = await ProjectAsync(request, current);
         var currentByIdMap = currentById.ToDictionary(order => order.OrderId);
         var removed = changedIds.Where(id => !currentByIdMap.ContainsKey(id)).ToList();
         var page = changedIds.Where(currentByIdMap.ContainsKey)
@@ -120,11 +118,20 @@ internal static class KitchenBoardOrderStream
         var count = await EligibleOrders(context, null).CountAsync(cancellationToken);
         var hasMore = rows.Count > pageSize;
         var next = hasMore
-            ? KitchenBoardCursorPolicy.Protect(cursor, filterHash, StreamName,
-                OperationalQueueSyncModes.Changes, upper, lower,
-                rows[pageSize - 1].Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                null, payload.Page + 1, pageSize, count)
-            : WatermarkCursor(cursor, filterHash, upper, pageSize, count);
+            ? KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
+                new OperationalQueueCursorRequest
+                {
+                    Mode = OperationalQueueSyncModes.Changes,
+                    FilterHash = request.FilterHash,
+                    UpperSequence = upper,
+                    LowerSequence = lower,
+                    Position = rows[pageSize - 1].Sequence.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture),
+                    Page = payload.Page + 1,
+                    PageSize = pageSize,
+                    TotalCount = count,
+                })
+            : WatermarkCursor(request, upper, count);
 
         return new KitchenBoardPageDto<KitchenBoardOrderDto>(
             page, count, hasMore, removed, next, upper,
@@ -141,22 +148,20 @@ internal static class KitchenBoardOrderStream
                 && (!upper.HasValue || order.LastChangeSequence <= upper.Value));
 
     private static IQueryable<Order> LoadOrderGraph(
-        IQueryable<Order> query, CancellationToken cancellationToken) => query
+        IQueryable<Order> query) => query
         .Include(order => order.RoutingStates)
         .Include(order => order.Items).ThenInclude(item => item.IngredientSnapshots)
-        .Include(order => order.Items).ThenInclude(item => item.Product)!
-            .ThenInclude(product => product!.DetailedIngredients)
-        .Include(order => order.Items).ThenInclude(item => item.Menu)!
-            .ThenInclude(menu => menu!.MenuItems).ThenInclude(menuItem => menuItem.Product)!
-            .ThenInclude(product => product!.DetailedIngredients)
+        .Include(order => order.Items).ThenInclude(item => item.Product!.DetailedIngredients)
+        .Include(order => order.Items).ThenInclude(item => item.Menu!.MenuItems)
+            .ThenInclude(menuItem => menuItem.Product!.DetailedIngredients)
         .AsSplitQuery();
 
     private static async Task<List<KitchenBoardOrderDto>> ProjectAsync(
-        ApplicationDbContext context,
-        List<Order> orders,
-        ILogger? logger,
-        CancellationToken cancellationToken)
+        KitchenBoardStreamReadContext request,
+        List<Order> orders)
     {
+        var context = request.Context;
+        var cancellationToken = request.CancellationToken;
         if (orders.Count == 0) return [];
         var ids = orders.Select(order => order.Id).ToArray();
         var completions = await context.KitchenBoardWorkCompletions.AsNoTracking()
@@ -190,7 +195,7 @@ internal static class KitchenBoardOrderStream
                 completed?.CreatedAt,
                 canComplete,
                 routes,
-                MapItems(order.Items, logger));
+                MapItems(order.Items, request.Logger));
         }).ToList();
     }
 
@@ -209,8 +214,9 @@ internal static class KitchenBoardOrderStream
         ILogger? logger)
     {
         var ingredients = logger is null
-            ? item.IngredientSnapshots.OrderBy(row => row.SortOrder)
+            ? item.IngredientSnapshots
                 .Where(row => row.IsRemoved || (row.Quantity > 0 && (row.Quantity > 1 || row.IsAddOn)))
+                .OrderBy(row => row.SortOrder)
                 .Select(row => new KitchenBoardIngredientDto(row.IngredientId,
                     row.IngredientName, row.Quantity, row.IsRemoved, row.IsAddOn)).ToList()
             : OrderIngredientCustomizations.Map(item, logger)?.Select(row =>
@@ -225,7 +231,15 @@ internal static class KitchenBoardOrderStream
     }
 
     private static string WatermarkCursor(
-        IOperationalQueueCursor cursor, string filterHash, long upper, int pageSize, int totalCount) =>
-        KitchenBoardCursorPolicy.Protect(cursor, filterHash, StreamName,
-            OperationalQueueSyncModes.Watermark, upper, 0, null, null, 1, pageSize, totalCount);
+        KitchenBoardStreamReadContext request, long upper, int totalCount) =>
+        KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
+            new OperationalQueueCursorRequest
+            {
+                Mode = OperationalQueueSyncModes.Watermark,
+                FilterHash = request.FilterHash,
+                UpperSequence = upper,
+                Page = 1,
+                PageSize = request.PageSize,
+                TotalCount = totalCount,
+            });
 }

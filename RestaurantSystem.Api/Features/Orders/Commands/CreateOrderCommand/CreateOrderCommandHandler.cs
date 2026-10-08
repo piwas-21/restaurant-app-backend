@@ -141,8 +141,9 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             if (guestSession is not null && guestParticipant is not null)
             {
+                await _routing.EnsureRoutesAsync(order, cancellationToken);
                 await GuestRoundOrderPolicy.RecordAcceptedRoundAsync(
-                    _context, _routing, _guestRounds ?? throw new InvalidOperationException(
+                    _context, _guestRounds ?? throw new InvalidOperationException(
                         "Guest round operations are not registered."),
                     guestContext!, guestSession, guestParticipant, order, cancellationToken);
             }

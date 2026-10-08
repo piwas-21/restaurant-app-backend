@@ -2,7 +2,6 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
-using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -57,12 +56,10 @@ internal static class GuestRoundOrderPolicy
     }
 
     public static async Task RecordAcceptedRoundAsync(
-        ApplicationDbContext context, IOrderRoutingService routing,
-        ITableGuestRoundOperationStore operations,
+        ApplicationDbContext context, ITableGuestRoundOperationStore operations,
         TableGuestRoundContext guestContext, TableServiceSession session,
         TableGuestParticipant participant, Order order, CancellationToken cancellationToken)
     {
-        await routing.EnsureRoutesAsync(order, cancellationToken);
         session.RecordAccountChange();
         context.Set<TableGuestRoundOperation>().Add(operations.CreateOperation(
             guestContext, participant.Id, order.Id, order.CreatedBy, order.CreatedAt));

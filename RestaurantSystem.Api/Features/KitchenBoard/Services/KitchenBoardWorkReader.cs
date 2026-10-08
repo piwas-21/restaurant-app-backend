@@ -36,14 +36,41 @@ public sealed class KitchenBoardWorkReader(
         var filter = KitchenBoardCursorPolicy.CreateFilter(currentUser);
 
         var orders = await KitchenBoardOrderStream.ReadAsync(
-            context, cursor, filter, query.OrdersCursor, pageSize,
-            orderWatermark, logger, cancellationToken);
+            new KitchenBoardStreamReadContext
+            {
+                Context = context,
+                Cursor = cursor,
+                FilterHash = filter,
+                CursorValue = query.OrdersCursor,
+                PageSize = pageSize,
+                CurrentWatermark = orderWatermark,
+                Logger = logger,
+                CancellationToken = cancellationToken,
+            });
         var corrections = await KitchenBoardCorrectionStream.ReadAsync(
-            context, cursor, filter, query.CorrectionsCursor, pageSize,
-            correctionWatermark, logger, cancellationToken);
+            new KitchenBoardStreamReadContext
+            {
+                Context = context,
+                Cursor = cursor,
+                FilterHash = filter,
+                CursorValue = query.CorrectionsCursor,
+                PageSize = pageSize,
+                CurrentWatermark = correctionWatermark,
+                Logger = logger,
+                CancellationToken = cancellationToken,
+            });
         var completions = await KitchenBoardCompletionStream.ReadAsync(
-            context, cursor, filter, query.CompletionsCursor, pageSize,
-            completionWatermark, cancellationToken);
+            new KitchenBoardStreamReadContext
+            {
+                Context = context,
+                Cursor = cursor,
+                FilterHash = filter,
+                CursorValue = query.CompletionsCursor,
+                PageSize = pageSize,
+                CurrentWatermark = completionWatermark,
+                Logger = logger,
+                CancellationToken = cancellationToken,
+            });
 
         await transaction.CommitAsync(cancellationToken);
         return new KitchenBoardWorkFeedDto(orders, corrections, completions);

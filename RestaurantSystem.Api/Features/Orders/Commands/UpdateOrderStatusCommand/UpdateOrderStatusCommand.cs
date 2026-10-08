@@ -4,7 +4,6 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.KitchenBoard.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -36,7 +35,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
     private readonly IOrderResponseProjector _responses;
     private readonly IOrderNotificationService _notifications;
     private readonly OrderWorkflowSettings _workflow;
-    private readonly ITenantFeatures? _features;
+    private readonly IOrderStatusTransitionPolicy? _transitionPolicy;
 
     public UpdateOrderStatusCommandHandler(
           ApplicationDbContext context,
@@ -45,8 +44,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
           IOrderResponseProjector responses,
           IOrderNotificationService notifications,
           ILogger<UpdateOrderStatusCommandHandler> logger,
-          IOptions<OrderWorkflowSettings>? workflow = null,
-          ITenantFeatures? features = null)
+          IOrderStatusTransitionPolicy? transitionPolicy = null)
     {
         _context = context;
         _currentUserService = currentUserService;
@@ -54,8 +52,8 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
         _responses = responses;
         _notifications = notifications;
         _logger = logger;
-        _workflow = workflow?.Value ?? new OrderWorkflowSettings();
-        _features = features;
+        _workflow = transitionPolicy?.Workflow ?? new OrderWorkflowSettings();
+        _transitionPolicy = transitionPolicy;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(UpdateOrderStatusCommand command, CancellationToken cancellationToken)
@@ -82,8 +80,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
             return validationFailure;
         }
 
-        if (command.NewStatus is OrderStatus.OutForDelivery or OrderStatus.Completed
-            && KitchenBoardFeaturePolicy.IsEnabled(_features))
+        if (_transitionPolicy?.RequiresKitchenBoardHandover(command.NewStatus) == true)
         {
             var workStates = await KitchenBoardHandoverGuard.ReadAsync(
                 _context, [order], true, cancellationToken);
