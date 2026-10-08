@@ -1,4 +1,6 @@
 using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Enums;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -36,6 +38,12 @@ public sealed class OrderBillingSnapshot : Entity
     public decimal RawRedemptionDiscountAmount { get; set; }
     public decimal RawCourtesyRoundingAmount { get; set; }
     public long EarningBasisMinor { get; set; }
+    public OrderBillingEarningDisposition? EarningDisposition { get; set; }
+    [NotMapped]
+    public OrderBillingEarningDisposition EffectiveEarningDisposition => EarningDisposition
+        ?? (EarnedPointsCandidate.HasValue
+            ? OrderBillingEarningDisposition.Evaluated
+            : OrderBillingEarningDisposition.Unevaluated);
     public int? EarnedPointsCandidate { get; set; }
     public string? EarningEvaluationVersion { get; set; }
     public string? EarningRuleSetFingerprint { get; set; }

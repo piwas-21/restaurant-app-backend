@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Models;
 using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using Microsoft.Extensions.Options;
@@ -43,9 +44,15 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
     public async Task<OrderBillingEarningEvaluation?> CalculatePointsToEarnAsync(
         Order order, decimal itemsTotal, Guid? userId, CancellationToken cancellationToken)
     {
-        if (!userId.HasValue || !_modules.IsEnabled(ModuleIds.Loyalty))
+        if (!userId.HasValue)
         {
-            return null;
+            order.FidelityPointsEarned = 0;
+            return KnownNoAward(OrderBillingEarningDisposition.NoCustomerOwnerAtAcceptance);
+        }
+        if (!_modules.IsEnabled(ModuleIds.Loyalty))
+        {
+            order.FidelityPointsEarned = 0;
+            return KnownNoAward(OrderBillingEarningDisposition.LoyaltyModuleDisabledAtAcceptance);
         }
 
         var evaluation = await _fidelityPointsService.EvaluateOrderAsync(itemsTotal, cancellationToken);
@@ -54,6 +61,9 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
         _logger.LogInformation("Order will earn {Points} fidelity points", order.FidelityPointsEarned);
         return evaluation;
     }
+
+    private static OrderBillingEarningEvaluation KnownNoAward(OrderBillingEarningDisposition disposition) =>
+        new(null, null, null, null, disposition);
 
     public async Task PreviewRedemptionAsync(
         Order order, int? pointsToRedeem, Guid? userId, CancellationToken cancellationToken)

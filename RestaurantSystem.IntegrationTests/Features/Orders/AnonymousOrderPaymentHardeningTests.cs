@@ -164,6 +164,12 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         snapshot.OrderId.Should().Be(order.Id);
         snapshot.Currency.Should().Be("CHF");
         snapshot.EarnedPointsCandidate.Should().BeNull("anonymous orders have no earning owner slot");
+        var earningDisposition = await context.Database.SqlQuery<string>($"""
+            SELECT earning_disposition::text AS "Value"
+            FROM order_billing_snapshots WHERE order_id = {order.Id}
+            """).SingleAsync();
+        earningDisposition.Should().Be("NoCustomerOwnerAtAcceptance",
+            "a new known-no-owner order must not be indistinguishable from historical unevaluated evidence");
         (await context.OrderBillingSnapshotOwnerLinks.AsNoTracking().CountAsync()).Should().Be(0);
     }
 

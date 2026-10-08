@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -16,10 +15,10 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 public sealed partial class OrderAmendmentResolutionService(
     ApplicationDbContext context,
     ICurrentUserService currentUser,
-    ITenantFeatures features,
     IAccountCheckoutEvidenceReader checkoutEvidence,
     IOrderAmendmentRefundProvider refundProvider,
     IOrderAmendmentResolutionPolicy resolutionPolicy,
+    IOrderAmendmentFinancialResolution financialResolution,
     IOrderAmendmentResolutionFinalizer finalizer)
     : IOrderAmendmentResolutionService
 {
@@ -28,7 +27,7 @@ public sealed partial class OrderAmendmentResolutionService(
         CancellationToken cancellationToken)
     {
         var actorId = RequireAdminActor();
-        OrderAmendmentPolicy.RequireFeature(features);
+        resolutionPolicy.RequireFeature();
         ValidateQuoteRequest(request);
         var state = await ReadPlanningStateAsync(orderId, amendmentId, request, cancellationToken);
         var expiresAt = resolutionPolicy.UtcNow.Add(resolutionPolicy.QuoteLifetime);
@@ -67,7 +66,7 @@ public sealed partial class OrderAmendmentResolutionService(
             await transaction.CommitAsync(cancellationToken);
             return OrderAmendmentResolutionStartOutcomeDto.Refused(MapRefusal(refusal));
         }
-        OrderAmendmentPolicy.RequireFeature(features);
+        resolutionPolicy.RequireFeature();
         var decision = await StartNewUnderLocksAsync(orderId, amendmentId, request,
             requestHash, actorId, cancellationToken);
         await transaction.CommitAsync(cancellationToken);

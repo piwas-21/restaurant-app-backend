@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using RestaurantSystem.Domain.Common.Enums;
+
 namespace RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 
 public sealed record OrderAmendmentResolutionQuoteDto(
@@ -15,12 +18,14 @@ public sealed record OrderAmendmentResolutionQuoteDto(
 
 public sealed record OrderAmendmentLoyaltyQuoteDto(
     bool AwardPending,
-    int CandidatePoints,
+    int? CandidatePoints,
     int AppliedAwardPoints,
     int SuppressedPoints,
     int EarnedClawbackPoints,
     int RedemptionRestorationPoints,
-    int RemovedUnitCount);
+    int RemovedUnitCount,
+    OrderBillingEarningDisposition EarningDisposition = OrderBillingEarningDisposition.Evaluated,
+    bool EarningRetired = false);
 
 public sealed record OrderAmendmentRefundLegQuoteDto(
     Guid PaymentId,

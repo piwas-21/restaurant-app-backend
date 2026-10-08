@@ -102,6 +102,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<OrderBillingSnapshot> OrderBillingSnapshots { get; set; }
         public DbSet<OrderBillingSnapshotUnit> OrderBillingSnapshotUnits { get; set; }
         public DbSet<OrderBillingSnapshotOwnerLink> OrderBillingSnapshotOwnerLinks { get; set; }
+        public DbSet<OrderBillingEarningRetirement> OrderBillingEarningRetirements { get; set; }
         public DbSet<OrderBillingAwardWitness> OrderBillingAwardWitnesses { get; set; }
         public DbSet<OrderBillingUnitAwardSuppression> OrderBillingUnitAwardSuppressions { get; set; }
         public DbSet<OrderBillingAwardUnitCoverage> OrderBillingAwardUnitCoverages { get; set; }

@@ -62,9 +62,11 @@ public sealed class OrderBillingSnapshotMigrationTests(DatabaseFixture fixture) 
                 seed.Orders.Add(order);
                 await seed.SaveChangesAsync();
                 var snapshot = OrderBillingSnapshotFactory.Build(order, "CHF", null, null, 1_000);
-                seed.OrderBillingSnapshots.Add(snapshot.Header);
+                await using var evidenceTransaction = await seed.Database.BeginTransactionAsync();
+                await LegacyOrderBillingSnapshotFixture.InsertAsync(seed, snapshot.Header);
                 seed.OrderBillingSnapshotUnits.AddRange(snapshot.Units);
                 await seed.SaveChangesAsync();
+                await evidenceTransaction.CommitAsync();
             }
 
             var failure = await Assert.ThrowsAsync<PostgresException>(() => MigrateAsync(PreviousMigration));
@@ -73,8 +75,10 @@ public sealed class OrderBillingSnapshotMigrationTests(DatabaseFixture fixture) 
             await AssertSchemaAsync(present: true);
             await using var verify = fixture.CreateContext();
             (await verify.Database.GetAppliedMigrationsAsync()).Last().Should().Be(SnapshotMigration);
-            (await verify.Orders.AsNoTracking().SingleAsync(value => value.Id == orderId)).Total.Should().Be(1m);
-            (await verify.OrderBillingSnapshots.AsNoTracking().SingleAsync()).TotalMinor.Should().Be(100);
+            (await verify.Database.SqlQuery<decimal>(
+                $"SELECT total AS \"Value\" FROM orders WHERE id = {orderId}").SingleAsync()).Should().Be(1m);
+            (await verify.Database.SqlQueryRaw<long>("SELECT total_minor AS \"Value\" FROM order_billing_snapshots")
+                .SingleAsync()).Should().Be(100);
             (await verify.OrderBillingSnapshotUnits.AsNoTracking().SingleAsync()).PayableFoodMinor.Should().Be(100);
         }
         finally { await MigrateAsync(); }

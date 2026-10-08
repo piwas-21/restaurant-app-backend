@@ -2,12 +2,50 @@ using System.Text.RegularExpressions;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 internal static partial class OrderAmendmentLoyaltyPlanner
 {
+    internal static bool HasValidRetirementSnapshot(
+        Order source, AccountMoney money, OrderAmendmentLoyaltyEvidence evidence)
+    {
+        if (evidence.Snapshot is null)
+            return false;
+        try
+        {
+            var accepted = ValidateSnapshot(source, money, evidence);
+            var snapshot = accepted.Snapshot;
+            var rawFoodMinor = source.Items.Where(value => !value.ParentOrderItemId.HasValue)
+                .Sum(value => money.ToMinor(value.ItemTotal));
+            var charge = FrozenOrderChargeMath.Read(source, money);
+            return snapshot.Currency == money.Currency
+                && snapshot.GrossFoodMinor == rawFoodMinor
+                && snapshot.EarningBasisMinor == rawFoodMinor
+                && snapshot.RawTaxAmount == source.Tax
+                && snapshot.RawOrderDiscountAmount == source.Discount
+                && snapshot.RawCustomerDiscountAmount == source.CustomerDiscountAmount
+                && snapshot.RawRedemptionDiscountAmount == source.FidelityPointsDiscount
+                && snapshot.TaxMinor == money.ToMinor(source.Tax)
+                && snapshot.DeliveryFeeMinor == money.ToMinor(source.DeliveryFee)
+                && snapshot.OrderDiscountMinor == money.ToMinor(source.Discount)
+                && snapshot.CustomerDiscountMinor == money.ToMinor(source.CustomerDiscountAmount)
+                && snapshot.RedeemedPoints == source.FidelityPointsRedeemed
+                && snapshot.RedemptionDiscountMinor == money.ToMinor(source.FidelityPointsDiscount)
+                && snapshot.PayableFoodMinor == charge.FoodMinor
+                && snapshot.ChargedDeliveryFeeMinor == charge.FeeMinor
+                && snapshot.TipMinor == charge.TipMinor
+                && snapshot.TotalMinor == charge.TotalMinor;
+        }
+        catch (Exception exception) when (exception is ConflictException
+            or BadRequestException or OverflowException)
+        {
+            return false;
+        }
+    }
+
     private static AcceptedLoyaltySnapshot ValidateSnapshot(
         Order source, AccountMoney money, OrderAmendmentLoyaltyEvidence evidence)
     {
@@ -48,39 +86,75 @@ internal static partial class OrderAmendmentLoyaltyPlanner
             || money.ToMinor(source.FidelityPointsDiscount) != snapshot.RedemptionDiscountMinor
             || units.Sum(value => value.TaxMinor) != snapshot.TaxMinor)
             throw Held("The source-order point counters do not conserve the immutable unit snapshot.");
-        if (!snapshot.EarnedPointsCandidate.HasValue && HasPartialEarningFacts(snapshot))
-            throw Held("An unevaluated earning snapshot contains partial evaluation facts.");
-        ValidateEarningRule(snapshot);
+        var disposition = snapshot.EffectiveEarningDisposition;
+        ValidateEarningRule(snapshot, disposition);
         ValidateEarningBasis(source, money, snapshot, units);
         ValidateRedemptionHeader(snapshot, money);
         var ownerLinks = ValidateOwnerLinks(source, snapshot, evidence.OwnerLinks);
-        return new(snapshot, units, candidate, ownerLinks.Earning, ownerLinks.Redemption);
+        return new(snapshot, units, candidate, ownerLinks.Earning, ownerLinks.Redemption, disposition);
     }
 
-    private static void ValidateEarningRule(OrderBillingSnapshot snapshot)
+    private static void ValidateEarningRule(
+        OrderBillingSnapshot snapshot, OrderBillingEarningDisposition disposition)
     {
-        if (!snapshot.EarnedPointsCandidate.HasValue)
+        if (snapshot.EarnedPointsCandidate is not int candidate)
         {
-            if (HasPartialEarningFacts(snapshot))
-                throw Held("An unevaluated earning snapshot contains partial evaluation facts.");
+            ValidateUnevaluatedEarningRule(snapshot, disposition);
             return;
         }
-        var candidate = snapshot.EarnedPointsCandidate.Value;
+        if (disposition != OrderBillingEarningDisposition.Evaluated)
+            throw Held("A non-evaluated earning disposition carries a numeric candidate.");
+
+        ValidateEvaluatedEarningRule(snapshot, candidate);
+    }
+
+    private static void ValidateUnevaluatedEarningRule(
+        OrderBillingSnapshot snapshot, OrderBillingEarningDisposition disposition)
+    {
+        if (disposition == OrderBillingEarningDisposition.Evaluated)
+            throw Held("An unevaluated earning snapshot contains partial evaluation facts.");
+        if (disposition is not (OrderBillingEarningDisposition.Unevaluated
+                or OrderBillingEarningDisposition.NoCustomerOwnerAtAcceptance
+                or OrderBillingEarningDisposition.LoyaltyModuleDisabledAtAcceptance)
+            || HasPartialEarningFacts(snapshot))
+            throw Held("An unevaluated earning snapshot contains partial evaluation facts.");
+    }
+
+    private static void ValidateEvaluatedEarningRule(OrderBillingSnapshot snapshot, int candidate)
+    {
         if (string.IsNullOrWhiteSpace(snapshot.EarningEvaluationVersion)
             || !IsFingerprint(snapshot.EarningRuleSetFingerprint))
             throw Held("The evaluated earning candidate has no versioned rule-set evidence.");
-        if (candidate > 0 && (!snapshot.EarningRuleId.HasValue
-                || snapshot.EarningRulePoints != candidate))
+        ValidateCandidateRule(snapshot, candidate);
+    }
+
+    private static void ValidateCandidateRule(OrderBillingSnapshot snapshot, int candidate)
+    {
+        if (candidate > 0 && (!snapshot.EarningRuleId.HasValue || snapshot.EarningRulePoints != candidate))
             throw Held("The positive earning candidate has no exact frozen rule evidence.");
-        if (snapshot.EarningRuleId.HasValue && (string.IsNullOrWhiteSpace(snapshot.EarningRuleName)
+        if (snapshot.EarningRuleId.HasValue)
+        {
+            ValidateMatchedEarningRule(snapshot, candidate);
+            return;
+        }
+        ValidateNoMatchEarningRule(snapshot);
+    }
+
+    private static void ValidateMatchedEarningRule(OrderBillingSnapshot snapshot, int candidate)
+    {
+        if (string.IsNullOrWhiteSpace(snapshot.EarningRuleName)
                 || !snapshot.EarningRuleMinimumMinor.HasValue || snapshot.EarningRuleMinimumMinor < 0
                 || snapshot.EarningRulePoints != candidate
                 || snapshot.EarningRuleMaximumMinor is long maximum
-                    && maximum < snapshot.EarningRuleMinimumMinor))
+                    && maximum < snapshot.EarningRuleMinimumMinor)
             throw Held("The frozen earning rule evidence is inconsistent with its candidate.");
-        if (!snapshot.EarningRuleId.HasValue && (snapshot.EarningRuleName is not null
+    }
+
+    private static void ValidateNoMatchEarningRule(OrderBillingSnapshot snapshot)
+    {
+        if (snapshot.EarningRuleName is not null
                 || snapshot.EarningRuleMinimumMinor.HasValue || snapshot.EarningRuleMaximumMinor.HasValue
-                || snapshot.EarningRulePoints.HasValue || snapshot.EarningRulePriority.HasValue))
+                || snapshot.EarningRulePoints.HasValue || snapshot.EarningRulePriority.HasValue)
             throw Held("A no-match earning evaluation contains partial rule facts.");
     }
 
@@ -177,5 +251,6 @@ internal static partial class OrderAmendmentLoyaltyPlanner
         IReadOnlyList<OrderBillingSnapshotUnit> Units,
         int CandidatePoints,
         OrderBillingSnapshotOwnerLink? EarningOwnerLink,
-        OrderBillingSnapshotOwnerLink? RedemptionOwnerLink);
+        OrderBillingSnapshotOwnerLink? RedemptionOwnerLink,
+        OrderBillingEarningDisposition EarningDisposition);
 }

@@ -73,31 +73,10 @@ public partial class FidelityPointsService
         if (snapshot is null)
             return await ReplayLegacyWithoutSnapshotAsync(order, existingAwards, transaction, cancellationToken);
         if (!snapshot.EarnedPointsCandidate.HasValue)
-        {
-            if (order.FidelityPointsEarned != 0 || HasPartialEarningEvidence(snapshot))
-                throw new ConflictException("The unevaluated earning snapshot contains partial or inconsistent rule evidence.");
-            return Deferred(FidelityPointsAwardDeferralReason.CandidateUnevaluated);
-        }
+            return await AwardWithoutAcceptedCandidateAsync(
+                order, snapshot, existingAwards, transaction, cancellationToken);
 
         return await AwardFromSnapshotAsync(order, snapshot, existingAwards, transaction, cancellationToken);
-    }
-
-    private async Task<FidelityPointsAwardResult> ReplayLegacyWithoutSnapshotAsync(
-        AwardOrderState order, List<FidelityPointsTransaction> existingAwards,
-        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
-        CancellationToken cancellationToken)
-    {
-        var result = await ReplayLegacyAwardAsync(order, existingAwards, cancellationToken);
-        await CommitOwnedTransactionAsync(transaction, cancellationToken);
-        if (result.Disposition != FidelityPointsAwardDisposition.Deferred)
-            return result;
-
-        var ineligible = ReadIneligibleReason(order);
-        if (ineligible.HasValue)
-            return Deferred(ineligible.Value);
-        if (await IsProviderManagedAsync(order.Id, cancellationToken))
-            return Deferred(FidelityPointsAwardDeferralReason.ProviderManaged);
-        return result;
     }
 
     private async Task<FidelityPointsAwardResult> AwardFromSnapshotAsync(

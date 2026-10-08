@@ -4,6 +4,7 @@ using System.Text.Json;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
@@ -41,7 +42,8 @@ internal sealed class OrderBillingEarningEvaluator : IOrderBillingEarningEvaluat
             winner?.PointsAwarded ?? 0,
             AlgorithmVersion,
             Fingerprint(activeRules),
-            winner is null ? null : ToEvidence(winner));
+            winner is null ? null : ToEvidence(winner),
+            OrderBillingEarningDisposition.Evaluated);
     }
 
     private static List<RuleFacts> CopyActiveRules(List<PointEarningRule>? queriedRules)

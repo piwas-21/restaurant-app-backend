@@ -6,7 +6,8 @@ public enum FidelityPointsAwardDisposition
     AlreadyAwarded = 2,
     EvaluatedZero = 3,
     FullySuppressed = 4,
-    Deferred = 5
+    Deferred = 5,
+    IneligibleAtAcceptance = 6
 }
 
 public enum FidelityPointsAwardDeferralReason

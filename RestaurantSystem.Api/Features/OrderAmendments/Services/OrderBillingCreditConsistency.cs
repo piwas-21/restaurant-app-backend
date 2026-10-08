@@ -98,16 +98,32 @@ internal static class OrderBillingCreditConsistency
         return outcome.LoyaltyState == OrderAmendmentLoyaltyState.Resolved
             && loyalty is not null
             && loyalty.State == OrderAmendmentLoyaltyOperationStatus.Resolved
-            && loyalty.CandidatePoints >= 0 && loyalty.AppliedAwardPoints >= 0
-            && loyalty.SuppressedPoints >= 0
-            && (long)loyalty.AppliedAwardPoints + loyalty.SuppressedPoints <= loyalty.CandidatePoints
-            && (loyalty.AwardPending || (long)loyalty.AppliedAwardPoints + loyalty.SuppressedPoints
-                == loyalty.CandidatePoints)
+            && HasValidResolvedEarningEvidence(loyalty)
             && loyalty.EarnedClawbackPoints >= 0 && loyalty.RedemptionRestorationPoints >= 0
             && loyalty.PostedClawbackPoints == loyalty.EarnedClawbackPoints
             && loyalty.PostedRestorationPoints == loyalty.RedemptionRestorationPoints
             && (loyalty.EarnedClawbackPoints > 0 || loyalty.RedemptionRestorationPoints > 0
                 || loyalty.SuppressedPoints > 0);
+    }
+
+    private static bool HasValidResolvedEarningEvidence(OrderAmendmentLoyaltyResultDto loyalty)
+    {
+        if (loyalty.EarningDisposition == OrderBillingEarningDisposition.Evaluated)
+        {
+            return !loyalty.EarningRetired && loyalty.CandidatePoints is int candidate && candidate >= 0
+                && loyalty.AppliedAwardPoints >= 0 && loyalty.SuppressedPoints >= 0
+                && (long)loyalty.AppliedAwardPoints + loyalty.SuppressedPoints <= candidate
+                && (loyalty.AwardPending || (long)loyalty.AppliedAwardPoints + loyalty.SuppressedPoints == candidate);
+        }
+
+        return (loyalty.EarningDisposition is OrderBillingEarningDisposition.Unevaluated
+                or OrderBillingEarningDisposition.NoCustomerOwnerAtAcceptance
+                or OrderBillingEarningDisposition.LoyaltyModuleDisabledAtAcceptance)
+            && !loyalty.CandidatePoints.HasValue && !loyalty.AwardPending
+            && loyalty.AppliedAwardPoints == 0 && loyalty.SuppressedPoints == 0
+            && loyalty.EarnedClawbackPoints == 0
+            && (loyalty.EarningDisposition == OrderBillingEarningDisposition.Unevaluated
+                ? loyalty.EarningRetired : !loyalty.EarningRetired);
     }
 
     private static bool IsNoLoyaltyEffect(OrderAmendmentLoyaltyResultDto? loyalty) => loyalty is null
