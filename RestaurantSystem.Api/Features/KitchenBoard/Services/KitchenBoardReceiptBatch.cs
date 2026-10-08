@@ -62,11 +62,8 @@ internal sealed class KitchenBoardReceiptBatch : IAsyncDisposable
         if (_transaction is null)
             return;
 
-        foreach (var receipt in _changed)
-        {
-            await KitchenBoardSequenceWriter.TouchCorrectionAsync(
-                _context, receipt.OrderId, receipt.JobId, receipt.Target, cancellationToken);
-        }
+        await KitchenBoardSequenceWriter.TouchCorrectionsAsync(
+            _context, _changed, cancellationToken);
 
         await _transaction.CommitAsync(cancellationToken);
     }
