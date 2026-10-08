@@ -4,6 +4,7 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 public interface IOrderAmendmentResolutionPolicy
 {
+    void RequireFeature();
     DateTime UtcNow { get; }
     TimeSpan QuoteLifetime { get; }
     bool IsProviderRetrySafe(DateTime requestedAt);

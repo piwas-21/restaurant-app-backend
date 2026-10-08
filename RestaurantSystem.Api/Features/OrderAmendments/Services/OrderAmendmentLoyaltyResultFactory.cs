@@ -38,6 +38,28 @@ internal static class OrderAmendmentLoyaltyResultFactory
             && link.UserId.HasValue && !link.ErasedAt.HasValue && link.ErasureTransactionId is null);
         var award = ReadAwardTotals(plan, evidence.AwardWitness);
         var disposition = plan.EarningDisposition ?? OrderBillingEarningDisposition.Evaluated;
+        ValidateEarningAward(plan, disposition, award);
+
+        var hasEffect = plan.PendingAwardSuppressions.Count > 0 || plan.Compensations.Count > 0;
+        var status = ReadOperationStatus(operation, plan, reservation, ownerAvailable, award.Pending, hasEffect);
+        var activeReservation = reservation?.State is OrderAmendmentLoyaltyReservationState.HeldShortfall
+            or OrderAmendmentLoyaltyReservationState.Reserved;
+        int? shortfall = activeReservation && evidence.AvailablePointsBeforeClawback is long available
+            ? checked((int)Math.Max(0L, plan.EarnedClawbackPoints - available)) : null;
+
+        return new OrderAmendmentLoyaltyResultDto(status, award.Pending,
+            disposition == OrderBillingEarningDisposition.Evaluated ? plan.CandidatePoints : null,
+            award.Applied, award.Suppressed, plan.EarnedClawbackPoints, plan.RedemptionRestorationPoints,
+            SumPosted(evidence.Compensations, evidence.Postings,
+                OrderAmendmentLoyaltyCompensationKind.EarnedClawback),
+            SumPosted(evidence.Compensations, evidence.Postings,
+                OrderAmendmentLoyaltyCompensationKind.RedemptionRestoration),
+            evidence.AvailablePointsBeforeClawback, shortfall, disposition, plan.EarningRetired == true);
+    }
+
+    private static void ValidateEarningAward(
+        OrderAmendmentLoyaltyPlan plan, OrderBillingEarningDisposition disposition, AwardTotals award)
+    {
         if (disposition == OrderBillingEarningDisposition.Evaluated)
         {
             if (plan.EarningRetired == true || award.Applied < 0 || award.Suppressed < 0
@@ -55,22 +77,6 @@ internal static class OrderAmendmentLoyaltyResultFactory
         {
             throw Invalid("An ineligible or unevaluated earning result cannot carry award points.");
         }
-
-        var hasEffect = plan.PendingAwardSuppressions.Count > 0 || plan.Compensations.Count > 0;
-        var status = ReadOperationStatus(operation, plan, reservation, ownerAvailable, award.Pending, hasEffect);
-        var activeReservation = reservation?.State is OrderAmendmentLoyaltyReservationState.HeldShortfall
-            or OrderAmendmentLoyaltyReservationState.Reserved;
-        int? shortfall = activeReservation && evidence.AvailablePointsBeforeClawback is long available
-            ? checked((int)Math.Max(0L, plan.EarnedClawbackPoints - available)) : null;
-
-        return new OrderAmendmentLoyaltyResultDto(status, award.Pending,
-            disposition == OrderBillingEarningDisposition.Evaluated ? plan.CandidatePoints : null,
-            award.Applied, award.Suppressed, plan.EarnedClawbackPoints, plan.RedemptionRestorationPoints,
-            SumPosted(evidence.Compensations, evidence.Postings,
-                OrderAmendmentLoyaltyCompensationKind.EarnedClawback),
-            SumPosted(evidence.Compensations, evidence.Postings,
-                OrderAmendmentLoyaltyCompensationKind.RedemptionRestoration),
-            evidence.AvailablePointsBeforeClawback, shortfall, disposition, plan.EarningRetired == true);
     }
 
     private static AwardTotals ReadAwardTotals(

@@ -18,7 +18,7 @@ public sealed partial class OrderAmendmentResolutionService
         CancellationToken cancellationToken)
     {
         RequireAdminActor();
-        OrderAmendmentPolicy.RequireFeature(features);
+        resolutionPolicy.RequireFeature();
         if (orderId == Guid.Empty || amendmentId == Guid.Empty)
             throw new BadRequestException("An order and committed amendment are required.");
 

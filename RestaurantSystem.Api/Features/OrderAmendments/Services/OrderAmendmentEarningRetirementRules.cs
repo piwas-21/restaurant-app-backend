@@ -6,7 +6,7 @@ using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
-internal static class OrderAmendmentEarningRetirementRules
+internal static partial class OrderAmendmentEarningRetirementRules
 {
     internal static bool IsEligible(
         Order source, OrderAmendment amendment, IReadOnlyList<OrderAmendmentChangeSnapshot> changes,
@@ -60,80 +60,6 @@ internal static class OrderAmendmentEarningRetirementRules
         {
             return false;
         }
-    }
-
-    private static bool MatchesUnknownFullSourceVoid(
-        Order source, OrderAmendment amendment, IReadOnlyList<OrderAmendmentChangeSnapshot> changes,
-        OrderAmendmentLoyaltyEvidence evidence, out int unitCount)
-    {
-        unitCount = 0;
-        var snapshot = evidence.Snapshot;
-        if (source.ExternalReference is not null || snapshot is null
-            || amendment.SourceOrderId != source.Id || amendment.State != OrderAmendmentState.Committed
-            || amendment.ServiceSessionId != source.ServiceSessionId || amendment.SupplementOrderId.HasValue
-            || !amendment.CommittedAt.HasValue || changes.Count == 0 || source.FidelityPointsEarned != 0
-            || snapshot.OrderId != source.Id || snapshot.Id == Guid.Empty
-            || snapshot.EarnedPointsCandidate.HasValue
-            || snapshot.EarningDisposition is not (null or OrderBillingEarningDisposition.Unevaluated)
-            || HasPartialEarningFacts(snapshot) || evidence.AwardWitness is not null
-            || evidence.AwardCoverage.Count != 0 || evidence.Suppressions.Count != 0
-            || evidence.Transactions.Any(value => value.TransactionType == TransactionType.Earned)
-            || evidence.PriorCompensations.Count != 0 || evidence.PriorUnits.Count != 0
-            || evidence.PriorPostings.Count != 0 || evidence.Reservations.Count != 0)
-            return false;
-
-        var roots = source.Items.Where(value => !value.ParentOrderItemId.HasValue).ToArray();
-        if (roots.Length == 0 || roots.Any(value => value.Id == Guid.Empty || value.Quantity <= 0)
-            || roots.Select(value => value.Id).Distinct().Count() != roots.Length)
-            return false;
-        var expected = roots.SelectMany(value => Enumerable.Range(1, value.Quantity)
-                .Select(ordinal => (value.Id, ordinal))).ToHashSet();
-        var frozen = evidence.Units;
-        if (frozen.Count != expected.Count || frozen.Select(value => (value.OrderItemId, value.UnitOrdinal))
-                .Distinct().Count() != frozen.Count
-            || frozen.Any(value => value.OrderId != source.Id || value.Id == Guid.Empty
-                || value.EarnedPoints != 0 || !expected.Contains((value.OrderItemId, value.UnitOrdinal)))
-            || !expected.SetEquals(frozen.Select(value => (value.OrderItemId, value.UnitOrdinal))))
-            return false;
-
-        var items = roots.ToDictionary(value => value.Id);
-        var selected = new HashSet<(Guid ItemId, int Ordinal)>();
-        foreach (var change in changes)
-        {
-            if (change.Kind != OrderAmendmentChangeKind.Void || change.Current is not null
-                || change.ReplacementDispatchedOrderId.HasValue
-                || change.ReplacementDispatchedOrderNumber is not null
-                || !items.TryGetValue(change.OrderItemId, out var item)
-                || change.Previous.Id != item.Id || change.Previous.Quantity != item.Quantity
-                || change.StartOrdinal < 1 || change.Quantity < 1
-                || (long)change.StartOrdinal + change.Quantity > (long)item.Quantity + 1)
-                return false;
-            for (var ordinal = change.StartOrdinal; ordinal < (long)change.StartOrdinal + change.Quantity; ordinal++)
-                if (!selected.Add((change.OrderItemId, checked((int)ordinal))))
-                    return false;
-        }
-        if (!expected.SetEquals(selected))
-            return false;
-
-        foreach (var prior in evidence.CommittedAmendments.Where(value => value.Id != amendment.Id))
-        {
-            if (prior.SourceOrderId != source.Id || prior.State != OrderAmendmentState.Committed)
-                return false;
-            try
-            {
-                var priorChanges = OrderAmendmentJson.Deserialize<List<OrderAmendmentChangeSnapshot>>(prior.ChangesJson);
-                if (priorChanges.Any(value => value.Kind is OrderAmendmentChangeKind.Void
-                        or OrderAmendmentChangeKind.Replace))
-                    return false;
-            }
-            catch (JsonException)
-            {
-                return false;
-            }
-        }
-
-        unitCount = frozen.Count;
-        return unitCount > 0;
     }
 
     private static bool HasPendingPaidCredit(

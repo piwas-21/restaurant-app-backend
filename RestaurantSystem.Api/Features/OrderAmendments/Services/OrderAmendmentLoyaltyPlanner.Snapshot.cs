@@ -97,34 +97,64 @@ internal static partial class OrderAmendmentLoyaltyPlanner
     private static void ValidateEarningRule(
         OrderBillingSnapshot snapshot, OrderBillingEarningDisposition disposition)
     {
-        if (!snapshot.EarnedPointsCandidate.HasValue)
+        if (snapshot.EarnedPointsCandidate is not int candidate)
         {
-            if (disposition == OrderBillingEarningDisposition.Evaluated
-                || disposition is not (OrderBillingEarningDisposition.Unevaluated
-                    or OrderBillingEarningDisposition.NoCustomerOwnerAtAcceptance
-                    or OrderBillingEarningDisposition.LoyaltyModuleDisabledAtAcceptance)
-                || HasPartialEarningFacts(snapshot))
-                throw Held("An unevaluated earning snapshot contains partial evaluation facts.");
+            ValidateUnevaluatedEarningRule(snapshot, disposition);
             return;
         }
         if (disposition != OrderBillingEarningDisposition.Evaluated)
             throw Held("A non-evaluated earning disposition carries a numeric candidate.");
-        var candidate = snapshot.EarnedPointsCandidate.Value;
+
+        ValidateEvaluatedEarningRule(snapshot, candidate);
+    }
+
+    private static void ValidateUnevaluatedEarningRule(
+        OrderBillingSnapshot snapshot, OrderBillingEarningDisposition disposition)
+    {
+        if (disposition == OrderBillingEarningDisposition.Evaluated)
+            throw Held("An unevaluated earning snapshot contains partial evaluation facts.");
+        if (disposition is not (OrderBillingEarningDisposition.Unevaluated
+                or OrderBillingEarningDisposition.NoCustomerOwnerAtAcceptance
+                or OrderBillingEarningDisposition.LoyaltyModuleDisabledAtAcceptance)
+            || HasPartialEarningFacts(snapshot))
+            throw Held("An unevaluated earning snapshot contains partial evaluation facts.");
+    }
+
+    private static void ValidateEvaluatedEarningRule(OrderBillingSnapshot snapshot, int candidate)
+    {
         if (string.IsNullOrWhiteSpace(snapshot.EarningEvaluationVersion)
             || !IsFingerprint(snapshot.EarningRuleSetFingerprint))
             throw Held("The evaluated earning candidate has no versioned rule-set evidence.");
-        if (candidate > 0 && (!snapshot.EarningRuleId.HasValue
-                || snapshot.EarningRulePoints != candidate))
+        ValidateCandidateRule(snapshot, candidate);
+    }
+
+    private static void ValidateCandidateRule(OrderBillingSnapshot snapshot, int candidate)
+    {
+        if (candidate > 0 && (!snapshot.EarningRuleId.HasValue || snapshot.EarningRulePoints != candidate))
             throw Held("The positive earning candidate has no exact frozen rule evidence.");
-        if (snapshot.EarningRuleId.HasValue && (string.IsNullOrWhiteSpace(snapshot.EarningRuleName)
+        if (snapshot.EarningRuleId.HasValue)
+        {
+            ValidateMatchedEarningRule(snapshot, candidate);
+            return;
+        }
+        ValidateNoMatchEarningRule(snapshot);
+    }
+
+    private static void ValidateMatchedEarningRule(OrderBillingSnapshot snapshot, int candidate)
+    {
+        if (string.IsNullOrWhiteSpace(snapshot.EarningRuleName)
                 || !snapshot.EarningRuleMinimumMinor.HasValue || snapshot.EarningRuleMinimumMinor < 0
                 || snapshot.EarningRulePoints != candidate
                 || snapshot.EarningRuleMaximumMinor is long maximum
-                    && maximum < snapshot.EarningRuleMinimumMinor))
+                    && maximum < snapshot.EarningRuleMinimumMinor)
             throw Held("The frozen earning rule evidence is inconsistent with its candidate.");
-        if (!snapshot.EarningRuleId.HasValue && (snapshot.EarningRuleName is not null
+    }
+
+    private static void ValidateNoMatchEarningRule(OrderBillingSnapshot snapshot)
+    {
+        if (snapshot.EarningRuleName is not null
                 || snapshot.EarningRuleMinimumMinor.HasValue || snapshot.EarningRuleMaximumMinor.HasValue
-                || snapshot.EarningRulePoints.HasValue || snapshot.EarningRulePriority.HasValue))
+                || snapshot.EarningRulePoints.HasValue || snapshot.EarningRulePriority.HasValue)
             throw Held("A no-match earning evaluation contains partial rule facts.");
     }
 

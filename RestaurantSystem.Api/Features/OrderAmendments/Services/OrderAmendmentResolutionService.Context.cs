@@ -14,7 +14,7 @@ public sealed partial class OrderAmendmentResolutionService
         Guid orderId, Guid amendmentId, CancellationToken cancellationToken)
     {
         RequireAdminActor();
-        OrderAmendmentPolicy.RequireFeature(features);
+        resolutionPolicy.RequireFeature();
         await using var transaction = await context.Database.BeginTransactionAsync(
             IsolationLevel.RepeatableRead, cancellationToken);
         var source = await LoadSourceAsync(orderId, cancellationToken);
