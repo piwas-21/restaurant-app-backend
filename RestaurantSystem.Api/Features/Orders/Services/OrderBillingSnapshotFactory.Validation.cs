@@ -1,6 +1,7 @@
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
@@ -140,10 +141,13 @@ internal static partial class OrderBillingSnapshotFactory
         if (evaluation is null || evaluation.CandidatePoints is null)
         {
             ValidateUnevaluatedEarning(order, evaluation);
-            return new(basisMinor, null, null, null, null, null, null);
+            return new(basisMinor, evaluation?.Disposition ?? OrderBillingEarningDisposition.Unevaluated,
+                null, null, null, null, null, null);
         }
 
         var candidatePoints = evaluation.CandidatePoints.Value;
+        if (evaluation.Disposition is not (null or OrderBillingEarningDisposition.Evaluated))
+            throw Reconciliation("A numeric earning candidate requires an evaluated disposition.");
         if (candidatePoints < 0 || string.IsNullOrWhiteSpace(evaluation.AlgorithmVersion)
             || !IsFingerprint(evaluation.RuleSetFingerprint) || !order.UserId.HasValue
             || candidatePoints != order.FidelityPointsEarned)
@@ -151,8 +155,8 @@ internal static partial class OrderBillingSnapshotFactory
 
         var rule = evaluation.MatchedRule;
         var (minimumMinor, maximumMinor) = ValidateMatchedEarningRule(rule, candidatePoints, basisMinor, money);
-        return new(basisMinor, candidatePoints, evaluation.AlgorithmVersion,
-            evaluation.RuleSetFingerprint, rule, minimumMinor, maximumMinor);
+        return new(basisMinor, OrderBillingEarningDisposition.Evaluated, candidatePoints,
+            evaluation.AlgorithmVersion, evaluation.RuleSetFingerprint, rule, minimumMinor, maximumMinor);
     }
 
     private static void ValidateUnevaluatedEarning(Order order, OrderBillingEarningEvaluation? evaluation)
@@ -160,6 +164,16 @@ internal static partial class OrderBillingSnapshotFactory
         if (evaluation is not null && (evaluation.AlgorithmVersion is not null
             || evaluation.RuleSetFingerprint is not null || evaluation.MatchedRule is not null))
             throw Reconciliation("Unevaluated loyalty evidence cannot carry a partial rule result.");
+        if (evaluation?.Disposition is not (null or OrderBillingEarningDisposition.Unevaluated
+            or OrderBillingEarningDisposition.NoCustomerOwnerAtAcceptance
+            or OrderBillingEarningDisposition.LoyaltyModuleDisabledAtAcceptance))
+            throw Reconciliation("A known ineligible earning disposition cannot carry a candidate.");
+        if (evaluation?.Disposition == OrderBillingEarningDisposition.NoCustomerOwnerAtAcceptance
+            && order.UserId.HasValue)
+            throw Reconciliation("An order with a customer owner cannot record a no-owner earning disposition.");
+        if (evaluation?.Disposition == OrderBillingEarningDisposition.LoyaltyModuleDisabledAtAcceptance
+            && !order.UserId.HasValue)
+            throw Reconciliation("A module-disabled earning disposition requires an owner at acceptance.");
         if (order.FidelityPointsEarned != 0)
             throw Reconciliation("The order's loyalty preview has no matching evaluation evidence.");
     }
@@ -246,6 +260,7 @@ internal static partial class OrderBillingSnapshotFactory
 
     private sealed record EarningFacts(
         long BasisMinor,
+        OrderBillingEarningDisposition Disposition,
         int? CandidatePoints,
         string? AlgorithmVersion,
         string? RuleSetFingerprint,

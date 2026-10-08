@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.IntegrationTests.Common;
+using RestaurantSystem.IntegrationTests.Infrastructure;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.IntegrationTests.Features.FidelityPoints;
@@ -48,10 +49,12 @@ public partial class FidelityPointsServiceTests
             new string('a', 64), rule);
         var snapshot = OrderBillingSnapshotFactory.Build(order, "CHF", evaluation, null,
             OrderBillingSnapshotLimits.AbsoluteMaximumUnitRows);
-        context.OrderBillingSnapshots.Add(snapshot.Header);
+        await using var snapshotTransaction = await context.Database.BeginTransactionAsync();
+        await LegacyOrderBillingSnapshotFixture.InsertAsync(context, snapshot.Header);
         context.OrderBillingSnapshotUnits.AddRange(snapshot.Units);
         context.OrderBillingSnapshotOwnerLinks.AddRange(snapshot.OwnerLinks);
         await context.SaveChangesAsync();
+        await snapshotTransaction.CommitAsync();
         return orderId;
     }
 }

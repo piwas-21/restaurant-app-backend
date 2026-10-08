@@ -21,6 +21,13 @@ public sealed class OrderAmendmentFinancialResolutionController(
         Ok(ApiResponse<OrderAmendmentResolutionContextDto>.SuccessWithData(
             await service.ContextAsync(orderId, amendmentId, cancellationToken)));
 
+    [HttpPost("prepare-earning-retirement")]
+    public async Task<ActionResult<ApiResponse<OrderAmendmentEarningRetirementDto>>> PrepareEarningRetirement(
+        Guid orderId, Guid amendmentId, [FromBody] OrderAmendmentEarningRetirementRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(ApiResponse<OrderAmendmentEarningRetirementDto>.SuccessWithData(
+            await service.PrepareEarningRetirementAsync(orderId, amendmentId, request, cancellationToken)));
+
     [HttpGet("recovery")]
     public async Task<ActionResult<ApiResponse<OrderAmendmentResolutionRecoveryDto>>> RecoverForAmendment(
         Guid orderId, Guid amendmentId, CancellationToken cancellationToken) =>

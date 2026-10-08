@@ -25,11 +25,22 @@ internal static class OrderBillingSnapshotConstraintSql
         AND food_reconciliation_minor = payable_food_minor - (gross_food_minor - tax_minor
         - order_discount_minor - customer_discount_minor + courtesy_rounding_minor - redemption_discount_minor)
         AND (earned_points_candidate IS NULL OR earned_points_candidate >= 0)
-        AND ((earned_points_candidate IS NULL
-        AND earning_evaluation_version IS NULL AND earning_rule_set_fingerprint IS NULL
-        AND earning_rule_id IS NULL AND earning_rule_name IS NULL AND earning_rule_minimum_minor IS NULL
-        AND earning_rule_maximum_minor IS NULL AND earning_rule_points IS NULL AND earning_rule_priority IS NULL)
-        OR (earned_points_candidate IS NOT NULL
+        AND ((earning_disposition IS NULL AND
+        ((earned_points_candidate IS NULL AND earning_evaluation_version IS NULL
+        AND earning_rule_set_fingerprint IS NULL AND earning_rule_id IS NULL
+        AND earning_rule_name IS NULL AND earning_rule_minimum_minor IS NULL
+        AND earning_rule_maximum_minor IS NULL AND earning_rule_points IS NULL
+        AND earning_rule_priority IS NULL)
+        OR (earned_points_candidate IS NOT NULL AND earning_evaluation_version IS NOT NULL
+        AND earning_evaluation_version <> '' AND earning_rule_set_fingerprint IS NOT NULL
+        AND earning_rule_set_fingerprint ~ '^[0-9a-f]{64}$')))
+        OR (earning_disposition IN ('Unevaluated', 'NoCustomerOwnerAtAcceptance', 'LoyaltyModuleDisabledAtAcceptance')
+        AND earned_points_candidate IS NULL AND earning_evaluation_version IS NULL
+        AND earning_rule_set_fingerprint IS NULL AND earning_rule_id IS NULL
+        AND earning_rule_name IS NULL AND earning_rule_minimum_minor IS NULL
+        AND earning_rule_maximum_minor IS NULL AND earning_rule_points IS NULL
+        AND earning_rule_priority IS NULL)
+        OR (earning_disposition = 'Evaluated' AND earned_points_candidate IS NOT NULL
         AND earning_evaluation_version IS NOT NULL AND earning_evaluation_version <> ''
         AND earning_rule_set_fingerprint IS NOT NULL
         AND earning_rule_set_fingerprint ~ '^[0-9a-f]{64}$'))

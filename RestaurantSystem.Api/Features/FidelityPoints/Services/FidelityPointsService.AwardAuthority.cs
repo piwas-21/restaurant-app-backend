@@ -135,7 +135,9 @@ public partial class FidelityPointsService
     {
         var candidate = snapshot.EarnedPointsCandidate
             ?? throw new ConflictException("An unevaluated earning snapshot cannot be awarded.");
-        if (candidate < 0 || order.FidelityPointsEarned != candidate
+        var disposition = snapshot.EffectiveEarningDisposition;
+        if (disposition != OrderBillingEarningDisposition.Evaluated
+            || candidate < 0 || order.FidelityPointsEarned != candidate
             || snapshot.EarningBasisMinor < 0
             || string.IsNullOrWhiteSpace(snapshot.EarningEvaluationVersion)
             || !IsRuleFingerprint(snapshot.EarningRuleSetFingerprint))

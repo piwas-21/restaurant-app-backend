@@ -158,6 +158,7 @@ internal static partial class OrderBillingSnapshotFactory
             RawRedemptionDiscountAmount = raw.RedemptionDiscountAmount,
             RawCourtesyRoundingAmount = raw.CourtesyRoundingAmount,
             EarningBasisMinor = earning.BasisMinor,
+            EarningDisposition = earning.Disposition,
             EarnedPointsCandidate = earning.CandidatePoints,
             EarningEvaluationVersion = earning.AlgorithmVersion,
             EarningRuleSetFingerprint = earning.RuleSetFingerprint,

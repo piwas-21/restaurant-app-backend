@@ -20,6 +20,7 @@ public sealed partial class OrderAmendmentResolutionService(
     IAccountCheckoutEvidenceReader checkoutEvidence,
     IOrderAmendmentRefundProvider refundProvider,
     IOrderAmendmentResolutionPolicy resolutionPolicy,
+    IOrderAmendmentFinancialResolution financialResolution,
     IOrderAmendmentResolutionFinalizer finalizer)
     : IOrderAmendmentResolutionService
 {

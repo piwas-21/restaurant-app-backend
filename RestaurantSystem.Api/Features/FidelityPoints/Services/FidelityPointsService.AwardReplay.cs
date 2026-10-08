@@ -30,6 +30,24 @@ public partial class FidelityPointsService
             original.Points, original.Points, 0);
     }
 
+    private async Task<FidelityPointsAwardResult> ReplayLegacyWithoutSnapshotAsync(
+        AwardOrderState order, List<FidelityPointsTransaction> existingAwards,
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        var result = await ReplayLegacyAwardAsync(order, existingAwards, cancellationToken);
+        await CommitOwnedTransactionAsync(transaction, cancellationToken);
+        if (result.Disposition != FidelityPointsAwardDisposition.Deferred)
+            return result;
+
+        var ineligible = ReadIneligibleReason(order);
+        if (ineligible.HasValue)
+            return Deferred(ineligible.Value);
+        if (await IsProviderManagedAsync(order.Id, cancellationToken))
+            return Deferred(FidelityPointsAwardDeferralReason.ProviderManaged);
+        return result;
+    }
+
     private async Task<FidelityPointsAwardResult> ReplayWitnessAsync(
         OrderBillingAwardWitness witness, AwardOrderState order, CancellationToken cancellationToken)
     {

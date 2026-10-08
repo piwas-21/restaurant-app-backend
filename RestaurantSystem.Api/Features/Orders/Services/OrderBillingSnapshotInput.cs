@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
@@ -16,7 +17,8 @@ public sealed record OrderBillingEarningEvaluation(
     int? CandidatePoints,
     string? AlgorithmVersion,
     string? RuleSetFingerprint,
-    OrderBillingEarningRuleEvidence? MatchedRule);
+    OrderBillingEarningRuleEvidence? MatchedRule,
+    OrderBillingEarningDisposition? Disposition = null);
 
 /// <summary>The exact persisted negative debit row returned by the redemption boundary.</summary>
 public sealed record OrderBillingRedemptionEvidence(

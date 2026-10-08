@@ -49,39 +49,46 @@ public sealed class PrinterWithdrawalMigrationTests(DatabaseFixture fixture) : I
     public async Task Withdrawal_evidence_refuses_downgrade_and_remains_available_for_cached_job_revocation()
     {
         await using var context = DatabaseFixture.CreateContext();
-        var now = DateTime.UtcNow;
-        var note = new OrderOperationalNote
+        try
         {
-            Id = Guid.NewGuid(),
-            ClientOperationId = Guid.NewGuid(),
-            Audience = OrderNoteAudience.Kitchen,
-            Text = "[erased]",
-            WithdrawnAt = now,
-            CreatedAt = now.AddMinutes(-1),
-            CreatedBy = "withdrawal-migration-test",
-            Order = new Order
+            var now = DateTime.UtcNow;
+            var note = new OrderOperationalNote
             {
                 Id = Guid.NewGuid(),
-                OrderNumber = $"MIG-{Guid.NewGuid():N}"[..20],
-                Type = OrderType.Takeaway,
-                Status = OrderStatus.Completed,
-                PaymentStatus = PaymentStatus.Completed,
-                Total = 12.35m,
-                OrderDate = now,
-                CreatedAt = now,
-                CreatedBy = "withdrawal-migration-test"
-            }
-        };
-        context.OrderOperationalNotes.Add(note);
-        await context.SaveChangesAsync();
-        var failure = await Assert.ThrowsAsync<PostgresException>(() =>
-            context.GetService<IMigrator>().MigrateAsync(PublishedParent));
-        Assert.Contains("withdrawal evidence prevents", failure.MessageText);
-        await using var verify = DatabaseFixture.CreateContext();
-        var retained = await verify.OrderOperationalNotes.AsNoTracking().SingleAsync(value => value.Id == note.Id);
-        Assert.NotNull(retained.WithdrawnAt);
-        Assert.Equal("[erased]", retained.Text);
-        Assert.Contains("20261004220409_" + nameof(WithdrawRetainedPrinterInstructions),
-            await verify.Database.GetAppliedMigrationsAsync());
+                ClientOperationId = Guid.NewGuid(),
+                Audience = OrderNoteAudience.Kitchen,
+                Text = "[erased]",
+                WithdrawnAt = now,
+                CreatedAt = now.AddMinutes(-1),
+                CreatedBy = "withdrawal-migration-test",
+                Order = new Order
+                {
+                    Id = Guid.NewGuid(),
+                    OrderNumber = $"MIG-{Guid.NewGuid():N}"[..20],
+                    Type = OrderType.Takeaway,
+                    Status = OrderStatus.Completed,
+                    PaymentStatus = PaymentStatus.Completed,
+                    Total = 12.35m,
+                    OrderDate = now,
+                    CreatedAt = now,
+                    CreatedBy = "withdrawal-migration-test"
+                }
+            };
+            context.OrderOperationalNotes.Add(note);
+            await context.SaveChangesAsync();
+            var failure = await Assert.ThrowsAsync<PostgresException>(() =>
+                context.GetService<IMigrator>().MigrateAsync(PublishedParent));
+            Assert.Contains("withdrawal evidence prevents", failure.MessageText);
+            await using var verify = DatabaseFixture.CreateContext();
+            var retained = await verify.OrderOperationalNotes.AsNoTracking().SingleAsync(value => value.Id == note.Id);
+            Assert.NotNull(retained.WithdrawnAt);
+            Assert.Equal("[erased]", retained.Text);
+            Assert.Contains("20261004220409_" + nameof(WithdrawRetainedPrinterInstructions),
+                await verify.Database.GetAppliedMigrationsAsync());
+        }
+        finally
+        {
+            await context.GetService<IMigrator>().MigrateAsync();
+        }
     }
 }

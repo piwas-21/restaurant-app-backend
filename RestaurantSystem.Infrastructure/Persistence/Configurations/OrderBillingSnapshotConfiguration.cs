@@ -15,6 +15,7 @@ public sealed class OrderBillingSnapshotConfiguration : IEntityTypeConfiguration
         builder.Property(value => value.PricingPolicyVersion).HasMaxLength(40).IsRequired();
         builder.Property(value => value.ComponentQuantizationPolicyVersion).HasMaxLength(60).IsRequired();
         builder.Property(value => value.EarningBasisPolicyVersion).HasMaxLength(50).IsRequired();
+        builder.Property(value => value.EarningDisposition).HasConversion<string>().HasMaxLength(48);
         builder.Property(value => value.RawTaxAmount).HasColumnType("numeric").IsRequired();
         builder.Property(value => value.RawOrderDiscountAmount).HasColumnType("numeric").IsRequired();
         builder.Property(value => value.RawCustomerDiscountAmount).HasColumnType("numeric").IsRequired();

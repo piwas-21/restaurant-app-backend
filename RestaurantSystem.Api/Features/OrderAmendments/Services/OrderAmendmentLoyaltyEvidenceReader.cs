@@ -53,12 +53,14 @@ internal static class OrderAmendmentLoyaltyEvidenceReader
         var operations = await context.OrderAmendmentResolutionOperations.AsNoTracking()
             .Where(value => value.SourceOrderId == orderId)
             .OrderBy(value => value.Id).ToListAsync(cancellationToken);
+        var retirement = await context.OrderBillingEarningRetirements.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.OrderId == orderId, cancellationToken);
         if (witnesses.Count > 1)
             throw new RestaurantSystem.Api.Common.Exceptions.ConflictException(
                 "The source order has duplicate immutable loyalty award witnesses.");
 
         return new(snapshot, units, ownerLinks, witnesses.SingleOrDefault(), coverage,
             suppressions, amendments, transactions, compensations, priorUnits,
-            priorPostings, reservations, operations);
+            priorPostings, reservations, operations, retirement);
     }
 }

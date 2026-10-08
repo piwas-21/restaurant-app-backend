@@ -25,9 +25,16 @@ internal static class OrderAmendmentResolutionQuoteFactory
             plan.RefundMinor, plan.UnpaidWaivedMinor, legs, MapLoyalty(plan.Loyalty));
     }
 
-    private static OrderAmendmentLoyaltyQuoteDto? MapLoyalty(OrderAmendmentLoyaltyPlan? plan) =>
-        plan is null || plan.SnapshotId is null ? null : new OrderAmendmentLoyaltyQuoteDto(
-            plan.AwardPending, plan.CandidatePoints, plan.AppliedAwardPoints,
-            plan.SuppressedPoints, plan.EarnedClawbackPoints,
-            plan.RedemptionRestorationPoints, plan.RemovedUnits.Count);
+    private static OrderAmendmentLoyaltyQuoteDto? MapLoyalty(OrderAmendmentLoyaltyPlan? plan)
+    {
+        if (plan is null || plan.SnapshotId is null)
+            return null;
+        var disposition = plan.EarningDisposition ?? OrderBillingEarningDisposition.Evaluated;
+        return new OrderAmendmentLoyaltyQuoteDto(
+            plan.AwardPending,
+            disposition == OrderBillingEarningDisposition.Evaluated ? plan.CandidatePoints : null,
+            plan.AppliedAwardPoints, plan.SuppressedPoints, plan.EarnedClawbackPoints,
+            plan.RedemptionRestorationPoints, plan.RemovedUnits.Count,
+            disposition, plan.EarningRetired == true);
+    }
 }

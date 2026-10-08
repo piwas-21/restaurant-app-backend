@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
@@ -18,6 +19,21 @@ public sealed partial class OrderAmendmentResolutionService
         var plan = snapshot.LoyaltyPlan;
         if (plan?.SnapshotId is null)
             return null;
+        if (!plan.EarningDisposition.HasValue || !plan.EarningRetired.HasValue)
+        {
+            var accepted = await context.OrderBillingSnapshots.AsNoTracking()
+                .SingleOrDefaultAsync(value => value.OrderId == operation.SourceOrderId, cancellationToken)
+                ?? throw new ConflictException("The accepted loyalty snapshot is unavailable.");
+            var disposition = accepted.EffectiveEarningDisposition;
+            var retired = await context.OrderBillingEarningRetirements.AsNoTracking()
+                .AnyAsync(value => value.OrderId == operation.SourceOrderId
+                    && value.SnapshotId == accepted.Id, cancellationToken);
+            plan = plan with
+            {
+                EarningDisposition = plan.EarningDisposition ?? disposition,
+                EarningRetired = plan.EarningRetired ?? retired
+            };
+        }
 
         var headers = await context.OrderAmendmentLoyaltyCompensations.AsNoTracking()
             .Where(value => value.OperationId == operation.Id)

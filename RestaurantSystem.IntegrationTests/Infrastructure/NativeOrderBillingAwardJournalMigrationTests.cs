@@ -162,9 +162,14 @@ public sealed class NativeOrderBillingAwardJournalMigrationTests(DatabaseFixture
         var evaluation = new OrderBillingEarningEvaluation(80, "fixed-test-v1", new string('a', 64), rule);
         var built = OrderBillingSnapshotFactory.Build(order, "CHF", evaluation, null,
             OrderBillingSnapshotLimits.AbsoluteMaximumUnitRows);
-        context.OrderBillingSnapshots.Add(built.Header);
-        context.OrderBillingSnapshotUnits.AddRange(built.Units);
-        context.OrderBillingSnapshotOwnerLinks.AddRange(built.OwnerLinks);
+        await using (var evidenceTransaction = await context.Database.BeginTransactionAsync())
+        {
+            await LegacyOrderBillingSnapshotFixture.InsertAsync(context, built.Header);
+            context.OrderBillingSnapshotUnits.AddRange(built.Units);
+            context.OrderBillingSnapshotOwnerLinks.AddRange(built.OwnerLinks);
+            await context.SaveChangesAsync();
+            await evidenceTransaction.CommitAsync();
+        }
 
         var unit = built.Units.Single();
         var change = new OrderAmendmentChangeSnapshot(unit.OrderItemId, OrderAmendmentChangeKind.Void,

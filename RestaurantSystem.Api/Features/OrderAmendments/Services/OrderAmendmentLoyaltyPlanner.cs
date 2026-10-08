@@ -25,7 +25,13 @@ internal static partial class OrderAmendmentLoyaltyPlanner
 
         var accepted = ValidateSnapshot(source, money, evidence);
         var removed = SelectRemovedUnits(source, changes, accepted.Units);
-        if (removed.Length > 0 && !accepted.Snapshot.EarnedPointsCandidate.HasValue)
+        var hasRetirement = evidence.Retirement is not null;
+        if (hasRetirement && !OrderAmendmentEarningRetirementRules.MatchesStoredRetirement(
+                source, money, evidence, out _))
+            throw Held("The frozen earning retirement does not match its full-source amendment evidence.");
+        var retiredForCurrentAmendment = evidence.Retirement?.AmendmentId == amendment.Id;
+        if (removed.Length > 0 && accepted.EarningDisposition == OrderBillingEarningDisposition.Unevaluated
+            && !retiredForCurrentAmendment)
             throw Held("The accepted earning evaluation is still pending.");
         var suppression = ValidateSuppressionEvidence(source, amendment.Id,
             accepted.Units, evidence, removed,
@@ -62,7 +68,8 @@ internal static partial class OrderAmendmentLoyaltyPlanner
             SumPoints(plans, OrderAmendmentLoyaltyCompensationKind.RedemptionRestoration),
             frozenRemoved, plans, suppression.PendingAwardSuppressions,
             accepted.EarningOwnerLink?.Id, accepted.RedemptionOwnerLink?.Id,
-            ReadSuppressedPoints(accepted, suppression.PendingAwardSuppressions, evidence));
+            ReadSuppressedPoints(accepted, suppression.PendingAwardSuppressions, evidence),
+            accepted.EarningDisposition, hasRetirement);
         return plan with
         {
             Compensations = plans.Select(value => value with

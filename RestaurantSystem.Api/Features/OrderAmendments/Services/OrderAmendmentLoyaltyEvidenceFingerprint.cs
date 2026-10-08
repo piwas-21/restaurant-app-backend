@@ -42,8 +42,26 @@ internal static class OrderAmendmentLoyaltyEvidenceFingerprint
                 .Select(ReservationSnapshot.From).ToArray(),
             evidence.Operations.Where(value => value.Id != excludeOperationId).OrderBy(value => value.Id)
                 .Select(OperationSnapshot.From).ToArray());
-        return OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(snapshot));
+        var legacyHash = OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(snapshot));
+        if (evidence.Snapshot?.EarningDisposition is null && evidence.Retirement is null)
+            return legacyHash;
+
+        var disposition = evidence.Snapshot?.EffectiveEarningDisposition
+            ?? OrderBillingEarningDisposition.Unevaluated;
+        var retirement = evidence.Retirement is null ? null : new RetirementSnapshot(
+            evidence.Retirement.Id, evidence.Retirement.OrderId, evidence.Retirement.SnapshotId,
+            evidence.Retirement.AmendmentId, evidence.Retirement.RetiredUnitCount,
+            evidence.Retirement.CreatedAt);
+        return OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(
+            new ExtendedEvidenceSnapshot(legacyHash, disposition, retirement)));
     }
+
+    private sealed record ExtendedEvidenceSnapshot(
+        string ExistingEvidenceHash, OrderBillingEarningDisposition EarningDisposition,
+        RetirementSnapshot? Retirement);
+
+    private sealed record RetirementSnapshot(
+        Guid Id, Guid OrderId, Guid SnapshotId, Guid AmendmentId, int RetiredUnitCount, DateTime CreatedAt);
 
     private sealed record EvidenceSnapshot(
         HeaderSnapshot? Snapshot, IReadOnlyList<UnitSnapshot> Units,

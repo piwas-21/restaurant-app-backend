@@ -25,17 +25,7 @@ public sealed partial class OrderAmendmentResolutionService
         if (await context.OrderAmendmentResolutionOperations.AsNoTracking()
             .AnyAsync(value => value.AmendmentId == amendmentId, cancellationToken))
             throw new ConflictException("This amendment already has a financial resolution operation.");
-        var sourceAmendments = await context.OrderAmendments.AsNoTracking()
-            .Where(value => value.SourceOrderId == source.Id
-                && value.State == OrderAmendmentState.Committed).ToListAsync(cancellationToken);
-        if (sourceAmendments.Any(value => value.Id != amendmentId
-                && OrderAmendmentFinancialGuard.IsUnresolved(value.FinancialResolutionJson)))
-            throw new ConflictException("Resolve the earlier committed amendment before starting another paid correction.");
-        if (source.ServiceSessionId is Guid sessionId
-            && await context.OrderAmendmentResolutionOperations.AsNoTracking().AnyAsync(value =>
-                value.ServiceSessionId == sessionId
-                && value.State != OrderAmendmentResolutionOperationState.Resolved, cancellationToken))
-            throw new ConflictException("Resolve the earlier paid correction in this table account first.");
+        var sourceAmendments = await EnsureNoPriorUnresolvedResolutionAsync(source, amendmentId, cancellationToken);
 
         var acceptedCurrency = await OrderNativeAcceptedCurrency.ReadOrderCurrencyEvidenceAsync(
             context, source, cancellationToken);
@@ -47,8 +37,17 @@ public sealed partial class OrderAmendmentResolutionService
         var loyaltyEvidence = await OrderAmendmentLoyaltyEvidenceReader.ReadAsync(
             context, source.Id, cancellationToken);
         var loyalty = loyaltyEvidence.Transactions;
-        var loyaltyPlan = OrderAmendmentLoyaltyPlanner.Build(
-            source, amendment, changes, money, loyaltyEvidence);
+        var recalculatedFinancial = await financialResolution.PreviewAsync(
+            source, changes, null, cancellationToken);
+        var retirementRequired = OrderAmendmentEarningRetirementRules.IsEligible(
+            source, amendment, changes, loyaltyEvidence, money, recalculatedFinancial, out _);
+        var loyaltyPlan = retirementRequired
+            ? OrderAmendmentLoyaltyPlan.Empty(money.Currency) with
+            {
+                SnapshotId = loyaltyEvidence.Snapshot!.Id,
+                EarningDisposition = OrderBillingEarningDisposition.Unevaluated
+            }
+            : OrderAmendmentLoyaltyPlanner.Build(source, amendment, changes, money, loyaltyEvidence);
         var refunds = await AccountAmendmentRefundIntegrity.ReadAsync(context, [source], sourceAmendments,
             attempts, money, cancellationToken);
         var credit = OrderAmendmentResolutionPlanner.ValidateSourceForResolution(
@@ -78,7 +77,8 @@ public sealed partial class OrderAmendmentResolutionService
             .OrderBy(value => value.PaymentId).ToArray();
 
         var result = new OrderAmendmentResolutionContextDto(source.Id, amendment.Id,
-            source.Version, source.ServiceSession?.AccountRevision, money.Currency, credit, candidates);
+            source.Version, source.ServiceSession?.AccountRevision, money.Currency, credit, candidates,
+            retirementRequired);
         await transaction.CommitAsync(cancellationToken);
         return result;
     }

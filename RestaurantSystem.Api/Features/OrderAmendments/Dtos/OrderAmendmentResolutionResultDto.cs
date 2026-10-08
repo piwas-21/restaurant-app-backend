@@ -27,19 +27,6 @@ public sealed record OrderAmendmentResolutionResultDto(
     IReadOnlyList<OrderAmendmentRefundLegResultDto> RefundLegs,
     OrderAmendmentLoyaltyResultDto? Loyalty = null);
 
-public sealed record OrderAmendmentLoyaltyResultDto(
-    OrderAmendmentLoyaltyOperationStatus State,
-    bool AwardPending,
-    int CandidatePoints,
-    int AppliedAwardPoints,
-    int SuppressedPoints,
-    int EarnedClawbackPoints,
-    int RedemptionRestorationPoints,
-    int PostedClawbackPoints,
-    int PostedRestorationPoints,
-    long? AvailablePointsBeforeClawback,
-    int? ClawbackShortfallPoints);
-
 public sealed record OrderAmendmentRefundLegResultDto(
     Guid PaymentId,
     string Custody,

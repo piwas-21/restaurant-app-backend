@@ -76,28 +76,27 @@ public partial class FidelityPointsService
         {
             if (order.FidelityPointsEarned != 0 || HasPartialEarningEvidence(snapshot))
                 throw new ConflictException("The unevaluated earning snapshot contains partial or inconsistent rule evidence.");
+            if (existingAwards.Count != 0)
+                throw new ConflictException("An order without an accepted earning candidate has an earned ledger row.");
+            var disposition = snapshot.EffectiveEarningDisposition;
+            if (disposition == OrderBillingEarningDisposition.Evaluated)
+                throw new ConflictException("An evaluated earning snapshot is missing its immutable candidate.");
+            if (disposition is OrderBillingEarningDisposition.NoCustomerOwnerAtAcceptance
+                or OrderBillingEarningDisposition.LoyaltyModuleDisabledAtAcceptance
+                || await _context.OrderBillingEarningRetirements.AsNoTracking()
+                    .AnyAsync(value => value.OrderId == order.Id && value.SnapshotId == snapshot.Id,
+                        cancellationToken))
+            {
+                await CommitOwnedTransactionAsync(transaction, cancellationToken);
+                return new FidelityPointsAwardResult(
+                    FidelityPointsAwardDisposition.IneligibleAtAcceptance, null, null, 0, 0);
+            }
+            if (disposition != OrderBillingEarningDisposition.Unevaluated)
+                throw new ConflictException("The frozen earning disposition is not recognized.");
             return Deferred(FidelityPointsAwardDeferralReason.CandidateUnevaluated);
         }
 
         return await AwardFromSnapshotAsync(order, snapshot, existingAwards, transaction, cancellationToken);
-    }
-
-    private async Task<FidelityPointsAwardResult> ReplayLegacyWithoutSnapshotAsync(
-        AwardOrderState order, List<FidelityPointsTransaction> existingAwards,
-        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
-        CancellationToken cancellationToken)
-    {
-        var result = await ReplayLegacyAwardAsync(order, existingAwards, cancellationToken);
-        await CommitOwnedTransactionAsync(transaction, cancellationToken);
-        if (result.Disposition != FidelityPointsAwardDisposition.Deferred)
-            return result;
-
-        var ineligible = ReadIneligibleReason(order);
-        if (ineligible.HasValue)
-            return Deferred(ineligible.Value);
-        if (await IsProviderManagedAsync(order.Id, cancellationToken))
-            return Deferred(FidelityPointsAwardDeferralReason.ProviderManaged);
-        return result;
     }
 
     private async Task<FidelityPointsAwardResult> AwardFromSnapshotAsync(

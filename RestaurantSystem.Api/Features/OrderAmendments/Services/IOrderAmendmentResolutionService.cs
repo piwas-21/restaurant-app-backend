@@ -7,6 +7,9 @@ public interface IOrderAmendmentResolutionService
     Task<OrderAmendmentResolutionContextDto> ContextAsync(Guid orderId, Guid amendmentId,
         CancellationToken cancellationToken);
 
+    Task<OrderAmendmentEarningRetirementDto> PrepareEarningRetirementAsync(Guid orderId, Guid amendmentId,
+        OrderAmendmentEarningRetirementRequest request, CancellationToken cancellationToken);
+
     Task<OrderAmendmentResolutionQuoteDto> QuoteAsync(Guid orderId, Guid amendmentId,
         OrderAmendmentResolutionQuoteRequest request, CancellationToken cancellationToken);
 

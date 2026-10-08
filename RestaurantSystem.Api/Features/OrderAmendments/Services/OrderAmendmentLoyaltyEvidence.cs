@@ -15,10 +15,11 @@ internal sealed record OrderAmendmentLoyaltyEvidence(
     IReadOnlyList<OrderAmendmentLoyaltyCompensationUnit> PriorUnits,
     IReadOnlyList<OrderAmendmentLoyaltyCompensationPosting> PriorPostings,
     IReadOnlyList<OrderAmendmentLoyaltyReservation> Reservations,
-    IReadOnlyList<OrderAmendmentResolutionOperation> Operations)
+    IReadOnlyList<OrderAmendmentResolutionOperation> Operations,
+    OrderBillingEarningRetirement? Retirement)
 {
     internal static OrderAmendmentLoyaltyEvidence Empty { get; } = new(
-        null, [], [], null, [], [], [], [], [], [], [], [], []);
+        null, [], [], null, [], [], [], [], [], [], [], [], [], null);
 
     internal OrderAmendmentLoyaltyEvidence WithoutOperation(Guid operationId)
     {

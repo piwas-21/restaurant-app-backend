@@ -27,18 +27,7 @@ public sealed partial class OrderAmendmentResolutionService
             .AnyAsync(value => value.AmendmentId == amendmentId, cancellationToken))
             throw new ConflictException("This amendment already has a financial resolution operation.");
         var changes = OrderAmendmentJson.Deserialize<List<OrderAmendmentChangeSnapshot>>(amendment.ChangesJson);
-        var sourceAmendments = await context.OrderAmendments.AsNoTracking()
-            .Where(value => value.SourceOrderId == source.Id
-                && value.State == OrderAmendmentState.Committed)
-            .ToListAsync(cancellationToken);
-        if (sourceAmendments.Any(value => value.Id != amendmentId
-                && OrderAmendmentFinancialGuard.IsUnresolved(value.FinancialResolutionJson)))
-            throw new ConflictException("Resolve the earlier committed amendment before starting another paid correction.");
-        if (source.ServiceSessionId is Guid sessionId
-            && await context.OrderAmendmentResolutionOperations.AsNoTracking().AnyAsync(value =>
-                value.ServiceSessionId == sessionId
-                && value.State != OrderAmendmentResolutionOperationState.Resolved, cancellationToken))
-            throw new ConflictException("Resolve the earlier paid correction in this table account first.");
+        var sourceAmendments = await EnsureNoPriorUnresolvedResolutionAsync(source, amendmentId, cancellationToken);
         var acceptedCurrency = await OrderNativeAcceptedCurrency.ReadOrderCurrencyEvidenceAsync(
             context, source, cancellationToken);
         var money = new AccountMoney(acceptedCurrency ?? (source.ServiceSessionId.HasValue

@@ -135,6 +135,7 @@ public class DatabaseFixture : IAsyncLifetime
             + "order_amendment_loyalty_owner_holds, order_amendment_loyalty_compensations, "
             + "order_billing_award_unit_coverages, order_billing_award_witnesses, "
             + "order_billing_unit_award_suppressions, "
+            + "order_billing_earning_retirements, "
             + "order_billing_snapshot_owner_links, order_billing_snapshot_units, "
             + "order_billing_snapshots, order_billing_credits, "
             + "table_ready_operations, order_amendment_resolution_refusals, "
