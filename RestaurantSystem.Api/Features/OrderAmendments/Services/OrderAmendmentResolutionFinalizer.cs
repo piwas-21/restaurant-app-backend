@@ -18,6 +18,8 @@ public sealed partial class OrderAmendmentResolutionFinalizer(
     public async Task TryFinalizeAsync(
         Guid operationId, Guid actorId, CancellationToken cancellationToken)
     {
+        ResetVerifiedCleanRequestContext();
+
         var sourceOrderId = await context.OrderAmendmentResolutionOperations.AsNoTracking()
             .Where(value => value.Id == operationId).Select(value => (Guid?)value.SourceOrderId)
             .SingleOrDefaultAsync(cancellationToken)

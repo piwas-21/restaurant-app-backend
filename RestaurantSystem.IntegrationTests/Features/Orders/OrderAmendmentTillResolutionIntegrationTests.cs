@@ -221,11 +221,11 @@ public sealed partial class OrderAmendmentTillResolutionIntegrationTests(Databas
                 "PostgreSQL truncates result timestamps to microsecond precision on reload");
             savedResult.ResolvedAt.Should().NotBe(persistedOperation.ResolvedAt,
                 "the fixed clock has sub-microsecond ticks that PostgreSQL cannot store in timestamp columns");
-            (savedResult.RefundLegs.Single().ResolvedAt!.Value.Ticks % 10).Should().Be(7);
+            (savedResult.RefundLegs.Single().ResolvedAt!.Value.Ticks % 10).Should().Be(0);
             (persistedOperation.Legs.Single().ResolvedAt!.Value.Ticks % 10).Should().Be(0);
-            savedResult.RefundLegs.Single().ResolvedAt.Should().NotBe(
+            savedResult.RefundLegs.Single().ResolvedAt.Should().Be(
                 persistedOperation.Legs.Single().ResolvedAt,
-                "the durable DTO currently retains finer timestamp precision than its source columns");
+                "finalization reloads the committed till proof before building the durable result");
         }
 
         using var eligibility = await Client.GetAsync($"/api/staff/orders/{_orderId}/amendments/eligibility");

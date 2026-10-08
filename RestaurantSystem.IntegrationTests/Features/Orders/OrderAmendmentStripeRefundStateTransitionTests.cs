@@ -2,19 +2,225 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.IntegrationTests.Common;
+using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
 
 public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
 {
+    [Fact]
+    public async Task Finalization_reloads_session_after_separate_account_commit_during_provider_io()
+    {
+        _refundState.LoseFirstCreateResponse = false;
+        _refundState.CreateStatuses.Enqueue("succeeded");
+        var providerGate = new FakeAmendmentRefundResponseGate();
+        _refundState.CreateResponseGate = providerGate;
+        AuthenticateAsAdmin();
+        var (basePath, request) = await BuildStartRequestAsync();
+        var startTask = Client.PostAsJsonAsync(basePath, request, JsonOptions);
+        HttpResponseMessage? response = null;
+
+        try
+        {
+            var providerRefund = await providerGate.ResponsePrepared.WaitAsync(TimeSpan.FromSeconds(30));
+            providerRefund.Status.Should().Be("succeeded");
+
+            await using (var concurrentContext = DatabaseFixture.CreateContext())
+            {
+                var concurrentSession = await concurrentContext.TableServiceSessions
+                    .SingleAsync(value => value.Id == _sessionId);
+                concurrentSession.RecordAccountChange();
+                await concurrentContext.SaveChangesAsync();
+            }
+
+            providerGate.Release();
+            response = await startTask;
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var outcome = (await response.Content.ReadFromJsonAsync<
+                ApiResponse<OrderAmendmentResolutionStartOutcomeDto>>(JsonOptions))!.Data!;
+            outcome.Outcome.Should().Be("accepted");
+            outcome.Result!.State.Should().Be("Resolved");
+            _refundState.CreateCalls.Should().Be(1);
+
+            await using var readback = DatabaseFixture.CreateContext();
+            var operation = await readback.OrderAmendmentResolutionOperations
+                .Include(value => value.Legs)
+                .SingleAsync(value => value.ClientOperationId == _clientOperationId);
+            operation.State.Should().Be(OrderAmendmentResolutionOperationState.Resolved);
+            operation.Legs.Should().ContainSingle(value =>
+                value.State == OrderAmendmentRefundLegState.Succeeded);
+            var credit = await readback.OrderBillingCredits.SingleAsync(value => value.AmendmentId == _amendmentId);
+            credit.AmountMinor.Should().Be(1000);
+            var reversal = await readback.AccountPaymentAllocationReversals.SingleAsync();
+            reversal.AmountMinor.Should().Be(1000);
+            reversal.StartOrdinal.Should().Be(1);
+            reversal.UnitCount.Should().Be(1);
+            (await readback.OrderPayments.SingleAsync(value => value.Id == _paymentId))
+                .RefundedAmount.Should().Be(10m);
+            (await readback.TableServiceSessions.SingleAsync(value => value.Id == _sessionId))
+                .AccountRevision.Should().Be(3);
+        }
+        finally
+        {
+            providerGate.Release();
+            if (response is null)
+            {
+                try
+                {
+                    response = await startTask.WaitAsync(TimeSpan.FromSeconds(30));
+                }
+                catch
+                {
+                    // The test's original failure remains the useful diagnostic.
+                }
+            }
+            response?.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task Finalization_rejects_financial_drift_and_recovers_successful_refund_when_feature_is_off()
+    {
+        _refundState.LoseFirstCreateResponse = false;
+        _refundState.CreateStatuses.Enqueue("succeeded");
+        var providerGate = new FakeAmendmentRefundResponseGate();
+        _refundState.CreateResponseGate = providerGate;
+        AuthenticateAsAdmin();
+        var (basePath, request) = await BuildStartRequestAsync();
+        var startTask = Client.PostAsJsonAsync(basePath, request, JsonOptions);
+        HttpResponseMessage? response = null;
+
+        try
+        {
+            var providerRefund = await providerGate.ResponsePrepared.WaitAsync(TimeSpan.FromSeconds(30));
+            providerRefund.Status.Should().Be("succeeded");
+
+            await using (var concurrentContext = DatabaseFixture.CreateContext())
+            {
+                var concurrentOrder = await concurrentContext.Orders.SingleAsync(value => value.Id == _orderId);
+                concurrentOrder.Tip = 1m;
+                concurrentOrder.Total = 21m;
+                concurrentOrder.RemainingAmount = 1m;
+                await concurrentContext.SaveChangesAsync();
+            }
+
+            providerGate.Release();
+            response = await startTask;
+            response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            (await response.Content.ReadFromJsonAsync<ApiResponse<object>>(JsonOptions))!
+                .Errors.Should().ContainSingle(value => value.Contains(
+                    "source financial evidence changed", StringComparison.OrdinalIgnoreCase));
+            _refundState.CreateCalls.Should().Be(1);
+
+            await using var readback = DatabaseFixture.CreateContext();
+            var operation = await readback.OrderAmendmentResolutionOperations
+                .Include(value => value.Legs)
+                .SingleAsync(value => value.ClientOperationId == _clientOperationId);
+            operation.State.Should().Be(OrderAmendmentResolutionOperationState.Processing);
+            operation.Legs.Should().ContainSingle(value =>
+                value.State == OrderAmendmentRefundLegState.Succeeded);
+            (await readback.OrderBillingCredits.CountAsync(value => value.AmendmentId == _amendmentId))
+                .Should().Be(0);
+            (await readback.AccountPaymentAllocationReversals.CountAsync()).Should().Be(0);
+            (await readback.OrderPayments.SingleAsync(value => value.Id == _paymentId))
+                .RefundedAmount.Should().BeNull();
+            var changedOrder = await readback.Orders.SingleAsync(value => value.Id == _orderId);
+            changedOrder.Tip.Should().Be(1m);
+            changedOrder.Total.Should().Be(21m);
+            changedOrder.RemainingAmount.Should().Be(1m);
+
+            await using (var restoreContext = DatabaseFixture.CreateContext())
+            {
+                var restoredOrder = await restoreContext.Orders.SingleAsync(value => value.Id == _orderId);
+                restoredOrder.Tip = 0m;
+                restoredOrder.Total = 20m;
+                restoredOrder.RemainingAmount = 0m;
+                await restoreContext.SaveChangesAsync();
+            }
+
+            _features.OrderAmendmentsV1 = false;
+            using var recovery = await Client.PostAsync(
+                $"/api/staff/amendment-financial-resolution-operations/{operation.Id}/recover", null);
+            recovery.StatusCode.Should().Be(HttpStatusCode.OK);
+            var recovered = (await recovery.Content.ReadFromJsonAsync<
+                ApiResponse<OrderAmendmentResolutionResultDto>>(JsonOptions))!.Data!;
+            recovered.State.Should().Be("Resolved");
+            _refundState.CreateCalls.Should().Be(1,
+                "recovering a durable succeeded provider leg must verify it without another refund create");
+            _refundState.CreatedEvidence.Should().ContainSingle(value => value.Status == "succeeded");
+
+            await using var recoveredState = DatabaseFixture.CreateContext();
+            (await recoveredState.OrderBillingCredits.CountAsync(value => value.AmendmentId == _amendmentId))
+                .Should().Be(1);
+            var recoveredReversal = await recoveredState.AccountPaymentAllocationReversals.SingleAsync();
+            recoveredReversal.AmountMinor.Should().Be(1000);
+            (await recoveredState.OrderPayments.SingleAsync(value => value.Id == _paymentId))
+                .RefundedAmount.Should().Be(10m);
+        }
+        finally
+        {
+            providerGate.Release();
+            if (response is null)
+            {
+                try
+                {
+                    response = await startTask.WaitAsync(TimeSpan.FromSeconds(30));
+                }
+                catch
+                {
+                    // Preserve the primary assertion and keep the provider gate unblocked.
+                }
+            }
+            response?.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task Finalizer_does_not_discard_pending_changes_from_its_request_context()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var session = await context.TableServiceSessions.SingleAsync(value => value.Id == _sessionId);
+        var originalTableNumber = session.TableNumber;
+        session.TableNumber++;
+
+        var finalizer = scope.ServiceProvider.GetRequiredService<IOrderAmendmentResolutionFinalizer>();
+        var act = () => finalizer.TryFinalizeAsync(Guid.NewGuid(), AdminId, CancellationToken.None);
+        var exception = await act.Should().ThrowAsync<ConflictException>();
+
+        exception.Which.Message.Should().Contain("Pending database changes");
+        context.ChangeTracker.HasChanges().Should().BeTrue();
+        context.Entry(session).State.Should().Be(EntityState.Modified);
+        session.TableNumber.Should().Be(originalTableNumber + 1);
+    }
+
+    [Fact]
+    public async Task Finalizer_rejects_an_ambient_transaction_before_touching_request_state()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        var finalizer = scope.ServiceProvider.GetRequiredService<IOrderAmendmentResolutionFinalizer>();
+        var act = () => finalizer.TryFinalizeAsync(Guid.NewGuid(), AdminId, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ConflictException>();
+
+        exception.Which.Message.Should().Contain("outside a database transaction");
+        context.Database.CurrentTransaction.Should().NotBeNull();
+    }
+
     [Fact]
     public async Task Delayed_pending_create_response_cannot_regress_a_later_succeeded_recovery()
     {
