@@ -37,7 +37,7 @@ public sealed class OrderBillingAdjustmentWriter(
         var money = new AccountMoney(preview.Currency);
         var acceptedBilling = await context.OrderBillingSnapshots.AsNoTracking()
             .SingleOrDefaultAsync(value => value.OrderId == source.Id, cancellationToken);
-        if (acceptedBilling is not null && !acceptedBilling.EarnedPointsCandidate.HasValue)
+        if (acceptedBilling is not null && !CanApplyUnpaidCredit(acceptedBilling))
             throw new ConflictException("The source order's accepted loyalty evaluation is pending.");
         await OrderBillingCreditConsistency.AssertAsync(context, new[] { source.Id }, cancellationToken);
         await AssertCurrentAggregateAsync(source, money, cancellationToken);
@@ -96,4 +96,14 @@ public sealed class OrderBillingAdjustmentWriter(
             || money.ToMinor(source.BillingCreditAmount) != entries.Sum(value => value.AmountMinor))
             throw new ConflictException("The current order credit differs from its immutable billing journal.");
     }
+
+    private static bool CanApplyUnpaidCredit(OrderBillingSnapshot acceptedBilling) =>
+        acceptedBilling.EffectiveEarningDisposition switch
+        {
+            OrderBillingEarningDisposition.Evaluated => acceptedBilling.EarnedPointsCandidate.HasValue,
+            OrderBillingEarningDisposition.NoCustomerOwnerAtAcceptance
+                or OrderBillingEarningDisposition.LoyaltyModuleDisabledAtAcceptance =>
+                !acceptedBilling.EarnedPointsCandidate.HasValue,
+            _ => false
+        };
 }
