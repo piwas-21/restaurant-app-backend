@@ -18,8 +18,7 @@ internal static class KitchenBoardSequenceWriter
         await context.Database.ExecuteSqlRawAsync(
             "SELECT pg_advisory_xact_lock(hashtextextended('restaurant-system.order-change-sequence', 0))",
             cancellationToken);
-        await context.Database.ExecuteSqlRawAsync(
-            "SELECT pg_advisory_xact_lock(664311, 2)", cancellationToken);
+        await KitchenBoardSequenceLock.AcquireAsync(context, cancellationToken);
     }
 
     internal static Task<int> TouchCorrectionAsync(

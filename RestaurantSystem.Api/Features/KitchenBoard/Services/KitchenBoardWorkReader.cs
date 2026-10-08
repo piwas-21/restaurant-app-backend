@@ -22,8 +22,7 @@ public sealed class KitchenBoardWorkReader(
         await context.Database.ExecuteSqlRawAsync(
             "SELECT pg_advisory_xact_lock(hashtextextended('restaurant-system.order-change-sequence', 0))",
             cancellationToken);
-        await context.Database.ExecuteSqlRawAsync(
-            "SELECT pg_advisory_xact_lock(664311, 2)", cancellationToken);
+        await KitchenBoardSequenceLock.AcquireAsync(context, cancellationToken);
 
         var orderWatermark = await context.OrderChanges.AsNoTracking()
             .Select(value => (long?)value.Sequence).MaxAsync(cancellationToken) ?? 0L;

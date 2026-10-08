@@ -60,7 +60,7 @@ internal static class KitchenBoardCorrectionStream
             query = query.Where(note => note.Id.CompareTo(afterId.Value) > 0);
         }
 
-        var rows = await LoadNotes(query).OrderBy(note => note.Id)
+        var rows = await query.OrderBy(note => note.Id)
             .Take(pageSize + 1).ToListAsync(cancellationToken);
         var items = await ProjectAsync(context, rows.Take(pageSize).ToList(), logger, cancellationToken);
         var hasMore = rows.Count > pageSize;
@@ -97,17 +97,22 @@ internal static class KitchenBoardCorrectionStream
             notes = notes.Where(note => note.KitchenBoardSequence > afterSequence);
         }
 
-        var rows = await LoadNotes(notes).OrderBy(note => note.KitchenBoardSequence)
+        // Read note scalars without joining Order: EF's required-navigation query filter
+        // would hide changed notes whose parent was soft-deleted, losing removals.
+        var rows = await notes.OrderBy(note => note.KitchenBoardSequence)
             .Take(pageSize + 1).ToListAsync(cancellationToken);
         var pageRows = rows.Take(pageSize).ToList();
         var projected = await ProjectAsync(context, pageRows, logger, cancellationToken);
         var projectedById = projected.ToDictionary(item => item.WorkItemId);
-        var rowsById = pageRows.ToDictionary(note => note.Id);
-        var items = projected.Where(item => rowsById.TryGetValue(item.WorkItemId, out var note)
-            && IsActiveWork(note) && !item.IsCompleted && !item.Withdrawn).ToList();
+        var rowIds = pageRows.Select(note => note.Id).ToArray();
+        var activeIds = await KitchenBoardWorkRules.ActiveCorrections(context)
+            .Where(note => rowIds.Contains(note.Id)).Select(note => note.Id)
+            .ToHashSetAsync(cancellationToken);
+        var items = projected.Where(item => activeIds.Contains(item.WorkItemId)
+            && !item.IsCompleted && !item.Withdrawn).ToList();
         var tombstones = projected.Where(item => item.Withdrawn).ToList();
         var removed = pageRows.Where(note => !projectedById.TryGetValue(note.Id, out var item)
-                || !IsActiveWork(note) || item.IsCompleted || item.Withdrawn)
+                || !activeIds.Contains(note.Id) || item.IsCompleted || item.Withdrawn)
             .Select(note => note.Id).Distinct().ToList();
         items.AddRange(tombstones);
         var count = await KitchenBoardWorkRules.ActiveCorrections(context).CountAsync(cancellationToken);
@@ -129,18 +134,9 @@ internal static class KitchenBoardCorrectionStream
 
     private static IQueryable<OrderOperationalNote> ChangedKitchenNotes(
         ApplicationDbContext context, long lower, long upper) => context.OrderOperationalNotes
-        // soft-delete-bypass: load changed notes for hidden Orders so clients can remove stale cards.
-        .IgnoreQueryFilters().AsNoTracking()
-        .Where(note => note.KitchenBoardSequence > lower && note.KitchenBoardSequence <= upper);
-
-    private static bool IsActiveWork(OrderOperationalNote note) =>
-        note.Audience == OrderNoteAudience.Kitchen && note.KitchenChangesJson is not null
-        && !note.WithdrawnAt.HasValue && !note.Order.IsDeleted
-        && note.Order.ExternalReference is null;
-
-    private static IQueryable<OrderOperationalNote> LoadNotes(
-        IQueryable<OrderOperationalNote> query) => query
-        .Include(note => note.Order).ThenInclude(order => order.RoutingStates);
+        .AsNoTracking()
+        .Where(note => note.Audience == OrderNoteAudience.Kitchen
+            && note.KitchenBoardSequence > lower && note.KitchenBoardSequence <= upper);
 
     private static async Task<List<KitchenBoardCorrectionDto>> ProjectAsync(
         ApplicationDbContext context,
@@ -149,7 +145,14 @@ internal static class KitchenBoardCorrectionStream
         CancellationToken cancellationToken)
     {
         if (notes.Count == 0) return [];
-        var ids = notes.Select(note => note.Id).ToArray();
+        var orderIds = notes.Select(note => note.OrderId).Distinct().ToArray();
+        var orders = await context.Orders.AsNoTracking()
+            .Where(order => orderIds.Contains(order.Id) && order.ExternalReference == null)
+            .Include(order => order.RoutingStates)
+            .ToDictionaryAsync(order => order.Id, cancellationToken);
+        var visibleNotes = notes.Where(note => orders.ContainsKey(note.OrderId)).ToList();
+        if (visibleNotes.Count == 0) return [];
+        var ids = visibleNotes.Select(note => note.Id).ToArray();
         var completions = await context.KitchenBoardWorkCompletions.AsNoTracking()
             .Where(work => ids.Contains(work.WorkItemId)
                 && work.Kind == KitchenBoardWorkKind.AmendmentCorrection)
@@ -170,12 +173,13 @@ internal static class KitchenBoardCorrectionStream
         var printedKeys = printed.Select(receipt => (
             receipt.OrderId, receipt.JobId, receipt.Target, receipt.DeviceId)).ToHashSet();
 
-        return notes.Select(note =>
+        return visibleNotes.Select(note =>
         {
+            var order = orders[note.OrderId];
             completions.TryGetValue(note.Id, out var completion);
             var target = note.KitchenTarget;
             var route = target.HasValue
-                ? note.Order.RoutingStates.FirstOrDefault(state => state.IsRequired
+                ? order.RoutingStates.FirstOrDefault(state => state.IsRequired
                     && state.Target == target.Value)
                 : null;
             var withdrawn = note.WithdrawnAt.HasValue;
@@ -186,13 +190,13 @@ internal static class KitchenBoardCorrectionStream
             return new KitchenBoardCorrectionDto(
                 note.Id,
                 note.OrderId,
-                note.Order.OrderNumber,
-                note.Order.Status.ToString(),
-                note.Order.Version,
-                note.Order.TableId,
-                note.Order.TableLabel,
-                note.Order.TableNumber,
-                note.Order.ServiceSessionId,
+                order.OrderNumber,
+                order.Status.ToString(),
+                order.Version,
+                order.TableId,
+                order.TableLabel,
+                order.TableNumber,
+                order.ServiceSessionId,
                 note.AmendmentId,
                 note.AccountRevision,
                 target?.ToString(),

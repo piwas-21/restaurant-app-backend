@@ -514,6 +514,49 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Marketplace_parent_correction_is_removed_without_exposing_its_details()
+    {
+        var (orderId, workItemId, _) = await SeedTerminalCorrectionAsync();
+        AuthenticateAsRole(UserRole.KitchenStaff);
+        var initial = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(
+            await Client.GetAsync("/api/staff/kitchen-board/work?pageSize=10")))!.Data!;
+        var cursor = initial.Corrections.NextCursor!;
+        initial.Corrections.Items.Should().ContainSingle(item => item.WorkItemId == workItemId);
+
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            context.ExternalOrderReferences.Add(new ExternalOrderReference
+            {
+                OrderId = orderId,
+                Provider = "marketplace-test",
+                ExternalStoreId = Guid.NewGuid().ToString("N"),
+                ExternalOrderId = Guid.NewGuid().ToString("N"),
+                ExternalDisplayId = "external-order",
+                ExternalState = "Accepted",
+                LastEventAt = TestNow,
+                Currency = "CHF",
+                MerchantTotal = 12m,
+                PayloadHash = new string('a', 64),
+                FulfillmentType = "Takeaway",
+                IsSandbox = true,
+                CreatedBy = nameof(KitchenBoardWorkflowTests),
+            });
+            var note = await context.OrderOperationalNotes.SingleAsync(value => value.Id == workItemId);
+            note.Text = "changed after marketplace linkage";
+            note.UpdatedAt = TestNow;
+            note.UpdatedBy = nameof(KitchenBoardWorkflowTests);
+            await context.SaveChangesAsync();
+        }
+
+        var response = await Client.GetAsync(
+            $"/api/staff/kitchen-board/work?pageSize=10&correctionsCursor={Uri.EscapeDataString(cursor)}");
+        var delta = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(response))!.Data!;
+        delta.Corrections.Items.Should().NotContain(item => item.WorkItemId == workItemId,
+            "marketplace correction details are outside the native board feed");
+        delta.Corrections.RemovedIds.Should().Contain(workItemId);
+    }
+
+    [Fact]
     public async Task Printer_receipt_completion_advances_correction_cursor()
     {
         var (orderId, workItemId, _) = await SeedTerminalCorrectionAsync();
