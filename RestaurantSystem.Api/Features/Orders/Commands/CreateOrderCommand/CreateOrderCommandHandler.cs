@@ -24,6 +24,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderPricingService _pricingService;
     private readonly IOrderPaymentBuilder _paymentBuilder;
     private readonly IOrderTableReservationService _tableReservation;
+    private readonly IOrderRoutingService _routing;
     private readonly IOrderNativeBillingAcceptance _fidelity;
     private readonly IOrderNotificationService _notifications;
     private readonly IOrderPermittedActionsService _permittedActionsService;
@@ -40,6 +41,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderPricingService pricingService,
         IOrderPaymentBuilder paymentBuilder,
         IOrderTableReservationService tableReservation,
+        IOrderRoutingService routing,
         IOrderNativeBillingAcceptance fidelity,
         IOrderNotificationService notifications,
         IOrderPermittedActionsService permittedActionsService,
@@ -58,6 +60,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _pricingService = pricingService;
         _paymentBuilder = paymentBuilder;
         _tableReservation = tableReservation;
+        _routing = routing;
         _fidelity = fidelity;
         _notifications = notifications;
         _permittedActionsService = permittedActionsService;
@@ -102,10 +105,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             var draft = await _orderFactory.CreateAsync(command, ownerId, language, cancellationToken);
 
-            if (draft.IsFailed)
-            {
-                return ApiResponse<OrderDto>.Failure(draft.Error);
-            }
+            if (draft.IsFailed) return ApiResponse<OrderDto>.Failure(draft.Error);
 
             var order = draft.Order;
             if (guestSession is not null)
@@ -141,10 +141,10 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             if (guestSession is not null && guestParticipant is not null)
             {
-                GuestRoundOrderPolicy.RecordAccountChange(
-                    _context, _guestRounds ?? throw new InvalidOperationException(
+                await GuestRoundOrderPolicy.RecordAcceptedRoundAsync(
+                    _context, _routing, _guestRounds ?? throw new InvalidOperationException(
                         "Guest round operations are not registered."),
-                    guestContext!, guestSession, guestParticipant, order);
+                    guestContext!, guestSession, guestParticipant, order, cancellationToken);
             }
 
             order.StatusHistory.Add(new OrderStatusHistory
