@@ -80,9 +80,22 @@ public sealed class PrinterWithdrawalMigrationTests(DatabaseFixture fixture) : I
                 context.GetService<IMigrator>().MigrateAsync(PublishedParent));
             Assert.Contains("withdrawal evidence prevents", failure.MessageText);
             await using var verify = DatabaseFixture.CreateContext();
-            var retained = await verify.OrderOperationalNotes.AsNoTracking().SingleAsync(value => value.Id == note.Id);
-            Assert.NotNull(retained.WithdrawnAt);
-            Assert.Equal("[erased]", retained.Text);
+            // The failed downgrade leaves the database at this older migration, before
+            // kitchen_board_sequence was introduced. Read only columns present at that level.
+            await using var verifyConnection = new NpgsqlConnection(DatabaseFixture.ConnectionString);
+            await verifyConnection.OpenAsync();
+            await using var command = new NpgsqlCommand("""
+                SELECT id, text, withdrawn_at
+                FROM "OrderOperationalNotes"
+                WHERE id = @noteId
+                """, verifyConnection);
+            command.Parameters.AddWithValue("noteId", note.Id);
+            await using var reader = await command.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal(note.Id, reader.GetGuid(0));
+            Assert.Equal("[erased]", reader.GetString(1));
+            Assert.False(reader.IsDBNull(2));
+            Assert.False(await reader.ReadAsync());
             Assert.Contains("20261004220409_" + nameof(WithdrawRetainedPrinterInstructions),
                 await verify.Database.GetAppliedMigrationsAsync());
         }
