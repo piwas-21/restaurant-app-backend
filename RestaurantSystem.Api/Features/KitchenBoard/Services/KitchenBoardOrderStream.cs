@@ -153,7 +153,7 @@ internal static class KitchenBoardOrderStream
         .Include(order => order.Items).ThenInclude(item => item.IngredientSnapshots)
         .Include(order => order.Items).ThenInclude(item => item.Product!.DetailedIngredients)
         .Include(order => order.Items).ThenInclude(item => item.Menu!.MenuItems)
-            .ThenInclude(menuItem => menuItem.Product!.DetailedIngredients)
+            .ThenInclude(menuItem => menuItem.Product.DetailedIngredients)
         .AsSplitQuery();
 
     private static async Task<List<KitchenBoardOrderDto>> ProjectAsync(
