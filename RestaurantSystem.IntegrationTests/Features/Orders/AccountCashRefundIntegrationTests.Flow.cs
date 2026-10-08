@@ -120,8 +120,8 @@ public sealed partial class AccountCashRefundIntegrationTests
                     .Select(value => value.ResultJson).SingleAsync();
                 var saved = RestaurantSystem.Api.Features.OrderAmendments.Services.OrderAmendmentJson
                     .Deserialize<OrderAmendmentResolutionResultDto>(savedJson!);
-                saved.RefundLegs.Single().CashReturn!.ConfirmedAt.Should().Be(FixedNow.UtcDateTime,
-                    "the durable JSON captures the clock before PostgreSQL truncates column precision");
+                saved.RefundLegs.Single().CashReturn!.ConfirmedAt.Should().Be(observedAt,
+                    "the durable JSON reflects the already-committed PostgreSQL evidence");
             }
             returnedTotal += resultLeg.CashReturn.CashReturnedMinor;
 
