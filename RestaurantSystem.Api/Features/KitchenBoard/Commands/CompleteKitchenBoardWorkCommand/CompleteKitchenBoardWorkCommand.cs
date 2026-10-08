@@ -80,7 +80,7 @@ public sealed class CompleteKitchenBoardWorkCommandHandler(
         await context.SaveChangesAsync(cancellationToken);
         if (kind == KitchenBoardWorkKind.AmendmentCorrection)
         {
-            var target = await context.OrderOperationalNotes.IgnoreQueryFilters().AsNoTracking()
+            var target = await context.OrderOperationalNotes.AsNoTracking()
                 .Where(value => value.Id == command.WorkItemId && value.OrderId == order.Id)
                 .Select(value => value.KitchenTarget)
                 .SingleAsync(cancellationToken);
@@ -146,7 +146,7 @@ public sealed class CompleteKitchenBoardWorkCommandHandler(
         if (command.WorkItemId == order.Id || !command.ExpectedAccountRevision.HasValue)
             throw new BadRequestException("An amendment correction requires its exact revision.");
 
-        var note = await context.OrderOperationalNotes.IgnoreQueryFilters().AsNoTracking()
+        var note = await context.OrderOperationalNotes.AsNoTracking()
             .SingleOrDefaultAsync(value => value.Id == command.WorkItemId
                 && value.OrderId == order.Id && value.Audience == OrderNoteAudience.Kitchen
                 && value.KitchenChangesJson != null, cancellationToken)
@@ -171,7 +171,7 @@ public sealed class CompleteKitchenBoardWorkCommandHandler(
             return;
         }
 
-        var note = await context.OrderOperationalNotes.IgnoreQueryFilters().AsNoTracking()
+        var note = await context.OrderOperationalNotes.AsNoTracking()
             .SingleAsync(value => value.Id == workItemId && value.OrderId == order.Id,
                 cancellationToken);
         var route = note.KitchenTarget.HasValue

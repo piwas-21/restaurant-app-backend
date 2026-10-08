@@ -465,12 +465,52 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
         await using var verify = DatabaseFixture.CreateContext();
         (await KitchenBoardCloseGuard.HasUnresolvedCorrectionAsync(
             verify, sessionId, null, null, CancellationToken.None)).Should().BeFalse();
-        var retained = await verify.OrderOperationalNotes.IgnoreQueryFilters()
+        var retained = await verify.OrderOperationalNotes
             .SingleAsync(value => value.Id == workItemId);
         retained.KitchenChangesJson.Should().BeNull("a withdrawn tombstone must not need the erased payload");
         retained.AmendmentId.Should().BeNull();
         retained.AccountRevision.Should().BeNull();
         retained.KitchenTarget.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Order_visibility_transitions_emit_correction_removal_and_restoration()
+    {
+        var (orderId, workItemId, _) = await SeedTerminalCorrectionAsync();
+        AuthenticateAsRole(UserRole.KitchenStaff);
+        var initial = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(
+            await Client.GetAsync("/api/staff/kitchen-board/work?pageSize=10")))!.Data!;
+        var cursor = initial.Corrections.NextCursor!;
+        initial.Corrections.Items.Should().ContainSingle(item => item.WorkItemId == workItemId);
+
+        await using var context = DatabaseFixture.CreateContext();
+        var order = await context.Orders.SingleAsync(value => value.Id == orderId);
+        order.IsDeleted = true;
+        order.DeletedAt = TestNow;
+        order.DeletedBy = nameof(KitchenBoardWorkflowTests);
+        await context.SaveChangesAsync();
+
+        var snapshot = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(
+            await Client.GetAsync("/api/staff/kitchen-board/work?pageSize=10")))!.Data!;
+        snapshot.Corrections.Items.Should().NotContain(item => item.WorkItemId == workItemId,
+            "initial snapshots must exclude soft-deleted parent orders");
+
+        var deltaResponse = await Client.GetAsync(
+            $"/api/staff/kitchen-board/work?pageSize=10&correctionsCursor={Uri.EscapeDataString(cursor)}");
+        var delta = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(deltaResponse))!.Data!;
+        delta.Corrections.Items.Should().NotContain(item => item.WorkItemId == workItemId);
+        delta.Corrections.RemovedIds.Should().Contain(workItemId,
+            "the order visibility transition must advance the retained correction cursor");
+
+        order.IsDeleted = false;
+        order.DeletedAt = null;
+        order.DeletedBy = null;
+        await context.SaveChangesAsync();
+
+        var restoredResponse = await Client.GetAsync(
+            $"/api/staff/kitchen-board/work?pageSize=10&correctionsCursor={Uri.EscapeDataString(delta.Corrections.NextCursor!)}");
+        var restored = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(restoredResponse))!.Data!;
+        restored.Corrections.Items.Should().ContainSingle(item => item.WorkItemId == workItemId);
     }
 
     [Fact]

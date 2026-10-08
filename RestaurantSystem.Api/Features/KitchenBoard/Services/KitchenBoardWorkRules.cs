@@ -8,7 +8,7 @@ namespace RestaurantSystem.Api.Features.KitchenBoard.Services;
 internal static class KitchenBoardWorkRules
 {
     internal static IQueryable<OrderOperationalNote> ActiveCorrections(ApplicationDbContext context) =>
-        context.OrderOperationalNotes.IgnoreQueryFilters().AsNoTracking()
+        context.OrderOperationalNotes.AsNoTracking()
             .Where(note => note.Audience == OrderNoteAudience.Kitchen
                 && note.KitchenChangesJson != null && !note.WithdrawnAt.HasValue
                 && note.Order.ExternalReference == null && !note.Order.IsDeleted

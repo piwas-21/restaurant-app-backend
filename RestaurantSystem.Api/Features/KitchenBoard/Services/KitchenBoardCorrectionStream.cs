@@ -129,6 +129,7 @@ internal static class KitchenBoardCorrectionStream
 
     private static IQueryable<OrderOperationalNote> ChangedKitchenNotes(
         ApplicationDbContext context, long lower, long upper) => context.OrderOperationalNotes
+        // soft-delete-bypass: load changed notes for hidden Orders so clients can remove stale cards.
         .IgnoreQueryFilters().AsNoTracking()
         .Where(note => note.KitchenBoardSequence > lower && note.KitchenBoardSequence <= upper);
 

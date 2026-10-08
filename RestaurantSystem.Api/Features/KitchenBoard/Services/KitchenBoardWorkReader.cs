@@ -27,7 +27,7 @@ public sealed class KitchenBoardWorkReader(
 
         var orderWatermark = await context.OrderChanges.AsNoTracking()
             .Select(value => (long?)value.Sequence).MaxAsync(cancellationToken) ?? 0L;
-        var correctionWatermark = await context.OrderOperationalNotes.IgnoreQueryFilters()
+        var correctionWatermark = await context.OrderOperationalNotes
             .AsNoTracking().Select(value => (long?)value.KitchenBoardSequence)
             .MaxAsync(cancellationToken) ?? 0L;
         var completionWatermark = await context.KitchenBoardWorkCompletions.AsNoTracking()
