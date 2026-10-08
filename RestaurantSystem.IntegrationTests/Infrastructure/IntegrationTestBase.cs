@@ -59,7 +59,8 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         if (RequiresIsolatedHost || OverridesConfigureTestServices(GetType()))
         {
             _ownedFactory = new TestWebApplicationFactory(
-                DatabaseFixture.ConnectionString, configureTestServices: ConfigureTestServices);
+                DatabaseFixture.ConnectionString, configureTestServices: ConfigureTestServices,
+                disableApplicationHostedServices: true);
             Factory = _ownedFactory;
         }
         else
