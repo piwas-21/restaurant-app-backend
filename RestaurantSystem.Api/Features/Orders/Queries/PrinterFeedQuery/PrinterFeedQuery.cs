@@ -140,9 +140,9 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
             .Include(o => o.Payments)
             .Include(o => o.StatusHistory)
             .Include(o => o.DeliveryAddress)
-            .Where(o => !o.IsDeleted)
-            .Where(o => o.Status == OrderStatus.Confirmed)
+            .Where(o => !o.IsDeleted && o.Status == OrderStatus.Confirmed)
             .Where(o => o.IsKitchenReleased)
+            .WithoutCompletedInitialBoardWork(_context)
             .AsNoTracking()
             .AsSplitQuery()
             .AsQueryable();

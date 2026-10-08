@@ -14,6 +14,10 @@ public sealed class OperationalQueueSyncOptions
     [Range(1, 500)]
     public int MaxPageSize { get; set; } = 100;
 
+    /// <summary>Page size used when a synchronization request omits its page size.</summary>
+    [Range(1, 500)]
+    public int DefaultPageSize { get; set; } = 100;
+
     /// <summary>
     /// Per-tenant discriminator included in every cursor. Provisioning should set this to the
     /// tenant id; the empty value is retained for the legacy single-tenant install.

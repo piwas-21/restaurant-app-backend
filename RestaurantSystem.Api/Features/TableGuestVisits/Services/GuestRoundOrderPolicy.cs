@@ -55,10 +55,10 @@ internal static class GuestRoundOrderPolicy
         order.ServiceSessionId = session.Id;
     }
 
-    public static void RecordAccountChange(
+    public static async Task RecordAcceptedRoundAsync(
         ApplicationDbContext context, ITableGuestRoundOperationStore operations,
         TableGuestRoundContext guestContext, TableServiceSession session,
-        TableGuestParticipant participant, Order order)
+        TableGuestParticipant participant, Order order, CancellationToken cancellationToken)
     {
         session.RecordAccountChange();
         context.Set<TableGuestRoundOperation>().Add(operations.CreateOperation(

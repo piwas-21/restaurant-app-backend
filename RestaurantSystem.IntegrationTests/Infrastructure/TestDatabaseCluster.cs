@@ -32,7 +32,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// </summary>
 internal static class TestDatabaseCluster
 {
-    internal const string CurrentSchemaMigration = "20261008010300_" + nameof(AddOrderBillingEarningRetirements);
+    internal const string CurrentSchemaMigration = "20261008185221_" + nameof(AdvanceKitchenBoardOnOrderSoftDelete);
 
     /// <summary>
     /// When set, the tests connect to this Postgres instead of starting a Testcontainers

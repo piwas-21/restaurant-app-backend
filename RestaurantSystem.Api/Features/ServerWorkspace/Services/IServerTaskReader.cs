@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.ServerWorkspace.Dtos;
+using RestaurantSystem.Api.Features.KitchenBoard.Services;
 using RestaurantSystem.Api.Features.ServerWorkspace.Queries.GetServerTasksQuery;
 using RestaurantSystem.Domain.Entities;
 
@@ -45,6 +46,7 @@ public sealed record ServerTaskPagePosition(
 
 public interface IServerTaskProjector
 {
-    ServerServiceTaskDto Project(Order order, DateTime serverTime);
+    ServerServiceTaskDto Project(
+        Order order, DateTime serverTime, KitchenBoardHandoverState? kitchenBoardState = null);
     List<ServerServiceTaskDto> FilterAndSort(IEnumerable<ServerServiceTaskDto> tasks, string bucket);
 }

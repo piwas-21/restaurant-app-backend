@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.KitchenBoard.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
@@ -34,6 +35,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
     private readonly IOrderResponseProjector _responses;
     private readonly IOrderNotificationService _notifications;
     private readonly OrderWorkflowSettings _workflow;
+    private readonly IOrderStatusTransitionPolicy? _transitionPolicy;
 
     public UpdateOrderStatusCommandHandler(
           ApplicationDbContext context,
@@ -42,7 +44,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
           IOrderResponseProjector responses,
           IOrderNotificationService notifications,
           ILogger<UpdateOrderStatusCommandHandler> logger,
-          IOptions<OrderWorkflowSettings>? workflow = null)
+          IOrderStatusTransitionPolicy? transitionPolicy = null)
     {
         _context = context;
         _currentUserService = currentUserService;
@@ -50,7 +52,8 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
         _responses = responses;
         _notifications = notifications;
         _logger = logger;
-        _workflow = workflow?.Value ?? new OrderWorkflowSettings();
+        _workflow = transitionPolicy?.Workflow ?? new OrderWorkflowSettings();
+        _transitionPolicy = transitionPolicy;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(UpdateOrderStatusCommand command, CancellationToken cancellationToken)
@@ -60,6 +63,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
         var order = await _context.Orders
             .Include(o => o.Items)
             .Include(o => o.Payments)
+            .Include(o => o.RoutingStates)
             .Include(o => o.StatusHistory)
             .FirstOrDefaultAsync(o => o.Id == command.OrderId && !o.IsDeleted, cancellationToken);
 
@@ -74,6 +78,21 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
         if (validationFailure is not null)
         {
             return validationFailure;
+        }
+
+        if (_transitionPolicy?.RequiresKitchenBoardHandover(command.NewStatus) == true)
+        {
+            var workStates = await KitchenBoardHandoverGuard.ReadAsync(
+                _context, [order], true, cancellationToken);
+            var blockingReason = workStates[order.Id].BlockReason(order);
+            if (blockingReason is not null)
+            {
+                return ApiResponse<OrderDto>.FailureWithCode(
+                    blockingReason == ErrorCodes.KitchenCorrectionUnresolved
+                        ? "A kitchen correction must be acknowledged before handover."
+                        : "Kitchen work must be completed before handover.",
+                    blockingReason);
+            }
         }
 
         if (command.NewStatus == OrderStatus.Cancelled)

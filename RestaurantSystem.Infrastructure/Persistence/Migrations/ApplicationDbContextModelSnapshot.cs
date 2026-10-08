@@ -3597,6 +3597,76 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("group_memberships");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.KitchenBoardWorkCompletion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<long?>("AccountRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("account_revision");
+
+                    b.Property<int>("AcknowledgedOrderVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("acknowledged_order_version");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<long>("Sequence")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("sequence")
+                        .HasDefaultValueSql("next_kitchen_board_completion_sequence()");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<Guid>("WorkItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_item_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_kitchen_board_work_completions");
+
+                    b.HasIndex("Sequence")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "WorkItemId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("kitchen_board_work_completions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_kitchen_board_work_completion_values", "acknowledged_order_version > 0 AND (account_revision IS NULL OR account_revision > 0)");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Menu", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7313,6 +7383,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasComputedColumnSql("COALESCE(withdrawn_at, created_at)", true);
 
+                    b.Property<long>("KitchenBoardSequence")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bigint")
+                        .HasColumnName("kitchen_board_sequence")
+                        .HasDefaultValueSql("next_kitchen_board_change_sequence()");
+
                     b.Property<string>("KitchenChangesJson")
                         .HasColumnType("jsonb")
                         .HasColumnName("kitchen_changes_json");
@@ -7346,6 +7422,9 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_order_operational_notes");
+
+                    b.HasIndex("KitchenBoardSequence")
+                        .IsUnique();
 
                     b.HasIndex("FeedEventAt", "Id");
 
@@ -11439,6 +11518,18 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Group");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.KitchenBoardWorkCompletion", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_kitchen_board_work_completions_orders_order_id");
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.MenuDefinition", b =>

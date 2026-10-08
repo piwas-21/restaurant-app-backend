@@ -1,6 +1,7 @@
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.ServerWorkspace.Dtos;
+using RestaurantSystem.Api.Features.KitchenBoard.Services;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -13,7 +14,8 @@ internal sealed class ServerTaskProjector : IServerTaskProjector
 
     public ServerTaskProjector(IOrderPermittedActionsService actions) => _actions = actions;
 
-    public ServerServiceTaskDto Project(Order order, DateTime serverTime)
+    public ServerServiceTaskDto Project(
+        Order order, DateTime serverTime, KitchenBoardHandoverState? kitchenBoardState = null)
     {
         var routing = order.RoutingStates
             .OrderBy(state => state.Target)
@@ -28,9 +30,14 @@ internal sealed class ServerTaskProjector : IServerTaskProjector
             .Single(action => action.Action == nameof(OrderAction.HandOver));
         var table = order.Type == OrderType.DineIn;
 
-        var deliveryAllowed = !requiredException && order.IsKitchenReleased && handOver.Allowed;
+        var routeBlocksDelivery = requiredException
+            && kitchenBoardState?.CanResolveRoutingException != true;
+        var boardBlockReason = kitchenBoardState?.BlockReason(order);
+        var deliveryAllowed = !routeBlocksDelivery && boardBlockReason is null
+            && order.IsKitchenReleased && handOver.Allowed;
         var deliveryReason = ResolveDeliveryReason(
-            deliveryAllowed, requiredException, order.IsKitchenReleased, handOver.ReasonCode);
+            deliveryAllowed, routeBlocksDelivery, boardBlockReason,
+            order.IsKitchenReleased, handOver.ReasonCode);
 
         return new ServerServiceTaskDto
         {
@@ -120,12 +127,18 @@ internal sealed class ServerTaskProjector : IServerTaskProjector
     private static string? ResolveDeliveryReason(
         bool deliveryAllowed,
         bool requiredException,
+        string? boardBlockReason,
         bool kitchenReleased,
         string? handOverReason)
     {
         if (deliveryAllowed)
         {
             return null;
+        }
+
+        if (boardBlockReason is not null)
+        {
+            return boardBlockReason;
         }
 
         if (requiredException)

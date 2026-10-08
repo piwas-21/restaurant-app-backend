@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.TenantFeatures;
+using RestaurantSystem.Api.Features.KitchenBoard.Services;
 using RestaurantSystem.Api.Features.ServerWorkspace.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -26,11 +28,14 @@ internal sealed class ServerTaskOrderReader : IServerTaskOrderReader
 
     private readonly ApplicationDbContext _context;
     private readonly IServerTaskProjector _projector;
+    private readonly ITenantFeatures? _features;
 
-    public ServerTaskOrderReader(ApplicationDbContext context, IServerTaskProjector projector)
+    public ServerTaskOrderReader(
+        ApplicationDbContext context, IServerTaskProjector projector, ITenantFeatures? features = null)
     {
         _context = context;
         _projector = projector;
+        _features = features;
     }
 
     public async Task<List<ServerServiceTaskDto>> LoadPageAsync(
@@ -59,9 +64,12 @@ internal sealed class ServerTaskOrderReader : IServerTaskOrderReader
         var orderIds = candidateRows.Select(candidate => candidate.Id).ToArray();
         var orders = await LoadOrderGraph(orderIds, cancellationToken);
         var byId = orders.ToDictionary(order => order.Id);
+        var boardStates = await KitchenBoardHandoverGuard.ReadAsync(
+            _context, orders, KitchenBoardFeaturePolicy.IsEnabled(_features), cancellationToken);
         return candidateRows
             .Where(candidate => byId.ContainsKey(candidate.Id))
-            .Select(candidate => _projector.Project(byId[candidate.Id], serverTime))
+            .Select(candidate => _projector.Project(byId[candidate.Id], serverTime,
+                boardStates[candidate.Id]))
             .ToList();
     }
 
@@ -90,7 +98,10 @@ internal sealed class ServerTaskOrderReader : IServerTaskOrderReader
             .Include(order => order.RoutingStates)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
-        return orders.Select(order => _projector.Project(order, serverTime)).ToList();
+        var boardStates = await KitchenBoardHandoverGuard.ReadAsync(
+            _context, orders, KitchenBoardFeaturePolicy.IsEnabled(_features), cancellationToken);
+        return orders.Select(order => _projector.Project(order, serverTime,
+            boardStates[order.Id])).ToList();
     }
 
     public List<ServerServiceTaskDto> Filter(
