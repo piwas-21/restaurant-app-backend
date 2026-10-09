@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Filters;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
 using RestaurantSystem.Api.Features.Orders.Models;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedUpdatesQuery;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.Orders;
 
@@ -33,11 +35,19 @@ public class PrinterFeedController : ControllerBase
 {
     private readonly CustomMediator _mediator;
     private readonly ILogger<PrinterFeedController> _logger;
+    private readonly OrderRoutingSettings _routingSettings;
+    private readonly TimeProvider _timeProvider;
 
-    public PrinterFeedController(CustomMediator mediator, ILogger<PrinterFeedController> logger)
+    public PrinterFeedController(
+        CustomMediator mediator,
+        ILogger<PrinterFeedController> logger,
+        IOptions<OrderRoutingSettings> routingSettings,
+        TimeProvider timeProvider)
     {
         _mediator = mediator;
         _logger = logger;
+        _routingSettings = routingSettings.Value;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>
@@ -61,8 +71,11 @@ public class PrinterFeedController : ControllerBase
             var deviceId = deviceHeader.IsPresent
                 ? deviceHeader.Value ?? string.Empty
                 : null;
+            var recoveryFence = PrinterFeedOrderCursor.ResolveRecoveryFence(
+                orderCursor, _timeProvider.GetUtcNow().UtcDateTime, _routingSettings);
             var orderDtos = await _mediator.SendQuery(
-                new PrinterFeedQuery(modifiedSince, language, deviceId, orderCursor),
+                new PrinterFeedQuery(
+                    modifiedSince, language, deviceId, orderCursor, recoveryFence.CutoffUtc),
                 cancellationToken);
             var updatePage = await _mediator.SendQuery(
                 new PrinterFeedUpdatesQuery(modifiedSince, updateCursor), cancellationToken);
@@ -79,7 +92,10 @@ public class PrinterFeedController : ControllerBase
                     // A full page conservatively requests one more page, including an empty
                     // terminal page at an exact multiple. Older clients ignore these fields.
                     hasMoreOrders = orderDtos.Count == PrinterFeedQuery.MaxOrdersPerPoll,
-                    nextOrderCursor = orderDtos.Count > 0 ? PrinterFeedOrderCursor.Encode(orderDtos[^1]) : null,
+                    nextOrderCursor = orderDtos.Count > 0
+                        ? PrinterFeedOrderCursor.Encode(
+                            orderDtos[^1], recoveryFence.CutoffUtc, recoveryFence.IssuedAtUtc)
+                        : null,
                     updates = updatePage.Items,
                     nextUpdateCursor = updatePage.NextUpdateCursor,
                     hasMoreUpdates = updatePage.HasMoreUpdates
