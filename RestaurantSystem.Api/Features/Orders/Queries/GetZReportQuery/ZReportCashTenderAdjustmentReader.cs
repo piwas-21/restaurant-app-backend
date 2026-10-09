@@ -131,13 +131,14 @@ internal static class ZReportCashTenderAdjustmentReader
                 exactRefundMinor = checked(exactRefundMinor + refund.ExactRefundMinor);
             }
 
-            // RefundedAmount is cumulative. If evidence cannot fit inside that exact total,
-            // keep the existing exact refund treatment instead of guessing which amount/currency
-            // the database row represents.
-            if (exactRefundMinor <= 0 || exactRefundMinor > payment.RefundedMinor)
+            // RefundedAmount is cumulative. Restore only the evidenced exact amount that is
+            // actually present in the payment's ledger; any remaining exact refund stays on the
+            // existing refund-date path.
+            var appliedExactRefundMinor = Math.Min(exactRefundMinor, payment.RefundedMinor);
+            if (appliedExactRefundMinor <= 0)
                 continue;
 
-            AddMinor(adjustments, paymentCurrency, exactRefundMinor);
+            AddMinor(adjustments, paymentCurrency, appliedExactRefundMinor);
         }
     }
 

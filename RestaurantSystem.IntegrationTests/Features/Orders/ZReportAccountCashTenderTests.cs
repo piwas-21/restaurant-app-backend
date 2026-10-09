@@ -65,40 +65,74 @@ public sealed class ZReportAccountCashTenderTests(DatabaseFixture fixture) : IAs
             await context.SaveChangesAsync();
         }
 
-        (await ReadNetCashAsync(DayOne)).Should().BeEquivalentTo(
+        var dayOne = await ReadNetCashAsync(DayOne);
+        var dayTwo = await ReadNetCashAsync(DayOne.AddDays(1));
+        dayOne.Should().BeEquivalentTo(
             new Dictionary<string, long> { ["CHF"] = 215 });
-        (await ReadNetCashAsync(DayOne.AddDays(1))).Should().BeEquivalentTo(
+        dayTwo.Should().BeEquivalentTo(
             new Dictionary<string, long> { ["CHF"] = -110 });
-        (await ReadNetCashAsync(DayOne.AddDays(2))).Should().BeEquivalentTo(
+        var dayThree = await ReadNetCashAsync(DayOne.AddDays(2));
+        var dayFour = await ReadNetCashAsync(DayOne.AddDays(3));
+        dayThree.Should().BeEquivalentTo(
             new Dictionary<string, long> { ["CHF"] = -95 });
-        (await ReadNetCashAsync(DayOne.AddDays(3))).Should().BeEquivalentTo(
+        dayFour.Should().BeEquivalentTo(
             new Dictionary<string, long> { ["CHF"] = 0 },
             "the exact refund is removed on its database date after its physical cash return was already reported");
+        new[] { dayOne, dayTwo, dayThree, dayFour }.SelectMany(value => value.Values).Sum()
+            .Should().Be(10, "the original 215 CHF collection less physical returns of 110 and 95 leaves 10");
     }
 
     [Fact]
-    public async Task Net_cash_keeps_exact_fallback_for_legacy_unfinalized_and_inconsistent_refunds()
+    public async Task Net_cash_caps_refund_relocation_to_the_amount_applied_to_the_payment_ledger()
     {
         await using (var context = fixture.CreateContext())
         {
-            AddLegacyCashPayment(context, "legacy-no-evidence", DayOne.AddHours(8),
-                amountMinor: 300, refundedMinor: 100, refundDate: DayOne.AddDays(1).AddHours(8));
             AddAccountTender(context, "cumulative-mismatch", DayOne.AddHours(9),
                 currency: "CHF", exactMinor: 200, tipMinor: 0, dueMinor: 200,
                 receivedMinor: 200, refundDate: DayOne.AddDays(1).AddHours(9),
                 refundExactMinor: 200, cashReturnedMinor: 200,
                 observedAt: DayOne.AddHours(11), paymentRefundedMinor: 100);
+            await context.SaveChangesAsync();
+        }
+
+        var physicalReturnDay = await ReadNetCashAsync(DayOne);
+        var refundLedgerDay = await ReadNetCashAsync(DayOne.AddDays(1));
+        physicalReturnDay.Should().BeEquivalentTo(
+            new Dictionary<string, long> { ["CHF"] = 0 },
+            "the 200 CHF capture and its physical 200 CHF return occurred on the same day");
+        refundLedgerDay.Should().BeEquivalentTo(
+            new Dictionary<string, long> { ["CHF"] = 0 },
+            "only the 100 CHF refund reflected in the payment ledger is restored from its refund date");
+        (physicalReturnDay.Values.Sum() + refundLedgerDay.Values.Sum()).Should().Be(0,
+            "the payment has no remaining physical cash after the confirmed 200 CHF return");
+    }
+
+    [Fact]
+    public async Task Net_cash_keeps_exact_fallback_for_legacy_and_unfinalized_refunds()
+    {
+        await using (var context = fixture.CreateContext())
+        {
+            AddLegacyCashPayment(context, "legacy-no-evidence", DayOne.AddHours(8),
+                amountMinor: 300, refundedMinor: 100, refundDate: DayOne.AddDays(1).AddHours(8));
             AddAccountTender(context, "not-finalized", DayOne.AddHours(10),
                 currency: "CHF", exactMinor: 300, tipMinor: 0, dueMinor: 300,
-                receivedMinor: 300, refundDate: DayOne.AddDays(1).AddHours(10),
+                receivedMinor: 300,
                 refundExactMinor: 100, cashReturnedMinor: 100,
                 observedAt: DayOne.AddHours(12), finalized: false);
             await context.SaveChangesAsync();
         }
 
-        (await ReadNetCashAsync(DayOne.AddDays(1))).Should().BeEquivalentTo(
-            new Dictionary<string, long> { ["CHF"] = -300 },
-            "legacy exact refunds remain exact, and evidence is not applied to a mismatched or unfinished cumulative refund");
+        var captureAndObservedReturnsDay = await ReadNetCashAsync(DayOne);
+        var refundLedgerDay = await ReadNetCashAsync(DayOne.AddDays(1));
+        captureAndObservedReturnsDay.Should().BeEquivalentTo(
+            new Dictionary<string, long> { ["CHF"] = 500 },
+            "the 600 CHF legacy and account cash captures are reduced by a 100 CHF observed physical return");
+        refundLedgerDay.Should().BeEquivalentTo(
+            new Dictionary<string, long> { ["CHF"] = -100 },
+            "the legacy refund remains exact, while unfinished evidence creates no refund-date adjustment");
+        (captureAndObservedReturnsDay.Values.Sum() + refundLedgerDay.Values.Sum())
+            .Should().Be(400,
+                "the 600 captured, less 100 physically returned and 100 legacy exact refund, leaves 400");
     }
 
     private static void AddAccountTender(
@@ -124,7 +158,7 @@ public sealed class ZReportAccountCashTenderTests(DatabaseFixture fixture) : IAs
         var receiptId = Guid.NewGuid();
         var actorId = Guid.NewGuid();
         var paymentMinor = exactMinor - tipMinor;
-        var appliedRefundMinor = paymentRefundedMinor ?? refundExactMinor;
+        var appliedRefundMinor = paymentRefundedMinor ?? (finalized ? refundExactMinor : null);
         var refundStatus = appliedRefundMinor.GetValueOrDefault() <= 0
             ? PaymentStatus.Completed
             : appliedRefundMinor >= paymentMinor
