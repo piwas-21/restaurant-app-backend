@@ -13,8 +13,12 @@ internal sealed record AccountAmendmentRefundSnapshot(
     IReadOnlyDictionary<Guid, long> AuthorizedRefundMinorByPayment,
     IReadOnlyDictionary<Guid, AccountCashRefundHistory> CashRefundHistoryByAttempt);
 
+internal sealed record AccountAmendmentRefundReadOptions(
+    Guid? ExcludedOperationId = null,
+    Guid? CancellationCashTargetOrderId = null);
+
 /// <summary>Checks that every table-account refund is backed by one resolved amendment operation.</summary>
-internal static class AccountAmendmentRefundIntegrity
+internal static partial class AccountAmendmentRefundIntegrity
 {
     internal static async Task<AccountAmendmentRefundSnapshot> ReadAsync(
         ApplicationDbContext context,
@@ -23,8 +27,10 @@ internal static class AccountAmendmentRefundIntegrity
         IReadOnlyList<AccountPaymentAttempt> attempts,
         AccountMoney money,
         CancellationToken cancellationToken,
-        Guid? excludedOperationId = null)
+        AccountAmendmentRefundReadOptions? options = null)
     {
+        var excludedOperationId = options?.ExcludedOperationId;
+        var cancellationCashTargetOrderId = options?.CancellationCashTargetOrderId;
         var allocationIds = attempts.SelectMany(value => value.Allocations)
             .Select(value => value.Id).ToArray();
         var reversalRows = allocationIds.Length == 0 ? []
@@ -40,11 +46,14 @@ internal static class AccountAmendmentRefundIntegrity
             if (excludedOperationId is Guid excludeId)
                 operationQuery = operationQuery.Where(value => value.Id != excludeId);
             operations = await operationQuery.Include(value => value.Legs).ThenInclude(value => value.Attempts)
+                .Include(value => value.Legs).ThenInclude(value => value.CashRefundIntent)
                 .ToListAsync(cancellationToken);
         }
         var amendmentById = amendments.ToDictionary(value => value.Id);
         if (operations.Any(value => !amendmentById.ContainsKey(value.AmendmentId)))
             throw NeedsReconciliation();
+        await AccountAmendmentLoyaltyJournalIntegrity.ValidateResolvedOperationsAsync(
+            context, operations, amendments, cancellationToken);
 
         var legIds = operations.SelectMany(value => value.Legs).Select(value => value.Id).ToArray();
         if (reversals.Any(value => !legIds.Contains(value.RefundLegId)))
@@ -56,8 +65,23 @@ internal static class AccountAmendmentRefundIntegrity
         ValidateResolvedAmendments(amendments, operations, evidence, reversals, attempts, money);
         var authorized = BuildAuthorizedRefunds(operations, orders, money);
         ValidateRefundedCapturedTenders(orders, operations, attempts, reversals, money);
+        IReadOnlySet<Guid>? cancellationCashTargetLegIds = null;
+        if (cancellationCashTargetOrderId is Guid targetOrderId)
+        {
+            var cashAttemptIds = attempts.Where(value => value.State == AccountPaymentState.Captured
+                    && value.PaymentMethod == PaymentMethod.Cash && value.CashCollectionReceipt is not null)
+                .Select(value => value.Id).ToHashSet();
+            var targetLegs = operations.Where(value => value.SourceOrderId == targetOrderId)
+                .SelectMany(value => value.Legs)
+                .Where(value => value.Custody == OrderAmendmentRefundCustody.ManualTill
+                    && value.AccountPaymentAttemptId is Guid attemptId && cashAttemptIds.Contains(attemptId))
+                .Select(value => value.Id).ToHashSet();
+            if (targetLegs.Count > 0)
+                cancellationCashTargetLegIds = targetLegs;
+        }
         var cashHistory = await AccountCashRefundHistoryReader.ReadAsync(context,
-            attempts.Select(value => value.Id).ToArray(), cancellationToken, excludedOperationId);
+            attempts.Select(value => value.Id).ToArray(), cancellationToken, excludedOperationId,
+            cancellationCashTargetLegIds);
         return new AccountAmendmentRefundSnapshot(reversals, authorized, cashHistory);
     }
 
@@ -99,7 +123,7 @@ internal static class AccountAmendmentRefundIntegrity
             || financial.ResolutionStatus != OrderAmendmentFinancialResolutionStatus.Resolved
             || financial.CreditState != OrderAmendmentCreditState.Resolved
             || financial.RefundState != OrderAmendmentRefundState.Resolved
-            || financial.LoyaltyState != OrderAmendmentLoyaltyState.None
+            || !OrderBillingCreditConsistency.HasSettledLoyaltyEvidence(financial)
             || financial.PotentialCreditMinor != operation.CreditMinor
             || operation.CreditMinor <= 0 || operation.RefundMinor < 0
             || operation.RefundMinor > operation.CreditMinor
@@ -111,37 +135,11 @@ internal static class AccountAmendmentRefundIntegrity
             || legs.Any(value => value.State != OrderAmendmentRefundLegState.Succeeded
                 || value.ResolvedAt is null || value.Currency != money.Currency || value.AmountMinor <= 0))
             throw NeedsReconciliation();
-        ValidateResult(operation);
+        ValidateResult(operation, financial);
         var allocationById = attempts.SelectMany(value => value.Allocations).ToDictionary(value => value.Id);
         foreach (var leg in legs)
             ValidateLeg(operation, leg, evidence.Where(value => value.RefundLegId == leg.Id).ToArray(),
                 reversals.Where(value => value.RefundLegId == leg.Id).ToArray(), allocationById, money);
-    }
-
-    private static void ValidateResult(OrderAmendmentResolutionOperation operation)
-    {
-        if (string.IsNullOrWhiteSpace(operation.ResultJson))
-            throw NeedsReconciliation();
-        var result = OrderAmendmentJson.Deserialize<OrderAmendmentResolutionResultDto>(operation.ResultJson);
-        if (result.RefundLegs is null)
-            throw NeedsReconciliation();
-        var resultLegs = result.RefundLegs.OrderBy(value => value.PaymentId).ToArray();
-        var operationLegs = operation.Legs.OrderBy(value => value.SourcePaymentId).ToArray();
-        if (result.OperationId != operation.Id || result.ClientOperationId != operation.ClientOperationId
-            || result.AmendmentId != operation.AmendmentId || result.SourceOrderId != operation.SourceOrderId
-            || result.State != OrderAmendmentResolutionOperationState.Resolved.ToString()
-            || result.Currency != operation.Currency || result.CreditMinor != operation.CreditMinor
-            || result.RefundMinor != operation.RefundMinor || result.UnpaidWaivedMinor != operation.UnpaidWaivedMinor
-            || !PostgresTimestampPrecision.MatchesColumn(result.ResolvedAt, operation.ResolvedAt)
-            || resultLegs.Length != operationLegs.Length
-            || resultLegs.Where((value, index) =>
-                value.PaymentId != operationLegs[index].SourcePaymentId
-                || value.Custody != operationLegs[index].Custody.ToString()
-                || value.State != OrderAmendmentRefundLegState.Succeeded.ToString()
-                || value.AmountMinor != operationLegs[index].AmountMinor
-                || !PostgresTimestampPrecision.MatchesColumn(
-                    value.ResolvedAt, operationLegs[index].ResolvedAt)).Any())
-            throw NeedsReconciliation();
     }
 
     private static void ValidateLeg(

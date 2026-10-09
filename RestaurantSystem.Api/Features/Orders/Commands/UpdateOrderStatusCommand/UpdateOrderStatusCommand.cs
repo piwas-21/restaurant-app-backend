@@ -96,7 +96,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
         }
 
         if (command.NewStatus == OrderStatus.Cancelled)
-            await AccountPaymentLedgerGuard.RequireOrderCorrectionAsync(_context, order.Id, cancellationToken);
+            await AccountPaymentLedgerGuard.RequireOrderCancellationAsync(_context, order.Id, cancellationToken);
         var previousStatus = order.Status.ToString();
         var statusHistory = CreateStatusHistory(order, command);
 
