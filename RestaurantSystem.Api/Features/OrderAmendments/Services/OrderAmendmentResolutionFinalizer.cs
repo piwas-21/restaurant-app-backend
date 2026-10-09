@@ -147,7 +147,8 @@ public sealed partial class OrderAmendmentResolutionFinalizer(
                 .Include(value => value.Allocations.Where(allocation => allocation.OrderId == source.Id))
                 .ToListAsync(cancellationToken);
         return await AccountAmendmentRefundIntegrity.ReadAsync(context, [source], amendments,
-            attempts, money, cancellationToken, currentOperationId);
+            attempts, money, cancellationToken,
+            new AccountAmendmentRefundReadOptions(ExcludedOperationId: currentOperationId));
     }
 
     private static void ValidateOperationSource(

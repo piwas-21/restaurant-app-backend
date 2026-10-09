@@ -18,7 +18,8 @@ public sealed class AccountCashRefundHistoryPrefixTests
     {
         var fixture = CreateFixture();
 
-        RequireValid(fixture);
+        Action action = () => RequireValid(fixture);
+        action.Should().NotThrow();
     }
 
     [Fact]
@@ -217,10 +218,11 @@ public sealed class AccountCashRefundHistoryPrefixTests
 
     private static void RequireValid(PendingCashTailCase fixture) =>
         AccountCashRefundHistoryPrefix.RequireUnrelatedPendingTail(
-            fixture.Intent, fixture.Leg, fixture.Operation, fixture.Receipt,
-            fixture.AttemptServiceSessionId, fixture.History, fixture.Evidence,
-            fixture.TailReversals, fixture.HistoryReversals, fixture.Allocations,
-            fixture.PriorOperationIds, fixture.TargetSourceOrderIds);
+            fixture.Intent, fixture.Leg, fixture.Operation, new AccountCashRefundPendingTailProof(
+                fixture.Receipt, fixture.AttemptServiceSessionId, fixture.History, fixture.Evidence,
+                fixture.TailReversals, new AccountCashRefundPendingTailScope(
+                    fixture.HistoryReversals, fixture.Allocations,
+                    fixture.PriorOperationIds, fixture.TargetSourceOrderIds)));
 
     private static void RequireRejected(PendingCashTailCase fixture)
     {

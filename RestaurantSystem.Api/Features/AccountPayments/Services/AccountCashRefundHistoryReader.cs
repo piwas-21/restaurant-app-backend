@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
@@ -9,7 +8,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
-internal static class AccountCashRefundHistoryReader
+internal static partial class AccountCashRefundHistoryReader
 {
     internal static async Task<IReadOnlyDictionary<Guid, AccountCashRefundHistory>> ReadAsync(
         ApplicationDbContext context, IReadOnlyCollection<Guid> attemptIds,
@@ -17,107 +16,21 @@ internal static class AccountCashRefundHistoryReader
         // Used only by cancellation integrity; null preserves whole-history validation.
         IReadOnlySet<Guid>? cancellationTargetLegIds = null)
     {
-        AccountCashRefundHistoryReadLimit.RequireWithinLimit(attemptIds.Count);
-        var cancellationTargets = cancellationTargetLegIds?.ToHashSet();
-        if (cancellationTargets is not null
-            && (cancellationTargets.Count == 0 || cancellationTargets.Contains(Guid.Empty)))
-            throw ReconciliationRequired();
-        if (cancellationTargets is not null)
-            AccountCashRefundHistoryReadLimit.RequireWithinLimit(cancellationTargets.Count);
-        var ids = attemptIds.Distinct().ToArray();
-        if (ids.Length == 0)
-        {
-            if (cancellationTargets is not null)
-                throw ReconciliationRequired();
-            return new Dictionary<Guid, AccountCashRefundHistory>();
-        }
+        var request = PrepareRequest(attemptIds, cancellationTargetLegIds);
+        if (request.AttemptIds.Length == 0)
+            return EmptyHistory(request);
 
-        var attempts = await AccountCashRefundHistoryReadLimit.ReadAsync(
-            context.AccountPaymentAttempts.AsNoTracking()
-            .Where(value => ids.Contains(value.Id))
-            .Include(value => value.CashCollectionReceipt), cancellationToken);
+        var attempts = await ReadAttemptsAsync(context, request.AttemptIds, cancellationToken);
         var cashAttempts = attempts.Where(value => value.PaymentMethod == PaymentMethod.Cash
                 && value.CashCollectionReceipt is not null)
             .ToArray();
         if (cashAttempts.Length == 0)
-        {
-            if (cancellationTargets is not null)
-                throw ReconciliationRequired();
-            return new Dictionary<Guid, AccountCashRefundHistory>();
-        }
+            return EmptyHistory(request);
 
-        var cashAttemptIds = cashAttempts.Select(value => value.Id).ToArray();
-        var allocations = await AccountCashRefundHistoryReadLimit.ReadAsync(
-            context.AccountPaymentAllocations.AsNoTracking()
-                .Where(value => cashAttemptIds.Contains(value.AttemptId)), cancellationToken);
-        foreach (var attempt in cashAttempts)
-            attempt.Allocations = allocations.Where(value => value.AttemptId == attempt.Id).ToArray();
-        var allLegs = await AccountCashRefundHistoryReadLimit.ReadAsync(
-            context.OrderAmendmentRefundLegs.AsNoTracking()
-            .Where(value => value.AccountPaymentAttemptId.HasValue
-                && cashAttemptIds.Contains(value.AccountPaymentAttemptId.Value))
-            .Include(value => value.CashRefundIntent!.ReturnEvidence), cancellationToken);
-        var excludedLegIds = GetExcludedLegIds(allLegs, excludedOperationId);
-        var legs = allLegs.Where(value => !excludedLegIds.Contains(value.Id)).ToArray();
-        var legIds = legs.Select(value => value.Id).ToArray();
-        var legIdSet = legIds.ToHashSet();
-        if (cancellationTargets is not null
-            && cancellationTargets.Any(value => !legIdSet.Contains(value)))
-            throw ReconciliationRequired();
-        var targetsByAttempt = cancellationTargets is null ? null : legs
-            .Where(value => cancellationTargets.Contains(value.Id))
-            .GroupBy(value => value.AccountPaymentAttemptId ?? throw ReconciliationRequired())
-            .ToDictionary(value => value.Key,
-                value => (IReadOnlySet<Guid>)value.Select(leg => leg.Id).ToHashSet());
-        if (await context.OrderAmendmentRefundLegs.AsNoTracking()
-                .AnyAsync(value => legIds.Contains(value.Id) && value.Attempts.Any(), cancellationToken))
-            throw ReconciliationRequired();
-        var intents = await AccountCashRefundHistoryReadLimit.ReadAsync(
-            context.AccountCashRefundIntents.AsNoTracking()
-            .Where(value => cashAttemptIds.Contains(value.AttemptId)
-                && (excludedOperationId == null || value.OperationId != excludedOperationId))
-            .Include(value => value.ReturnEvidence), cancellationToken);
-        if (intents.Any(value => !legIds.Contains(value.RefundLegId)))
-            throw ReconciliationRequired();
-
-        var allocationIds = cashAttempts.SelectMany(value => value.Allocations)
-            .Select(value => value.Id).ToArray();
-        var reversals = allocationIds.Length == 0 ? []
-            : await AccountCashRefundHistoryReadLimit.ReadAsync(
-                context.AccountPaymentAllocationReversals.AsNoTracking()
-                .Where(value => allocationIds.Contains(value.AllocationId)
-                    && !excludedLegIds.Contains(value.RefundLegId)), cancellationToken);
-        var evidence = legIds.Length == 0 ? []
-            : await AccountCashRefundHistoryReadLimit.ReadAsync(
-                context.OrderAmendmentRefundEvidence.AsNoTracking()
-                .Where(value => legIds.Contains(value.RefundLegId)), cancellationToken);
-        var operationIds = legs.Select(value => value.OperationId).Distinct().ToArray();
-        var operations = operationIds.Length == 0 ? []
-            : await AccountCashRefundHistoryReadLimit.ReadAsync(
-                context.OrderAmendmentResolutionOperations.AsNoTracking()
-                .Where(value => operationIds.Contains(value.Id)), cancellationToken);
-
-        var result = new Dictionary<Guid, AccountCashRefundHistory>();
-        foreach (var attempt in cashAttempts)
-        {
-            var receipt = attempt.CashCollectionReceipt!;
-            var snapshot = AccountPaymentSnapshots.Deserialize<AccountPaymentQuoteSnapshot>(attempt.SnapshotJson);
-            AccountCashCaptureReceiptPolicy.ValidateStored(attempt, snapshot);
-            ValidateCapturedAllocations(attempt);
-            var original = new CashSettlementQuote(receipt.PolicyVersion, receipt.Currency,
-                receipt.PaymentMethod, receipt.ExactAmountMinor, receipt.AdjustmentMinor,
-                receipt.DueAmountMinor);
-            AccountCashSettlementPolicy.RequireMatches(original, attempt.Currency,
-                attempt.PaymentMethod, attempt.AmountMinor);
-            var attemptAllocationIds = attempt.Allocations.Select(value => value.Id).ToHashSet();
-
-            result.Add(attempt.Id, ReadOne(attempt, receipt, new AccountCashHistoryEvidence(
-                legs.Where(value => value.AccountPaymentAttemptId == attempt.Id).ToArray(),
-                intents.Where(value => value.AttemptId == attempt.Id).ToArray(),
-                reversals.Where(value => attemptAllocationIds.Contains(value.AllocationId)).ToArray(),
-                evidence, operations), targetsByAttempt?.GetValueOrDefault(attempt.Id), cancellationToken));
-        }
-        return result;
+        var legRows = await ReadLegRowsAsync(context, cashAttempts, request.CancellationTargetLegIds,
+            excludedOperationId, cancellationToken);
+        var ledgerRows = await ReadLedgerRowsAsync(context, cashAttempts, legRows, cancellationToken);
+        return ReadHistories(cashAttempts, legRows, ledgerRows, cancellationToken);
     }
 
     private static HashSet<Guid> GetExcludedLegIds(
@@ -127,83 +40,8 @@ internal static class AccountCashRefundHistoryReader
             : [];
 
     private static AccountCashRefundHistory ReadOne(
-        AccountPaymentAttempt attempt, AccountCashCollectionReceipt receipt,
-        AccountCashHistoryEvidence historyEvidence, IReadOnlySet<Guid>? cancellationTargetLegIds,
-        CancellationToken cancellationToken)
-    {
-        var (legs, intents, reversals, evidence, operations) = historyEvidence;
-        cancellationToken.ThrowIfCancellationRequested();
-        if (legs.Length != intents.Length || legs.Any(value => value.CashRefundIntent is null)
-            || intents.Any(value => legs.All(leg => leg.Id != value.RefundLegId)))
-            throw ReconciliationRequired();
-
-        var byLeg = legs.ToDictionary(value => value.Id);
-        var operationById = operations.ToDictionary(value => value.Id);
-        var allocationById = attempt.Allocations.ToDictionary(value => value.Id);
-        var (priorOperationIds, targetSourceOrderIds) = AccountCashRefundHistoryPrefix.TargetScope(
-            cancellationTargetLegIds, byLeg, operationById);
-        var remaining = intents.ToList();
-        var validatedTargets = new HashSet<Guid>();
-        var refundedExact = 0L;
-        var refundedCash = 0L;
-        var fingerprint = AccountCashRefundHistoryFingerprint.Seed(receipt);
-        while (remaining.Count > 0)
-        {
-            var next = remaining.Where(value => value.PriorHistoryFingerprint == fingerprint
-                && value.PreviouslyRefundedExactMinor == refundedExact
-                && value.PreviouslyRefundedCashMinor == refundedCash).ToArray();
-            if (next.Length != 1)
-                throw ReconciliationRequired();
-            var nextLeg = byLeg[next[0].RefundLegId];
-            if (cancellationTargetLegIds is not null
-                && validatedTargets.Count == cancellationTargetLegIds.Count
-                && nextLeg.State == OrderAmendmentRefundLegState.Pending)
-            {
-                if (remaining.Count != 1)
-                    throw ReconciliationRequired();
-                var tailIntent = next[0];
-                if (!operationById.TryGetValue(tailIntent.OperationId, out var tailOperation))
-                    throw ReconciliationRequired();
-                AccountCashRefundHistoryPrefix.RequireUnrelatedPendingTail(
-                    tailIntent, nextLeg, tailOperation, receipt, attempt.ServiceSessionId,
-                    new AccountCashRefundHistory(refundedExact, refundedCash, fingerprint),
-                    evidence.Where(value => value.RefundLegId == nextLeg.Id).ToArray(),
-                    reversals.Where(value => value.RefundLegId == nextLeg.Id).ToArray(),
-                    reversals, allocationById, priorOperationIds, targetSourceOrderIds);
-                break;
-            }
-            var intent = next[0];
-            var leg = byLeg[intent.RefundLegId];
-            if (!operationById.TryGetValue(intent.OperationId, out var operation))
-                throw ReconciliationRequired();
-            var scopes = OrderAmendmentJson.Deserialize<List<OrderAmendmentRefundScope>>(leg.FrozenScopesJson);
-            var legEvidence = evidence.Where(value => value.RefundLegId == leg.Id).ToArray();
-            var legReversals = reversals.Where(value => value.RefundLegId == leg.Id).ToArray();
-            var returnEvidence = intent.ReturnEvidence;
-            ValidateRefund(intent, new AccountCashRefundProof(leg, operation, receipt, scopes,
-                legEvidence, legReversals, allocationById), returnEvidence,
-                new AccountCashRefundHistory(refundedExact, refundedCash, fingerprint));
-            priorOperationIds.Add(operation.Id);
-
-            refundedExact = checked(refundedExact + intent.ExactRefundAmountMinor);
-            refundedCash = checked(refundedCash + intent.CashRefundAmountMinor);
-            fingerprint = AccountCashRefundHistoryFingerprint.Advance(
-                fingerprint, intent, returnEvidence!, scopes, legReversals);
-            if (cancellationTargetLegIds?.Contains(leg.Id) == true)
-                validatedTargets.Add(leg.Id);
-            remaining.Remove(intent);
-        }
-
-        if (cancellationTargetLegIds is not null
-            && validatedTargets.Count != cancellationTargetLegIds.Count)
-            throw ReconciliationRequired();
-
-        var allLegIds = legs.Select(value => value.Id).ToHashSet();
-        if (reversals.Any(value => !allLegIds.Contains(value.RefundLegId))
-            || reversals.Sum(value => value.AmountMinor) != refundedExact)
-            throw ReconciliationRequired();
-        return new AccountCashRefundHistory(refundedExact, refundedCash, fingerprint);
-    }
+        AccountCashRefundHistoryWalkContext context, CancellationToken cancellationToken) =>
+        ReadHistorySequence(context, cancellationToken);
 
     private static void ValidateCapturedAllocations(AccountPaymentAttempt attempt)
     {

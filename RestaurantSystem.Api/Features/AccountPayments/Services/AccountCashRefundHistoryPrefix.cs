@@ -6,6 +6,20 @@ using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
+internal sealed record AccountCashRefundPendingTailScope(
+    IReadOnlyList<AccountPaymentAllocationReversal> HistoryReversals,
+    IReadOnlyDictionary<Guid, AccountPaymentAllocation> Allocations,
+    IReadOnlySet<Guid> PriorOperationIds,
+    IReadOnlySet<Guid> TargetSourceOrderIds);
+
+internal sealed record AccountCashRefundPendingTailProof(
+    AccountCashCollectionReceipt Receipt,
+    Guid AttemptServiceSessionId,
+    AccountCashRefundHistory History,
+    IReadOnlyList<OrderAmendmentRefundEvidence> Evidence,
+    IReadOnlyList<AccountPaymentAllocationReversal> TailReversals,
+    AccountCashRefundPendingTailScope Scope);
+
 /// <summary>Allows cancellation checks to stop after their resolved cash legs, never before them.</summary>
 internal static class AccountCashRefundHistoryPrefix
 {
@@ -33,17 +47,12 @@ internal static class AccountCashRefundHistoryPrefix
 
     internal static void RequireUnrelatedPendingTail(
         AccountCashRefundIntent intent, OrderAmendmentRefundLeg leg,
-        OrderAmendmentResolutionOperation operation, AccountCashCollectionReceipt receipt,
-        Guid attemptServiceSessionId,
-        AccountCashRefundHistory history, IReadOnlyList<OrderAmendmentRefundEvidence> evidence,
-        IReadOnlyList<AccountPaymentAllocationReversal> tailReversals,
-        IReadOnlyList<AccountPaymentAllocationReversal> historyReversals,
-        IReadOnlyDictionary<Guid, AccountPaymentAllocation> allocations,
-        IReadOnlySet<Guid> priorOperationIds, IReadOnlySet<Guid> targetSourceOrderIds)
+        OrderAmendmentResolutionOperation operation, AccountCashRefundPendingTailProof proof)
     {
-        if (operation.Id != intent.OperationId || priorOperationIds.Contains(operation.Id)
-            || operation.SourceOrderId == Guid.Empty || targetSourceOrderIds.Contains(operation.SourceOrderId)
-            || operation.ServiceSessionId != attemptServiceSessionId
+        var tailScope = proof.Scope;
+        if (operation.Id != intent.OperationId || tailScope.PriorOperationIds.Contains(operation.Id)
+            || operation.SourceOrderId == Guid.Empty || tailScope.TargetSourceOrderIds.Contains(operation.SourceOrderId)
+            || operation.ServiceSessionId != proof.AttemptServiceSessionId
             || operation.State != OrderAmendmentResolutionOperationState.Processing
             || operation.ResolvedAt is not null || operation.FailureCode is not null
             || operation.ResultJson is not null
@@ -51,10 +60,10 @@ internal static class AccountCashRefundHistoryPrefix
             || leg.FailureCode is not null || leg.ManualTillReference is not null
             || leg.Custody != OrderAmendmentRefundCustody.ManualTill
             || !AccountAmendmentRefundIntegrity.HasNoProviderContext(leg)
-            || intent.ReturnEvidence is not null || evidence.Count != 0 || tailReversals.Count != 0)
+            || intent.ReturnEvidence is not null || proof.Evidence.Count != 0 || proof.TailReversals.Count != 0)
             throw ReconciliationRequired();
 
-        AccountCashRefundIntentValidator.RequireMatchesHistory(intent, leg, operation, receipt, history);
+        AccountCashRefundIntentValidator.RequireMatchesHistory(intent, leg, operation, proof.Receipt, proof.History);
         var scopes = OrderAmendmentJson.Deserialize<List<OrderAmendmentRefundScope>>(leg.FrozenScopesJson);
         if (scopes.Count == 0 || scopes.Sum(value => value.AmountMinor) != leg.AmountMinor)
             throw ReconciliationRequired();
@@ -62,9 +71,9 @@ internal static class AccountCashRefundHistoryPrefix
         for (var index = 0; index < scopes.Count; index++)
         {
             var scope = scopes[index];
-            if (!allocations.TryGetValue(scope.AllocationId, out var allocation)
+            if (!tailScope.Allocations.TryGetValue(scope.AllocationId, out var allocation)
                 || scope.OrderId != operation.SourceOrderId
-                || allocation.AttemptId != receipt.AttemptId || allocation.OrderPaymentId != leg.SourcePaymentId
+                || allocation.AttemptId != proof.Receipt.AttemptId || allocation.OrderPaymentId != leg.SourcePaymentId
                 || allocation.OrderId != scope.OrderId || allocation.OrderItemId != scope.OrderItemId
                 || allocation.MinorPerUnit != scope.MinorPerUnit || scope.MinorPerUnit <= 0
                 || scope.AmountMinor <= 0 || scope.UnitCount <= 0
@@ -75,7 +84,7 @@ internal static class AccountCashRefundHistoryPrefix
 
             if (scopes.Take(index).Any(previous => previous.AllocationId == scope.AllocationId
                     && Overlaps(previous.StartOrdinal, previous.UnitCount, scope.StartOrdinal, scope.UnitCount))
-                || historyReversals.Any(value => value.AllocationId == scope.AllocationId
+                || tailScope.HistoryReversals.Any(value => value.AllocationId == scope.AllocationId
                     && Overlaps(value.StartOrdinal, value.UnitCount, scope.StartOrdinal, scope.UnitCount)))
                 throw ReconciliationRequired();
         }

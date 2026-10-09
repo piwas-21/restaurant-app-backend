@@ -13,6 +13,10 @@ internal sealed record AccountAmendmentRefundSnapshot(
     IReadOnlyDictionary<Guid, long> AuthorizedRefundMinorByPayment,
     IReadOnlyDictionary<Guid, AccountCashRefundHistory> CashRefundHistoryByAttempt);
 
+internal sealed record AccountAmendmentRefundReadOptions(
+    Guid? ExcludedOperationId = null,
+    Guid? CancellationCashTargetOrderId = null);
+
 /// <summary>Checks that every table-account refund is backed by one resolved amendment operation.</summary>
 internal static partial class AccountAmendmentRefundIntegrity
 {
@@ -23,9 +27,10 @@ internal static partial class AccountAmendmentRefundIntegrity
         IReadOnlyList<AccountPaymentAttempt> attempts,
         AccountMoney money,
         CancellationToken cancellationToken,
-        Guid? excludedOperationId = null,
-        Guid? cancellationCashTargetOrderId = null)
+        AccountAmendmentRefundReadOptions? options = null)
     {
+        var excludedOperationId = options?.ExcludedOperationId;
+        var cancellationCashTargetOrderId = options?.CancellationCashTargetOrderId;
         var allocationIds = attempts.SelectMany(value => value.Allocations)
             .Select(value => value.Id).ToArray();
         var reversalRows = allocationIds.Length == 0 ? []

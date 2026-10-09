@@ -28,7 +28,8 @@ internal static class OrderAmendmentFinancialSourceFingerprintReader
                 .Include(value => value.Allocations.Where(allocation => allocation.OrderId == source.Id))
                 .ToListAsync(cancellationToken);
         var prior = await AccountAmendmentRefundIntegrity.ReadAsync(context, [source], amendments,
-            attempts, money, cancellationToken, currentOperationId);
+            attempts, money, cancellationToken,
+            new AccountAmendmentRefundReadOptions(ExcludedOperationId: currentOperationId));
         var attemptIds = attempts.Select(value => value.Id).ToArray();
         var journals = attemptIds.Length == 0 ? []
             : await context.AccountCheckoutJournals.AsNoTracking()

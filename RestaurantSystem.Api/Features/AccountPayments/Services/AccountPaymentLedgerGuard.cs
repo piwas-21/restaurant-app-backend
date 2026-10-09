@@ -134,7 +134,7 @@ internal static class AccountPaymentLedgerGuard
             .AsSplitQuery().ToListAsync(cancellationToken);
         var refundHistory = await AccountAmendmentRefundIntegrity.ReadAsync(
             context, [order], amendments, targetAttempts, money, cancellationToken,
-            cancellationCashTargetOrderId: orderId);
+            new AccountAmendmentRefundReadOptions(CancellationCashTargetOrderId: orderId));
         var remaining = AccountPaymentAllocationReversalMath.Apply(
             capturedAllocations, refundHistory.Reversals, money);
         if (remaining.Count > 0)

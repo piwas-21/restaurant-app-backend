@@ -10,6 +10,27 @@ internal sealed record AccountCashHistoryEvidence(
     IReadOnlyList<OrderAmendmentRefundEvidence> Evidence,
     IReadOnlyList<OrderAmendmentResolutionOperation> Operations);
 
+internal sealed record AccountCashRefundHistoryReadRequest(
+    Guid[] AttemptIds,
+    IReadOnlySet<Guid>? CancellationTargetLegIds);
+
+internal sealed record AccountCashRefundHistoryLegRows(
+    OrderAmendmentRefundLeg[] Legs,
+    HashSet<Guid> ExcludedLegIds,
+    AccountCashRefundIntent[] Intents,
+    IReadOnlyDictionary<Guid, IReadOnlySet<Guid>>? TargetsByAttempt);
+
+internal sealed record AccountCashRefundHistoryLedgerRows(
+    AccountPaymentAllocationReversal[] Reversals,
+    OrderAmendmentRefundEvidence[] Evidence,
+    OrderAmendmentResolutionOperation[] Operations);
+
+internal sealed record AccountCashRefundHistoryWalkContext(
+    AccountPaymentAttempt Attempt,
+    AccountCashCollectionReceipt Receipt,
+    AccountCashHistoryEvidence Evidence,
+    IReadOnlySet<Guid>? CancellationTargetLegIds);
+
 internal sealed record AccountCashRefundProof(
     OrderAmendmentRefundLeg Leg,
     OrderAmendmentResolutionOperation Operation,
