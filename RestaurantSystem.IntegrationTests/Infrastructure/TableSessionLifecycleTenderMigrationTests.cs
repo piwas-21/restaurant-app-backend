@@ -38,7 +38,9 @@ public sealed class TableSessionLifecycleTenderMigrationTests(DatabaseFixture fi
         var tableId = Guid.NewGuid();
         var releasedVisitId = Guid.NewGuid();
         var currentVisitId = Guid.NewGuid();
-        var releaseAt = DateTime.UtcNow;
+        // PostgreSQL timestamptz persists microseconds; seed an exact representable value so the
+        // rollback assertion compares retained evidence rather than client-side sub-microsecond ticks.
+        var releaseAt = new DateTime(DateTime.UtcNow.Ticks / 10 * 10, DateTimeKind.Utc);
         await using (var seed = fixture.CreateContext())
         {
             seed.Tables.Add(new Table

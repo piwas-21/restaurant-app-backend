@@ -55,6 +55,8 @@ public sealed class ReleaseTableServiceSessionCommandHandler
         if (session is null) return NotFound();
         if (locked.IdentityChanged || session.TableId.HasValue && locked.Table?.Id != session.TableId.Value)
             return Stale(session.Version);
+        if (!TableServiceSessionRowLock.IsPhysicalTableResolved(session, locked.Table))
+            return Refused("Resolve the physical table identity before releasing its table.");
 
         if (session.Status != TableServiceSessionStatus.Open)
             return Refused("A closed table visit cannot release its table.");

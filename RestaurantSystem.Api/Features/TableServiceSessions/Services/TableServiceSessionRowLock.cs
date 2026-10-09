@@ -56,10 +56,15 @@ public static class TableServiceSessionRowLock
         var identityChanged = session is not null && (located is null
             || session.TableId != located.TableId
             || session.TableNumber != located.TableNumber
-            || !located.TableId.HasValue && (!located.TableNumber.HasValue
-                || table is null
-                || table.TableNumber != located.TableNumber.Value.ToString(CultureInfo.InvariantCulture)));
+            || !located.TableId.HasValue && !located.TableNumber.HasValue);
         return new TableServiceSessionLifecycleRows(table, session, identityChanged);
+    }
+
+    public static bool IsPhysicalTableResolved(TableServiceSession session, Table? table)
+    {
+        if (session.TableId is Guid tableId) return table?.Id == tableId;
+        if (session.TableNumber is not int tableNumber || table is null) return false;
+        return table.TableNumber == tableNumber.ToString(CultureInfo.InvariantCulture);
     }
 }
 

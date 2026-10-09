@@ -67,6 +67,8 @@ public sealed class ClearPendingTableOrdersCommandHandler(
         if (session is null) return TargetResolution.Failed(NotFound());
         if (locked.IdentityChanged || (session.TableId.HasValue && locked.Table?.Id != session.TableId.Value))
             return TargetResolution.Failed(Stale(session.Version));
+        if (!TableServiceSessionRowLock.IsPhysicalTableResolved(session, locked.Table))
+            return TargetResolution.Failed(Refused("Resolve the physical table identity before clearing pending orders."));
         if (session.Status != TableServiceSessionStatus.Open)
             return TargetResolution.Failed(Refused("A closed table visit cannot clear pending orders."));
         if (expectedVersion is null || expectedVersion != session.Version)
@@ -115,7 +117,7 @@ public sealed class ClearPendingTableOrdersCommandHandler(
         order.Status != OrderStatus.Pending || order.Payments.Count > 0 || order.TotalPaid > 0
         || order.RoutingStates.Count > 0 || order.IsKitchenReleased || order.KitchenReleasedAt.HasValue;
 
-    private static void CancelOrders(IEnumerable<Order> orders, DateTime now, string audit)
+    private void CancelOrders(IEnumerable<Order> orders, DateTime now, string audit)
     {
         foreach (var order in orders)
         {
@@ -123,7 +125,7 @@ public sealed class ClearPendingTableOrdersCommandHandler(
             order.CancellationReason = ClearReason;
             order.UpdatedAt = now;
             order.UpdatedBy = audit;
-            order.StatusHistory.Add(new OrderStatusHistory
+            context.OrderStatusHistories.Add(new OrderStatusHistory
             {
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
