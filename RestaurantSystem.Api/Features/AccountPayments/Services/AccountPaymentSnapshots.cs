@@ -63,14 +63,7 @@ internal static class AccountPaymentSnapshots
     internal static AccountPaymentOperationDto ToOperation(AccountPaymentAttempt attempt)
     {
         var snapshot = Deserialize<AccountPaymentQuoteSnapshot>(attempt.SnapshotJson);
-        if (snapshot.TipMinor != attempt.TipMinor
-            || (snapshot.Mode == AccountPaymentMode.CustomAmount
-                ? snapshot.CustomSharePlanId != attempt.EqualSharePlanId
-                    || snapshot.CustomShareOrdinal != attempt.EqualShareOrdinal
-                : snapshot.Mode == AccountPaymentMode.Equal
-                    ? snapshot.EqualSharePlanId != attempt.EqualSharePlanId
-                        || snapshot.EqualShareOrdinal != attempt.EqualShareOrdinal
-                    : attempt.EqualSharePlanId is not null || attempt.EqualShareOrdinal is not null))
+        if (snapshot.TipMinor != attempt.TipMinor || !HasMatchingShareMetadata(snapshot, attempt))
             throw new ConflictException("The saved payment snapshot differs from its durable tender metadata.");
         if (snapshot.CashSettlement is CashSettlementQuote frozen)
             AccountCashSettlementPolicy.RequireMatches(frozen, attempt.Currency,
@@ -94,6 +87,16 @@ internal static class AccountPaymentSnapshots
                 receipt.ChangeMinor, receipt.CapturedAt)
         };
     }
+
+    private static bool HasMatchingShareMetadata(
+        AccountPaymentQuoteSnapshot snapshot, AccountPaymentAttempt attempt) => snapshot.Mode switch
+        {
+            AccountPaymentMode.CustomAmount => snapshot.CustomSharePlanId == attempt.EqualSharePlanId
+                && snapshot.CustomShareOrdinal == attempt.EqualShareOrdinal,
+            AccountPaymentMode.Equal => snapshot.EqualSharePlanId == attempt.EqualSharePlanId
+                && snapshot.EqualShareOrdinal == attempt.EqualShareOrdinal,
+            _ => attempt.EqualSharePlanId is null && attempt.EqualShareOrdinal is null
+        };
 
     internal static AccountEqualSharePlanDto ToPlan(AccountEqualSharePlan plan) => new(
         plan.ServiceSessionId, plan.Id, plan.OperationId, plan.AccountRevision,
