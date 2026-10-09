@@ -7,7 +7,9 @@ using RestaurantSystem.Api.Features.Basket.Services;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.Settings.Interfaces;
 using RestaurantSystem.Api.Features.TableGuestVisits.Services;
+using RestaurantSystem.Domain.Common.Enums;
 using LegacyCreateOrderCommand = RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand.CreateOrderCommand;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.CreateOrderFromBasketCommand;
@@ -19,6 +21,7 @@ public class CreateOrderFromBasketCommandHandler
     private readonly IBasketToOrderTranslator _translator;
     private readonly ICurrentUserService _currentUserService;
     private readonly CustomMediator _mediator;
+    private readonly IOrderTypeConfigurationService _orderTypeConfigurationService;
     private readonly ITableGuestRoundOperationStore? _guestRounds;
 
     public CreateOrderFromBasketCommandHandler(
@@ -26,12 +29,14 @@ public class CreateOrderFromBasketCommandHandler
         IBasketToOrderTranslator translator,
         ICurrentUserService currentUserService,
         CustomMediator mediator,
+        IOrderTypeConfigurationService orderTypeConfigurationService,
         ITableGuestRoundOperationStore? guestRounds = null)
     {
         _basketService = basketService;
         _translator = translator;
         _currentUserService = currentUserService;
         _mediator = mediator;
+        _orderTypeConfigurationService = orderTypeConfigurationService;
         _guestRounds = guestRounds;
     }
 
@@ -46,6 +51,17 @@ public class CreateOrderFromBasketCommandHandler
             if (replay is not null)
             {
                 return replay;
+            }
+        }
+
+        if (command.GuestRoundContext is not null)
+        {
+            var enabledOrderTypes = await _orderTypeConfigurationService.GetEnabledOrderTypesAsync(cancellationToken);
+            if (!enabledOrderTypes.Contains(OrderType.DineIn))
+            {
+                throw new BadRequestException(
+                    "Dine-in ordering is currently unavailable. Your table visit and basket are still saved. Try again later or ask staff.",
+                    ErrorCodes.OrderTypeNotAvailable);
             }
         }
 
