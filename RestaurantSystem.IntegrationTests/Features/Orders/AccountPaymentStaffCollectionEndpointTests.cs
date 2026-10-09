@@ -65,7 +65,7 @@ public sealed partial class AccountPaymentStaffCollectionEndpointTests(DatabaseF
             var bill = await client.GetFromJsonAsync<ApiResponse<AccountPaymentAccountDto>>(Route(account.SessionId), JsonOptions);
             bill!.Data!.AvailableMinor.Should().Be(1000);
             bill.Data.ActiveEqualSharePlan!.Slots.Select(slot => slot.AmountMinor)
-                .Should().Equal(334L, 333L, 333L);
+                .Should().Equal(330L, 330L, 340L);
         }
     }
 
@@ -105,7 +105,7 @@ public sealed partial class AccountPaymentStaffCollectionEndpointTests(DatabaseF
         var quote = (await quoteResponse.Content.ReadFromJsonAsync<
             ApiResponse<AccountPaymentOperationDto>>(JsonOptions))!.Data!;
         quote.State.Should().Be(AccountPaymentState.Quoted);
-        quote.AmountMinor.Should().Be(334);
+        quote.AmountMinor.Should().Be(330);
         quote.EqualSharePlanId.Should().Be(plan.PlanId);
         quote.EqualShareOrdinal.Should().Be(1);
 
@@ -134,11 +134,11 @@ public sealed partial class AccountPaymentStaffCollectionEndpointTests(DatabaseF
 
         var finalAccount = (await client.GetFromJsonAsync<
             ApiResponse<AccountPaymentAccountDto>>(route, JsonOptions))!.Data!;
-        finalAccount.OutstandingMinor.Should().Be(666);
-        finalAccount.AvailableMinor.Should().Be(666);
-        finalAccount.CapturedAccountPaymentMinor.Should().Be(334);
+        finalAccount.OutstandingMinor.Should().Be(670);
+        finalAccount.AvailableMinor.Should().Be(670);
+        finalAccount.CapturedAccountPaymentMinor.Should().Be(330);
         var capturedPlan = finalAccount.ActiveEqualSharePlan!;
-        capturedPlan.Slots.Select(value => value.AmountMinor).Should().Equal(334L, 333L, 333L);
+        capturedPlan.Slots.Select(value => value.AmountMinor).Should().Equal(330L, 330L, 340L);
         capturedPlan.Slots[0].ClaimState.Should().Be(AccountPaymentState.Captured);
 
         await using var verify = fixture.CreateContext();
@@ -148,9 +148,9 @@ public sealed partial class AccountPaymentStaffCollectionEndpointTests(DatabaseF
         attempt.EqualShareOrdinal.Should().Be(1);
         var order = await verify.Orders.Include(value => value.Payments)
             .SingleAsync(value => value.Id == account.OrderId);
-        order.TotalPaid.Should().Be(3.34m);
-        order.RemainingAmount.Should().Be(6.66m);
-        order.Payments.Should().ContainSingle(value => value.Amount == 3.34m
+        order.TotalPaid.Should().Be(3.30m);
+        order.RemainingAmount.Should().Be(6.70m);
+        order.Payments.Should().ContainSingle(value => value.Amount == 3.30m
             && value.PaymentMethod == PaymentMethod.CreditCard
             && value.Status == PaymentStatus.Completed);
     }

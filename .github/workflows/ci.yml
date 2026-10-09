@@ -36,7 +36,7 @@ jobs:
       image: mcr.microsoft.com/dotnet/sdk:10.0
     services:
       channels-postgres:
-        image: postgres:16-alpine
+        image: mirror.gcr.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea # Docker Hub image, cached to avoid shared-runner pull limits
         env:
           POSTGRES_DB: channels_test
           POSTGRES_USER: test
@@ -159,7 +159,7 @@ jobs:
       image: mcr.microsoft.com/dotnet/sdk:10.0
     services:
       postgres:
-        image: postgres:16-alpine
+        image: mirror.gcr.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea # Docker Hub image, cached to avoid shared-runner pull limits
         env:
           POSTGRES_DB: restaurant_test
           POSTGRES_USER: test

@@ -4,6 +4,7 @@ namespace RestaurantSystem.Api.Features.TableGuestVisits.Services;
 
 public interface ITableGuestAdmissionService
 {
-    Task<TableGuestAdmissionCodeDto> CreateCodeAsync(Guid serviceSessionId, CancellationToken cancellationToken);
+    Task<TableGuestAdmissionCodeDto> CreateCodeAsync(
+        Guid serviceSessionId, CancellationToken cancellationToken, bool preferShortCode = false);
     Task<TableGuestJoinDto> JoinAsync(string qrCodeData, string admissionCode, CancellationToken cancellationToken);
 }

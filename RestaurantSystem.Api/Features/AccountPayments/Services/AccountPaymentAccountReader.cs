@@ -141,13 +141,19 @@ public sealed class AccountPaymentAccountReader(
         int maximumSegments, int maximumShares)
     {
         if (scope.Count > maximumSegments || plan.ShareCount < 2 || plan.ShareCount > maximumShares
+            || plan.RoundingIncrementMinor <= 0
             || AccountDebtMath.Total(scope) != plan.TotalMinor || !HasValidShareAmounts(plan, customAmounts))
             throw new ConflictException("The equal-share plan exceeds the configured allocation display limit.");
     }
 
     private static bool HasValidShareAmounts(AccountEqualSharePlan plan, IReadOnlyList<long>? customAmounts)
     {
-        if (customAmounts is null) return plan.TotalMinor >= plan.ShareCount;
+        if (customAmounts is null)
+        {
+            var distribution = AccountShareMath.Equal(
+                plan.TotalMinor, plan.ShareCount, plan.RoundingIncrementMinor);
+            return Enumerable.Range(1, plan.ShareCount).All(ordinal => distribution.At(ordinal) > 0);
+        }
         if (customAmounts.Count != plan.ShareCount || customAmounts.Any(value => value <= 0))
             return false;
         try
@@ -173,7 +179,7 @@ public sealed class AccountPaymentAccountReader(
         IReadOnlyDictionary<int, AccountPaymentState> claims, int ordinal)
     {
         var share = customAmounts is null
-            ? AccountEqualScopeMath.ForShare(scope, plan.ShareCount, ordinal)
+            ? AccountEqualScopeMath.ForShare(scope, plan.ShareCount, ordinal, plan.RoundingIncrementMinor)
             : AccountCustomShareScopeMath.ForShare(scope, customAmounts, ordinal);
         var hasClaim = claims.TryGetValue(ordinal, out var claimState);
         var isAvailable = !hasClaim && IsScopeAvailable(available, share);

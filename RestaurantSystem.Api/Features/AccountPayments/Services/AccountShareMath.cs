@@ -6,12 +6,22 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 /// <summary>Exact minor-unit distribution; stable positions receive any indivisible remainder.</summary>
 internal static class AccountShareMath
 {
-    internal static AccountShareDistribution Equal(long totalMinor, int count)
+    private const long OneMinorUnit = 1;
+    private const long FiveMinorUnitStep = 5;
+
+    internal static AccountShareDistribution Equal(
+        long totalMinor, int count, long roundingIncrementMinor = OneMinorUnit)
     {
-        if (totalMinor < 0 || count <= 0)
+        if (totalMinor < 0 || count <= 0 || roundingIncrementMinor <= 0)
             throw new BadRequestException("A share distribution requires a nonnegative balance and positive count.");
-        return new AccountShareDistribution(totalMinor, count);
+        return new AccountShareDistribution(totalMinor, count, roundingIncrementMinor);
     }
+
+    internal static long EqualShareIncrementMinorUnits(string currency) =>
+        string.Equals(currency, "CHF", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(currency, "EUR", StringComparison.OrdinalIgnoreCase)
+            ? FiveMinorUnitStep
+            : OneMinorUnit;
 
     /// <summary>Allocates a frozen amount by nonnegative weights, using stable largest remainders.</summary>
     internal static IReadOnlyList<long> Weighted(long totalMinor, IReadOnlyList<long> weights)
@@ -41,12 +51,32 @@ internal static class AccountShareMath
 }
 
 /// <summary>Compact ordinal range; even extreme quantities do not allocate one object per unit.</summary>
-internal sealed record AccountShareDistribution(long TotalMinor, int Count)
+internal sealed record AccountShareDistribution(long TotalMinor, int Count, long RoundingIncrementMinor)
 {
     internal long At(int oneBasedOrdinal)
     {
         if (oneBasedOrdinal <= 0 || oneBasedOrdinal > Count)
             throw new BadRequestException("The selected share ordinal is outside the reviewed distribution.");
+
+        var baseShare = GetBaseShare();
+        if (RoundingIncrementMinor > 1)
+            return oneBasedOrdinal == Count
+                ? TotalMinor - baseShare * (Count - 1L)
+                : baseShare;
+
         return TotalMinor / Count + (oneBasedOrdinal <= TotalMinor % Count ? 1 : 0);
     }
+
+    internal long Before(int oneBasedOrdinal)
+    {
+        if (oneBasedOrdinal <= 0 || oneBasedOrdinal > Count)
+            throw new BadRequestException("The selected share ordinal is outside the reviewed distribution.");
+        var previousCount = oneBasedOrdinal - 1L;
+        var baseShare = GetBaseShare();
+        return RoundingIncrementMinor > 1
+            ? baseShare * previousCount
+            : TotalMinor / Count * previousCount + Math.Min(TotalMinor % Count, previousCount);
+    }
+
+    private long GetBaseShare() => TotalMinor / Count / RoundingIncrementMinor * RoundingIncrementMinor;
 }

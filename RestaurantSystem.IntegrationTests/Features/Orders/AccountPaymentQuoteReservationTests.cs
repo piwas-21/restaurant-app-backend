@@ -156,8 +156,8 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
 
         var last = await CreateQuote(account.SessionId, EqualQuote(Guid.NewGuid(), plan.PlanId, 3, revision: 2));
         var first = await CreateQuote(account.SessionId, EqualQuote(Guid.NewGuid(), plan.PlanId, 1, revision: 2));
-        last.AmountMinor.Should().Be(333);
-        first.AmountMinor.Should().Be(334);
+        last.AmountMinor.Should().Be(340);
+        first.AmountMinor.Should().Be(330);
         last.Allocations.Should().OnlyContain(value => value.OrderId == account.OrderId);
         first.Allocations.Should().OnlyContain(value => value.OrderId == account.OrderId);
 
@@ -168,8 +168,8 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
 
         await using var verify = fixture.CreateContext();
         var snapshot = await new AccountDebtSnapshotReader(verify).ReadAsync(account.SessionId, CancellationToken.None);
-        snapshot.Debt.ReservedMinor.Should().Be(667);
-        snapshot.Debt.AvailableMinor.Should().Be(833);
+        snapshot.Debt.ReservedMinor.Should().Be(670);
+        snapshot.Debt.AvailableMinor.Should().Be(830);
         snapshot.Debt.Available.Should().Contain(value => value.OrderId == laterRound.OrderId);
         snapshot.Debt.Available.Should().Contain(value => value.OrderId == account.OrderId);
     }

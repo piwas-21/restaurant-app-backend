@@ -10,7 +10,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 public sealed class OrderPaymentTipsMigrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private const string PreviousMigration = "20261009131247_AddTableSessionLifecycleAndTenderTips";
-    private const string TipsMigration = TestDatabaseCluster.CurrentSchemaMigration;
+    private const string TipsMigration = "20261009140008_AddOrderPaymentTips";
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;

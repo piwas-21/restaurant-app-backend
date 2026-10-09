@@ -69,6 +69,8 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
         var sessionEntities = await LoadSessionsAsync(cancellationToken);
         var sessions = await BuildSessionRowsAsync(sessionEntities, tenantCurrency, cancellationToken);
         var orders = await LoadOrdersAsync(tables, sessions, cancellationToken);
+        // Track the presence of unidentified debt in the floor cursor, but never project
+        // it as occupancy or ambiguity on each physical table.
         var hasUnidentifiedLegacyOrders = _tableVisitReadinessEnabled
             && await _context.Orders.AsNoTracking().Where(order =>
                 !order.IsDeleted && order.Type == OrderType.DineIn
@@ -170,13 +172,15 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
             .Where(number => number.HasValue)
             .Select(number => number!.Value)
             .ToArray();
-        var legacy = _context.Orders.AsNoTracking()
+        var legacy = TableServiceSessionCloseRules.ExcludeArchivedLegacyOccupancy(
+            _context.Orders.AsNoTracking()
             .Where(order => !order.IsDeleted && order.Type == OrderType.DineIn)
             .Where(order => !order.ServiceSessionId.HasValue
                 && ((order.TableId.HasValue && tableIds.Contains(order.TableId.Value))
                     || (!order.TableId.HasValue && order.TableNumber.HasValue
                         && tableNumbers.Contains(order.TableNumber.Value))))
-            .Where(TableServiceSessionCloseRules.BlockingLegacyQuery(_paymentTolerance));
+            .Where(TableServiceSessionCloseRules.BlockingLegacyQuery(_paymentTolerance)),
+            _context.TableOccupancyRecoveryDispositions);
         // The explicit-session bill above is the authoritative settlement projection. This query
         // includes only unassigned lifecycle blockers. Reversed tenders may prevent collection while
         // their unresolved charge still requires legacy review; settled history remains excluded.

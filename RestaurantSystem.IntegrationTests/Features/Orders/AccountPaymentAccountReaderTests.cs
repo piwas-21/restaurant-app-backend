@@ -151,7 +151,7 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
         summary.Scope.Should().OnlyContain(value => value.OrderId == identity.OrderId);
         summary.Scope.Should().NotContain(value => value.OrderId == nextRound.OrderId);
         summary.Slots.OrderBy(value => value.Ordinal).Select(value => value.AmountMinor)
-            .Should().Equal(334L, 333L, 333L);
+            .Should().Equal(330L, 330L, 340L);
 
         var slots = summary.Slots.ToDictionary(value => value.Ordinal);
         slots[1].ClaimState.Should().Be(AccountPaymentState.Reserved);
@@ -259,7 +259,7 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
             new AccountPaymentCaptureWriter(context, currentUser.Object, TimeProvider.System),
             fidelity.Object, TimeProvider.System, NullLogger<AccountPaymentCaptureService>.Instance);
         return await service.CaptureManualAsync(sessionId, operationId,
-            new CaptureAccountPaymentRequest { ExpectedVersion = expectedVersion, ReceivedMinor = 335 }, CancellationToken.None);
+            new CaptureAccountPaymentRequest { ExpectedVersion = expectedVersion, ReceivedMinor = 340 }, CancellationToken.None);
     }
 
     private static CreateAccountPaymentQuoteRequest EqualQuote(

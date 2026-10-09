@@ -11,6 +11,8 @@ public sealed class AccountEqualSharePlan : Entity
     public long AccountRevision { get; set; }
     public long TotalMinor { get; set; }
     public int ShareCount { get; set; }
+    /// <summary>Frozen increment used by non-custom slots; 1 preserves legacy active plans.</summary>
+    public int RoundingIncrementMinor { get; set; } = 1;
     public string Currency { get; set; } = string.Empty;
     public string PayloadHash { get; set; } = string.Empty;
     public string ScopeJson { get; set; } = string.Empty;

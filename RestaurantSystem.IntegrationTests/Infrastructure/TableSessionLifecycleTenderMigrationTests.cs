@@ -130,25 +130,35 @@ public sealed class TableSessionLifecycleTenderMigrationTests(DatabaseFixture fi
             await seed.SaveChangesAsync();
         }
 
-        await AssertRollbackRefusedAsync();
-
-        await using var verify = fixture.CreateContext();
-        switch (evidence)
+        try
         {
-            case "table-tip":
-                (await verify.TableBillPaymentOperations.SingleAsync()).TipMinor.Should().Be(50);
-                break;
-            case "account-tip":
-                (await verify.AccountPaymentAttempts.SingleAsync()).TipMinor.Should().Be(50);
-                break;
-            case "custom-plan":
-                JsonSerializer.Deserialize<long[]>(
-                    (await verify.AccountEqualSharePlans.SingleAsync()).CustomAmountsJson!)
-                    .Should().Equal(50, 50);
-                break;
-            case "custom-attempt":
-                (await verify.AccountPaymentAttempts.SingleAsync()).Mode.Should().Be(AccountPaymentMode.CustomAmount);
-                break;
+            await AssertRollbackRefusedAsync();
+            // The rollback attempt removes the latest recovery migration before the older lifecycle
+            // guard refuses. Restore the current schema before querying with the current EF model.
+            await MigrateAsync();
+
+            await using var verify = fixture.CreateContext();
+            switch (evidence)
+            {
+                case "table-tip":
+                    (await verify.TableBillPaymentOperations.SingleAsync()).TipMinor.Should().Be(50);
+                    break;
+                case "account-tip":
+                    (await verify.AccountPaymentAttempts.SingleAsync()).TipMinor.Should().Be(50);
+                    break;
+                case "custom-plan":
+                    JsonSerializer.Deserialize<long[]>(
+                        (await verify.AccountEqualSharePlans.SingleAsync()).CustomAmountsJson!)
+                        .Should().Equal(50, 50);
+                    break;
+                case "custom-attempt":
+                    (await verify.AccountPaymentAttempts.SingleAsync()).Mode.Should().Be(AccountPaymentMode.CustomAmount);
+                    break;
+            }
+        }
+        finally
+        {
+            await MigrateAsync();
         }
     }
 

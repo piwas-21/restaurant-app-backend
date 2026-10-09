@@ -35,11 +35,12 @@ public sealed class TableGuestVisitsController : ControllerBase
     [RequireTableServiceStaff]
     [RequireModule(ModuleIds.Server, ModuleIds.Cashier)]
     public async Task<ActionResult<ApiResponse<TableGuestAdmissionCodeDto>>> CreateAdmissionCode(
-        Guid serviceSessionId)
+        Guid serviceSessionId,
+        [FromQuery] bool preferShortCode = false)
     {
         SetNoStore();
         return Ok(await _mediator.SendCommand(
-            new CreateTableGuestAdmissionCodeCommand(serviceSessionId), HttpContext.RequestAborted));
+            new CreateTableGuestAdmissionCodeCommand(serviceSessionId, preferShortCode), HttpContext.RequestAborted));
     }
 
     [HttpGet("{serviceSessionId:guid}/account")]

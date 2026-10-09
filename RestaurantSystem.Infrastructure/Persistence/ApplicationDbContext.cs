@@ -97,6 +97,8 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<OrderNumberSequence> OrderNumberSequences { get; set; }
         public DbSet<TableServiceSession> TableServiceSessions { get; set; }
         public DbSet<TableReadyOperation> TableReadyOperations { get; set; }
+        public DbSet<TableOccupancyRecoveryOperation> TableOccupancyRecoveryOperations { get; set; }
+        public DbSet<TableOccupancyRecoveryDisposition> TableOccupancyRecoveryDispositions { get; set; }
         public DbSet<OrderChange> OrderChanges { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<OrderBillingSnapshot> OrderBillingSnapshots { get; set; }
