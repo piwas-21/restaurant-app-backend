@@ -23,7 +23,7 @@ public record RepairLegacyTableServiceSessionCommand : ICommand<ApiResponse<Tabl
     public string? Currency { get; init; }
 }
 
-public sealed class RepairLegacyTableServiceSessionCommandHandler
+public sealed partial class RepairLegacyTableServiceSessionCommandHandler
     : ICommandHandler<RepairLegacyTableServiceSessionCommand, ApiResponse<TableServiceSessionDto>>
 {
     private readonly ApplicationDbContext _context;
@@ -84,16 +84,20 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
 
         table = ToIdentity(lockedTable);
         var session = await FindOpenSessionAsync(table, cancellationToken);
-        var created = session is null;
         if (session is not null)
         {
             session = await TableServiceSessionRowLock.LoadAsync(
                 _context, session.Id, cancellationToken);
-            if (session is null)
-            {
-                created = true;
-            }
         }
+        var created = session is null;
+        var legacyOrders = await FindBlockingLegacyOrdersAsync(table, cancellationToken);
+        if (created && legacyOrders.Count == 0)
+        {
+            return ApiResponse<TableServiceSessionDto>.FailureWithCode(
+                "No table-scoped blocking legacy orders were found to repair. Open a new visit through the normal readiness workflow once this table is available.",
+                ErrorCodes.TableServiceSessionAmbiguous);
+        }
+
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         if (session is null)
         {
@@ -125,7 +129,6 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
                 session.Version++;
             }
         }
-        var legacyOrders = await FindBlockingLegacyOrdersAsync(table, cancellationToken);
         foreach (var order in legacyOrders)
         {
             order.TableId = table.Id;
@@ -144,20 +147,6 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
 
         var result = await _reader.ReadAsync(session.Id, cancellationToken);
         return ToResponse(result, legacyOrders.Count);
-    }
-
-    private static ApiResponse<TableServiceSessionDto> ToResponse(TableServiceSessionDto? result, int adoptedOrderCount)
-    {
-        if (result is null)
-        {
-            return ApiResponse<TableServiceSessionDto>.FailureWithCode(
-                "The repaired table service session could not be read back.",
-                ErrorCodes.TableServiceSessionNotFound);
-        }
-
-        return ApiResponse<TableServiceSessionDto>.SuccessWithData(result, adoptedOrderCount == 0
-            ? "Table service session already resolved"
-            : "Legacy table orders adopted into the table service session");
     }
 
     private Task<List<Order>> FindBlockingLegacyOrdersAsync(
