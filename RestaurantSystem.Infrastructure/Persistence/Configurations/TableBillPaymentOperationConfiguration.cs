@@ -12,6 +12,7 @@ public class TableBillPaymentOperationConfiguration : IEntityTypeConfiguration<T
         builder.Property(operation => operation.ExpectedVersion);
         builder.Property(operation => operation.Currency).HasMaxLength(3);
         builder.Property(operation => operation.Amount).HasColumnType("decimal(10,2)").IsRequired();
+        builder.Property(operation => operation.TipMinor).IsRequired();
         builder.Property(operation => operation.PaymentMethod).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(operation => operation.TransactionId).HasMaxLength(100);
         builder.Property(operation => operation.ReferenceNumber).HasMaxLength(50);

@@ -46,6 +46,8 @@ public sealed class AccountPaymentQuoteService(
         AccountPaymentRequestRules.ValidateQuote(request, allowOnlinePayment: guest);
         if (guest && request.PaymentMethod != PaymentMethod.OnlinePayment)
             throw new BadRequestException("Guest account payments support online payment only.");
+        if (request.TipMinor > 0 && (guest || request.PaymentMethod == PaymentMethod.OnlinePayment))
+            throw new BadRequestException("Tips are available only for staff-collected cash or card payments.");
         var settings = options.Value;
         if (request.SelectedUnits.Count > settings.MaximumSelectedUnits)
             throw new BadRequestException("The item selection is too large.");
@@ -82,8 +84,17 @@ public sealed class AccountPaymentQuoteService(
                 throw new BadRequestException("The payment scope exceeds the configured segment limit.");
             var amount = AccountDebtMath.Total(segments);
             if (guest) guestPolicy.RequireContribution(amount, account.Money.Currency);
+            long tenderExactMinor;
+            try
+            {
+                tenderExactMinor = checked(amount + request.TipMinor);
+            }
+            catch (OverflowException)
+            {
+                throw new BadRequestException("The payment and tip exceed the supported amount.");
+            }
             var cashSettlement = AccountCashSettlementPolicy.ResolveConfigured(
-                account.Money.Currency, request.PaymentMethod, amount, settings);
+                account.Money.Currency, request.PaymentMethod, tenderExactMinor, settings);
             var capacity = await AccountCashRefundHistoryCapacityReader.ReadQuoteSizeAsync(
                 context, sessionId, cancellationToken);
             if (!capacity.CanAdd(AccountCashRefundHistoryCapacityGrowth.ForQuote(segments.Count)))
@@ -103,19 +114,29 @@ public sealed class AccountPaymentQuoteService(
                 Version = 1,
                 ExpectedAccountRevision = request.ExpectedAccountRevision,
                 AmountMinor = amount,
+                TipMinor = request.TipMinor,
                 Currency = account.Money.Currency,
                 PayloadHash = hash,
                 QuoteExpiresAt = quoteExpires,
-                EqualSharePlanId = request.EqualSharePlanId,
-                EqualShareOrdinal = request.EqualShareOrdinal,
+                EqualSharePlanId = request.Mode == AccountPaymentMode.CustomAmount
+                    ? request.CustomSharePlanId : request.EqualSharePlanId,
+                EqualShareOrdinal = request.Mode == AccountPaymentMode.CustomAmount
+                    ? request.CustomShareOrdinal : request.EqualShareOrdinal,
                 CreatedAt = now,
                 CreatedBy = actor.AuditIdentifier
             };
             attempt.Allocations = AccountPaymentSnapshots.Allocations(attempt.Id, segments, actor.AuditIdentifier);
             attempt.SnapshotJson = AccountPaymentSnapshots.Serialize(new AccountPaymentQuoteSnapshot(
                 request.ExpectedAccountRevision, request.Mode, request.PaymentMethod, amount,
-                account.Money.Currency, quoteExpires, request.EqualSharePlanId,
-                request.EqualShareOrdinal, AccountPaymentSnapshots.ToDtos(segments), cashSettlement));
+                account.Money.Currency, quoteExpires,
+                request.Mode == AccountPaymentMode.Equal ? request.EqualSharePlanId : null,
+                request.Mode == AccountPaymentMode.Equal ? request.EqualShareOrdinal : null,
+                AccountPaymentSnapshots.ToDtos(segments), cashSettlement)
+            {
+                TipMinor = request.TipMinor,
+                CustomSharePlanId = request.CustomSharePlanId,
+                CustomShareOrdinal = request.CustomShareOrdinal
+            });
             context.AccountPaymentAttempts.Add(attempt);
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -146,17 +167,32 @@ public sealed class AccountPaymentQuoteService(
         {
             segments = AccountDebtMath.Amount(account.Debt.Available, request.AmountMinor!.Value);
         }
-        else
+        else if (request.Mode == AccountPaymentMode.Full)
         {
+            segments = account.Debt.Available;
+        }
+        else if (request.Mode is AccountPaymentMode.Equal or AccountPaymentMode.CustomAmount)
+        {
+            var isCustom = request.Mode == AccountPaymentMode.CustomAmount;
+            var planId = isCustom ? request.CustomSharePlanId : request.EqualSharePlanId;
+            var ordinal = isCustom ? request.CustomShareOrdinal : request.EqualShareOrdinal;
             var plan = await context.AccountEqualSharePlans.AsNoTracking().SingleOrDefaultAsync(
-                value => value.Id == request.EqualSharePlanId && value.ServiceSessionId == sessionId,
+                value => value.Id == planId && value.ServiceSessionId == sessionId,
                 cancellationToken) ?? throw new NotFoundException("The equal-share plan was not found.");
             if (plan.InvalidatedAt is not null)
                 throw new ConflictException("The equal-share plan is no longer available to this cashier.");
-            if (request.EqualShareOrdinal > plan.ShareCount)
+            if ((plan.CustomAmountsJson is not null) != isCustom)
+                throw new ConflictException("The selected guest split plan does not match the payment mode.");
+            if (ordinal > plan.ShareCount)
                 throw new BadRequestException("The equal-share position is outside the reviewed plan.");
-            segments = AccountEqualScopeMath.ForShare(AccountPaymentSnapshots.ReadScope(plan.ScopeJson),
-                plan.ShareCount, request.EqualShareOrdinal!.Value);
+            var scope = AccountPaymentSnapshots.ReadScope(plan.ScopeJson);
+            segments = isCustom
+                ? AccountDebtMath.Amount(scope, ReadCustomShareAmount(plan.CustomAmountsJson!, ordinal!.Value))
+                : AccountEqualScopeMath.ForShare(scope, plan.ShareCount, ordinal!.Value);
+        }
+        else
+        {
+            throw new BadRequestException("The selected payment mode is not supported.");
         }
 
         // A quote is not a reservation. Keep the exact reviewed scope and fail rather than silently
@@ -165,6 +201,15 @@ public sealed class AccountPaymentQuoteService(
         if (segments.Count == 0 || AccountDebtMath.Total(segments) <= 0)
             throw new BadRequestException("The payment scope has no payable value.");
         return segments;
+    }
+
+    private static long ReadCustomShareAmount(string json, int ordinal)
+    {
+        var amounts = AccountPaymentSnapshots.Deserialize<List<long>>(json);
+        if (amounts.Count == 0 || amounts.Any(value => value <= 0)
+            || ordinal < 1 || ordinal > amounts.Count)
+            throw new ConflictException("The custom guest split plan requires reconciliation.");
+        return amounts[ordinal - 1];
     }
 
     private static AccountPaymentOperationDto RequireReplay(

@@ -10,7 +10,9 @@ public sealed record AccountPaymentEqualShareSummaryDto(
     string Currency,
     bool IsOwnPlan,
     IReadOnlyList<AccountEqualShareSlotSummaryDto> Slots,
-    IReadOnlyList<AccountPaymentAllocationDto> Scope);
+    IReadOnlyList<AccountPaymentAllocationDto> Scope,
+    bool IsCustom = false,
+    IReadOnlyList<long>? CustomAmountsMinor = null);
 
 public sealed record AccountEqualShareSlotSummaryDto(
     int Ordinal,

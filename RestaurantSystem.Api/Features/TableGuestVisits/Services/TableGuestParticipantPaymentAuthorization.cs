@@ -18,7 +18,8 @@ public sealed class TableGuestParticipantPaymentAuthorization(
         string? participantCredential,
         CancellationToken cancellationToken)
     {
-        if (lockedSession.Status != TableServiceSessionStatus.Open || !lockedSession.TableId.HasValue)
+        if (lockedSession.Status != TableServiceSessionStatus.Open || lockedSession.ReleasedAt.HasValue
+            || !lockedSession.TableId.HasValue)
             throw Unavailable();
 
         var participant = await FindParticipantAsync(
@@ -33,7 +34,8 @@ public sealed class TableGuestParticipantPaymentAuthorization(
     {
         var session = await context.TableServiceSessions.AsNoTracking()
             .SingleOrDefaultAsync(value => value.Id == serviceSessionId, cancellationToken);
-        if (session?.Status != TableServiceSessionStatus.Open || !session.TableId.HasValue)
+        if (session?.Status != TableServiceSessionStatus.Open || session.ReleasedAt.HasValue
+            || !session.TableId.HasValue)
             throw Unavailable();
 
         var participant = await FindParticipantAsync(serviceSessionId, participantCredential, cancellationToken);

@@ -22,7 +22,10 @@ internal static class AccountPaymentRequestRules
             selectedUnits = units,
             request.AmountMinor,
             request.EqualSharePlanId,
-            request.EqualShareOrdinal
+            request.EqualShareOrdinal,
+            request.CustomSharePlanId,
+            request.CustomShareOrdinal,
+            request.TipMinor
         });
     }
 
@@ -33,12 +36,14 @@ internal static class AccountPaymentRequestRules
             request.OperationId,
             request.ExpectedAccountRevision,
             request.ShareCount,
+            customAmountsMinor = request.CustomAmountsMinor.ToArray(),
             request.SupersedesPlanId
         });
 
     internal static void ValidateQuote(CreateAccountPaymentQuoteRequest request, bool allowOnlinePayment = false)
     {
         if (request.OperationId == Guid.Empty || request.ExpectedAccountRevision <= 0
+            || request.TipMinor < 0 || request.TipMinor > 9_999_999_999
             || !Enum.IsDefined(request.Mode) || !Enum.IsDefined(request.PaymentMethod))
             throw new BadRequestException("A valid operation, account revision, payment mode and method are required.");
         if (request.PaymentMethod is not (PaymentMethod.Cash or PaymentMethod.CreditCard)
@@ -49,17 +54,29 @@ internal static class AccountPaymentRequestRules
         switch (request.Mode)
         {
             case AccountPaymentMode.Items when units.Count > 0 && request.AmountMinor is null
-                && request.EqualSharePlanId is null && request.EqualShareOrdinal is null:
+                && request.EqualSharePlanId is null && request.EqualShareOrdinal is null
+                && request.CustomSharePlanId is null && request.CustomShareOrdinal is null:
                 if (units.Any(value => value.OrderId == Guid.Empty || value.OrderItemId == Guid.Empty || value.Ordinal < 1)
                     || units.Distinct().Count() != units.Count)
                     throw new BadRequestException("Select distinct payable item units.");
                 break;
             case AccountPaymentMode.Amount when units.Count == 0 && request.AmountMinor is > 0
-                && request.EqualSharePlanId is null && request.EqualShareOrdinal is null:
+                && request.EqualSharePlanId is null && request.EqualShareOrdinal is null
+                && request.CustomSharePlanId is null && request.CustomShareOrdinal is null:
+                break;
+            case AccountPaymentMode.Full when units.Count == 0 && request.AmountMinor is null
+                && request.EqualSharePlanId is null && request.EqualShareOrdinal is null
+                && request.CustomSharePlanId is null && request.CustomShareOrdinal is null:
                 break;
             case AccountPaymentMode.Equal when units.Count == 0 && request.AmountMinor is null
                 && request.EqualSharePlanId is Guid planId && planId != Guid.Empty
-                && request.EqualShareOrdinal is > 0:
+                && request.EqualShareOrdinal is > 0
+                && request.CustomSharePlanId is null && request.CustomShareOrdinal is null:
+                break;
+            case AccountPaymentMode.CustomAmount when units.Count == 0 && request.AmountMinor is null
+                && request.CustomSharePlanId is Guid customPlanId && customPlanId != Guid.Empty
+                && request.CustomShareOrdinal is > 0
+                && request.EqualSharePlanId is null && request.EqualShareOrdinal is null:
                 break;
             default:
                 throw new BadRequestException("The payment request contains fields that do not match its selected mode.");

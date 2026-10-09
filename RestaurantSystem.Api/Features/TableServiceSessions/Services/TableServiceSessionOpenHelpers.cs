@@ -58,7 +58,8 @@ internal static class TableServiceSessionOpenHelpers
             .Where(session => (session.TableId == table.Id
                 || (table.Number.HasValue && session.TableId == null
                     && session.TableNumber == table.Number))
-                && session.Status == TableServiceSessionStatus.Open)
+                && session.Status == TableServiceSessionStatus.Open
+                && session.ReleasedAt == null)
             .OrderBy(session => session.Id)
             .Select(session => session.Id)
             .Take(2)

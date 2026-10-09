@@ -43,7 +43,7 @@ public sealed class TableGuestAdmissionService : ITableGuestAdmissionService
         EnsureEnabled();
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         var session = await TableServiceSessionRowLock.LoadAsync(_context, serviceSessionId, cancellationToken);
-        if (session?.Status != TableServiceSessionStatus.Open || !session.TableId.HasValue)
+        if (session?.Status != TableServiceSessionStatus.Open || session.ReleasedAt.HasValue || !session.TableId.HasValue)
         {
             throw Unavailable();
         }
@@ -110,7 +110,8 @@ public sealed class TableGuestAdmissionService : ITableGuestAdmissionService
         }
 
         var sessionId = await _context.TableServiceSessions.AsNoTracking()
-            .Where(value => value.TableId == table.Id && value.Status == TableServiceSessionStatus.Open)
+            .Where(value => value.TableId == table.Id && value.Status == TableServiceSessionStatus.Open
+                && value.ReleasedAt == null)
             .Select(value => (Guid?)value.Id)
             .SingleOrDefaultAsync(cancellationToken);
         if (!sessionId.HasValue)
@@ -119,7 +120,8 @@ public sealed class TableGuestAdmissionService : ITableGuestAdmissionService
         }
 
         var session = await TableServiceSessionRowLock.LoadAsync(_context, sessionId.Value, cancellationToken);
-        if (session?.Status != TableServiceSessionStatus.Open || session.TableId != table.Id)
+        if (session?.Status != TableServiceSessionStatus.Open || session.ReleasedAt.HasValue
+            || session.TableId != table.Id)
         {
             throw Unavailable();
         }

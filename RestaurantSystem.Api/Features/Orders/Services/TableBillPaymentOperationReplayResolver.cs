@@ -56,6 +56,7 @@ public class TableBillPaymentOperationReplayResolver : ITableBillPaymentOperatio
             || string.Equals(operation.Currency, command.Currency, StringComparison.OrdinalIgnoreCase))
         && operation.PaymentMethod == command.PaymentMethod
         && operation.Amount == command.Amount
+        && operation.TipMinor == command.TipMinor
         && operation.TransactionId == command.TransactionId
         && operation.ReferenceNumber == command.ReferenceNumber
         && operation.CardLastFourDigits == command.CardLastFourDigits

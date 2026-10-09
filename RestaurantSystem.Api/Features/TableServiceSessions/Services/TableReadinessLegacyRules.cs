@@ -26,13 +26,15 @@ internal static class TableReadinessLegacyRules
     public static Task<bool> HasStableOpenVisitAsync(
         ApplicationDbContext context, Guid tableId, CancellationToken cancellationToken) =>
         context.TableServiceSessions.AsNoTracking().AnyAsync(session =>
-            session.Status == TableServiceSessionStatus.Open && session.TableId == tableId,
+            session.Status == TableServiceSessionStatus.Open && session.ReleasedAt == null
+            && session.TableId == tableId,
             cancellationToken);
 
     public static Task<bool> HasAmbiguousLegacyOpenVisitAsync(
         ApplicationDbContext context, int? tableNumber, CancellationToken cancellationToken) =>
         context.TableServiceSessions.AsNoTracking().AnyAsync(session =>
-            session.Status == TableServiceSessionStatus.Open && session.TableId == null
+            session.Status == TableServiceSessionStatus.Open && session.ReleasedAt == null
+            && session.TableId == null
             && (session.TableNumber == null || session.TableNumber == tableNumber),
             cancellationToken);
 

@@ -11,9 +11,11 @@ using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.Orders.Queries.GetTableBillQuery;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServiceSessionPaymentCommand;
+using RestaurantSystem.Api.Features.TableServiceSessions.Commands.ClearPendingTableOrdersCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.OpenTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.RepairLegacyTableServiceSessionCommand;
+using RestaurantSystem.Api.Features.TableServiceSessions.Commands.ReleaseTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetTableServiceSessionPaymentOperationQuery;
@@ -756,6 +758,255 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         crossSession.Data.Payments.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Releasing_a_table_preserves_payable_visit_and_allows_a_new_visit_on_the_same_table()
+    {
+        var tableId = await SeedTableAsync("47");
+        var sessionId = await SeedStableSessionAsync(tableId);
+        var orderId = await SeedStableOrderAsync(sessionId, tableId, "47", 18m, Utc(12, 0));
+        TableServiceSessionDto released;
+
+        await using (var context = _fixture.CreateContext())
+        {
+            var reader = SessionReader(context);
+            var current = new Mock<ICurrentUserService>();
+            current.Setup(value => value.GetAuditIdentifier()).Returns("cashier-test");
+            current.Setup(value => value.UserId).Returns(Guid.NewGuid());
+            var handler = new ReleaseTableServiceSessionCommandHandler(
+                context, reader,
+                new RestaurantSystem.Api.Features.TableGuestVisits.Services.TableGuestVisitRevoker(context),
+                current.Object);
+
+            var result = await handler.Handle(new ReleaseTableServiceSessionCommand
+            {
+                ServiceSessionId = sessionId,
+                ExpectedVersion = 1,
+            }, CancellationToken.None);
+
+            result.Success.Should().BeTrue();
+            released = result.Data!;
+            released.Status.Should().Be(nameof(TableServiceSessionStatus.Open));
+            released.IsTableReleased.Should().BeTrue();
+            released.ReleasedBy.Should().Be("cashier-test");
+            released.CanCollect.Should().BeTrue();
+            released.Bill.Orders.Should().ContainSingle(order => order.Id == orderId);
+            released.Bill.EligibleOutstanding.Should().Be(18m);
+        }
+
+        await using (var context = _fixture.CreateContext())
+        {
+            var reader = SessionReader(context);
+            (await reader.ReadActiveAsync(CancellationToken.None)).Should().BeEmpty();
+            (await reader.ReadReleasedAsync(CancellationToken.None)).Should().ContainSingle(
+                value => value.ServiceSessionId == sessionId);
+            var oldVisit = await context.TableServiceSessions.SingleAsync(value => value.Id == sessionId);
+            oldVisit.Status.Should().Be(TableServiceSessionStatus.Open);
+            oldVisit.ReleasedAt.Should().NotBeNull();
+            oldVisit.Version.Should().Be(2);
+            (await context.Orders.SingleAsync(value => value.Id == orderId)).ServiceSessionId.Should().Be(sessionId);
+        }
+
+        var nextVisit = await OpenStableTableAsync(tableId);
+        nextVisit.Success.Should().BeTrue();
+        nextVisit.Data!.ServiceSessionId.Should().NotBe(sessionId);
+        await using (var verifySessions = _fixture.CreateContext())
+            (await verifySessions.TableServiceSessions.CountAsync()).Should().Be(2);
+
+        await using var retryContext = _fixture.CreateContext();
+        var retry = await new ReleaseTableServiceSessionCommandHandler(
+            retryContext,
+            SessionReader(retryContext),
+            new RestaurantSystem.Api.Features.TableGuestVisits.Services.TableGuestVisitRevoker(retryContext),
+            Mock.Of<ICurrentUserService>(user => user.GetAuditIdentifier() == "cashier-test"))
+            .Handle(new ReleaseTableServiceSessionCommand
+            {
+                ServiceSessionId = sessionId,
+                ExpectedVersion = 1,
+            }, CancellationToken.None);
+        retry.Success.Should().BeTrue();
+        retry.Data!.IsTableReleased.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Releasing_a_repaired_legacy_visit_keeps_its_orders_payable_and_separate_from_the_next_visit()
+    {
+        var tableId = await SeedTableAsync("52");
+        var legacyOrderId = await SeedStableOrderAsync(null, tableId, "old table label", 18m, Utc(12, 0));
+
+        var repaired = await RepairStableTableAsync(tableId);
+        repaired.Success.Should().BeTrue();
+        var oldSessionId = repaired.Data!.ServiceSessionId;
+        repaired.Data.Bill.Orders.Should().ContainSingle(order => order.Id == legacyOrderId);
+
+        TableServiceSessionDto released;
+        await using (var context = _fixture.CreateContext())
+        {
+            var current = new Mock<ICurrentUserService>();
+            current.Setup(value => value.GetAuditIdentifier()).Returns("legacy-cashier");
+            current.Setup(value => value.UserId).Returns(Guid.NewGuid());
+            released = (await new ReleaseTableServiceSessionCommandHandler(
+                context, SessionReader(context),
+                new RestaurantSystem.Api.Features.TableGuestVisits.Services.TableGuestVisitRevoker(context),
+                current.Object).Handle(new ReleaseTableServiceSessionCommand
+                {
+                    ServiceSessionId = oldSessionId,
+                    ExpectedVersion = repaired.Data.Version,
+                }, CancellationToken.None)).Data!;
+        }
+
+        released.IsTableReleased.Should().BeTrue();
+        released.Bill.EligibleOutstanding.Should().Be(18m);
+        await using (var readiness = _fixture.CreateContext())
+        {
+            (await readiness.Tables.SingleAsync(value => value.Id == tableId)).ReadinessState
+                .Should().Be(TableReadinessState.NeedsReset);
+            await readiness.Tables.Where(value => value.Id == tableId).ExecuteUpdateAsync(setters =>
+                setters.SetProperty(value => value.ReadinessState, TableReadinessState.ReadyForGuests));
+        }
+
+        var nextVisit = await OpenStableTableAsync(tableId, readinessEnabled: true);
+        nextVisit.Success.Should().BeTrue();
+        nextVisit.Data!.ServiceSessionId.Should().NotBe(oldSessionId);
+        nextVisit.Data.Bill.Orders.Should().BeEmpty();
+
+        var oldPayment = await PayAsync(oldSessionId, released.Version, 18m, "CHF");
+        oldPayment.Success.Should().BeTrue("cashiers must be able to settle the released historical visit");
+        oldPayment.Data!.Bill.EligibleOutstanding.Should().Be(0m);
+        await using (var nextContext = _fixture.CreateContext())
+        {
+            (await SessionReader(nextContext).ReadAsync(
+                nextVisit.Data.ServiceSessionId, CancellationToken.None))!.Bill.Orders.Should().BeEmpty();
+        }
+
+        var tableNumberLookup = await Assembler().AssembleAsync(52, CancellationToken.None);
+        tableNumberLookup!.IsAmbiguous.Should().BeTrue(
+            "table-number compatibility reads must never mix a released payable visit with the new visit");
+        await using var verify = _fixture.CreateContext();
+        var oldOrder = await verify.Orders.SingleAsync(value => value.Id == legacyOrderId);
+        oldOrder.ServiceSessionId.Should().Be(oldSessionId);
+        oldOrder.TotalPaid.Should().Be(18m);
+        (await verify.Orders.CountAsync(value => value.ServiceSessionId == nextVisit.Data.ServiceSessionId))
+            .Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Table_tip_is_separate_from_food_debt_and_part_of_the_idempotent_tender_payload()
+    {
+        var sessionId = await SeedSessionAsync(53, currency: "CHF");
+        var orderId = await SeedOrderAsync(sessionId, 53, 10m, Utc(12, 0));
+        var operationId = Guid.NewGuid();
+
+        var paid = await PayAsync(sessionId, 1, 5m, "CHF", operationId: operationId, tipMinor: 125);
+        paid.Success.Should().BeTrue();
+        paid.Data!.Bill.EligibleOutstanding.Should().Be(5m);
+        paid.Data.Bill.PaymentTip.Should().Be(1.25m);
+
+        var replay = await PayAsync(sessionId, 1, 5m, "CHF", operationId: operationId, tipMinor: 125);
+        replay.Success.Should().BeTrue();
+        replay.Data!.Bill.PaymentTip.Should().Be(1.25m);
+        var mismatch = await PayAsync(sessionId, 1, 5m, "CHF", operationId: operationId, tipMinor: 126);
+        mismatch.Success.Should().BeFalse();
+
+        await using var verify = _fixture.CreateContext();
+        var payment = await verify.OrderPayments.SingleAsync(value => value.OrderId == orderId);
+        payment.Amount.Should().Be(5m, "gratuity must not be added to food-debt allocation");
+        var operation = await verify.TableBillPaymentOperations.SingleAsync(value => value.OperationId == operationId);
+        operation.TipMinor.Should().Be(125);
+    }
+
+    [Fact]
+    public async Task Clearing_new_visit_pending_orders_preserves_rows_and_records_cancellation_audit()
+    {
+        var tableId = await SeedTableAsync("54");
+        var sessionId = await SeedStableSessionAsync(tableId);
+        var orderId = await SeedStableOrderAsync(sessionId, tableId, "54", 9m, Utc(12, 0));
+        await using (var seed = _fixture.CreateContext())
+        {
+            var order = await seed.Orders.SingleAsync(value => value.Id == orderId);
+            order.Status = OrderStatus.Pending;
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var context = _fixture.CreateContext())
+        {
+            var current = new Mock<ICurrentUserService>();
+            current.Setup(value => value.GetAuditIdentifier()).Returns("cashier-clear-test");
+            var result = await new ClearPendingTableOrdersCommandHandler(
+                context, current.Object,
+                new RestaurantSystem.Api.Features.TableGuestVisits.Services.TableGuestVisitRevoker(context),
+                TimeProvider.System).Handle(new ClearPendingTableOrdersCommand
+                {
+                    ServiceSessionId = sessionId,
+                    ExpectedVersion = 1,
+                }, CancellationToken.None);
+
+            result.Success.Should().BeTrue();
+            result.Data!.CancelledOrderCount.Should().Be(1);
+            result.Data.ServiceSessionId.Should().Be(sessionId);
+        }
+
+        await using var verify = _fixture.CreateContext();
+        var retained = await verify.Orders.Include(value => value.StatusHistory)
+            .Include(value => value.RoutingStates).SingleAsync(value => value.Id == orderId);
+        retained.Status.Should().Be(OrderStatus.Cancelled);
+        retained.CreatedAt.Should().Be(Utc(12, 0));
+        retained.CancellationReason.Should().NotBeNullOrWhiteSpace();
+        retained.StatusHistory.Should().ContainSingle(value =>
+            value.FromStatus == OrderStatus.Pending
+            && value.ToStatus == OrderStatus.Cancelled
+            && value.ChangedBy == "cashier-clear-test");
+        retained.RoutingStates.Should().BeEmpty();
+        (await verify.OrderPayments.CountAsync()).Should().Be(0);
+        var released = await verify.TableServiceSessions.SingleAsync(value => value.Id == sessionId);
+        released.ReleasedAt.Should().NotBeNull();
+        released.ReleasedBy.Should().Be("cashier-clear-test");
+        released.Version.Should().Be(2);
+        released.AccountRevision.Should().Be(2);
+        (await verify.Tables.SingleAsync(value => value.Id == tableId)).ReadinessState
+            .Should().Be(TableReadinessState.NeedsReset);
+    }
+
+    [Fact]
+    public async Task Clearing_legacy_pending_orders_cancels_only_unrouted_rows_before_freeing_table()
+    {
+        const int tableNumber = 55;
+        var tableId = await SeedTableAsync(tableNumber.ToString());
+        var orderId = await SeedOrderAsync(null, tableNumber, 11m, Utc(12, 0));
+        await using (var seed = _fixture.CreateContext())
+        {
+            var order = await seed.Orders.SingleAsync(value => value.Id == orderId);
+            order.Status = OrderStatus.Pending;
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var context = _fixture.CreateContext())
+        {
+            var current = new Mock<ICurrentUserService>();
+            current.Setup(value => value.GetAuditIdentifier()).Returns("legacy-clear-test");
+            var result = await new ClearPendingTableOrdersCommandHandler(
+                context, current.Object,
+                new RestaurantSystem.Api.Features.TableGuestVisits.Services.TableGuestVisitRevoker(context),
+                TimeProvider.System).Handle(new ClearPendingTableOrdersCommand
+                {
+                    TableNumber = tableNumber,
+                }, CancellationToken.None);
+
+            result.Success.Should().BeTrue();
+            result.Data!.CancelledOrderCount.Should().Be(1);
+            result.Data.TableNumber.Should().Be(tableNumber);
+        }
+
+        await using var verify = _fixture.CreateContext();
+        var retained = await verify.Orders.Include(value => value.StatusHistory)
+            .SingleAsync(value => value.Id == orderId);
+        retained.Status.Should().Be(OrderStatus.Cancelled);
+        retained.ServiceSessionId.Should().BeNull();
+        retained.TableNumber.Should().Be(tableNumber);
+        retained.StatusHistory.Should().ContainSingle(value => value.ToStatus == OrderStatus.Cancelled);
+        (await verify.Tables.SingleAsync(value => value.Id == tableId)).ReadinessState
+            .Should().Be(TableReadinessState.NeedsReset);
+    }
+
     private TableBillAssembler Assembler()
     {
         var context = _fixture.CreateContext();
@@ -766,9 +1017,17 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         return new TableBillAssembler(context, mapping, NullLogger<TableBillAssembler>.Instance);
     }
 
+    private static TableServiceSessionReader SessionReader(ApplicationDbContext context)
+    {
+        var mapping = new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
+            NullLogger<OrderMappingService>.Instance);
+        return new TableServiceSessionReader(context,
+            new TableBillAssembler(context, mapping, NullLogger<TableBillAssembler>.Instance));
+    }
+
     private async Task<ApiResponse<TableServiceSessionDto>> PayAsync(
         Guid sessionId, int expectedVersion, decimal amount, string? currency = null,
-        DbCommandInterceptor? interceptor = null, Guid? operationId = null)
+        DbCommandInterceptor? interceptor = null, Guid? operationId = null, long tipMinor = 0)
     {
         await using var context = interceptor is null
             ? _fixture.CreateContext()
@@ -799,6 +1058,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
             OperationId = operationId ?? Guid.NewGuid(),
             PaymentMethod = PaymentMethod.Cash,
             Amount = amount,
+            TipMinor = tipMinor,
             Currency = currency,
         }, CancellationToken.None);
     }
@@ -1051,10 +1311,11 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         return id;
     }
 
-    private async Task<ApiResponse<TableServiceSessionDto>> OpenStableTableAsync(Guid tableId)
+    private async Task<ApiResponse<TableServiceSessionDto>> OpenStableTableAsync(
+        Guid tableId, bool readinessEnabled = false)
     {
         await using var context = _fixture.CreateContext();
-        return await OpenHandler(context).Handle(
+        return await OpenHandler(context, readinessEnabled).Handle(
             new OpenTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
     }
 

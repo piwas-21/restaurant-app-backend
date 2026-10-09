@@ -23,6 +23,9 @@ public sealed record CreateAccountPaymentQuoteRequest
     public long? AmountMinor { get; init; }
     public Guid? EqualSharePlanId { get; init; }
     public int? EqualShareOrdinal { get; init; }
+    public Guid? CustomSharePlanId { get; init; }
+    public int? CustomShareOrdinal { get; init; }
+    public long TipMinor { get; init; }
 }
 
 public sealed record CreateAccountEqualSharePlanRequest
@@ -37,6 +40,7 @@ public sealed record CreateAccountEqualSharePlanRequest
     public int ShareCount { get; init; }
 
     public Guid? SupersedesPlanId { get; init; }
+    public IReadOnlyList<long> CustomAmountsMinor { get; init; } = [];
 }
 
 public sealed record ReserveAccountPaymentRequest

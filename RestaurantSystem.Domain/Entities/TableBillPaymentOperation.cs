@@ -17,6 +17,8 @@ public class TableBillPaymentOperation : Entity
     public string? Currency { get; set; }
     public PaymentMethod PaymentMethod { get; set; }
     public decimal Amount { get; set; }
+    /// <summary>Exact tender gratuity in currency minor units, outside order debt allocation.</summary>
+    public long TipMinor { get; set; }
     public string? TransactionId { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? CardLastFourDigits { get; set; }

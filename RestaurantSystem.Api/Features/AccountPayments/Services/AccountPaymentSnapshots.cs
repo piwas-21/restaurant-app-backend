@@ -19,7 +19,12 @@ internal sealed record AccountPaymentQuoteSnapshot(
     Guid? EqualSharePlanId,
     int? EqualShareOrdinal,
     IReadOnlyList<AccountPaymentAllocationDto> Allocations,
-    CashSettlementQuote? CashSettlement = null);
+    CashSettlementQuote? CashSettlement = null)
+{
+    public long TipMinor { get; init; }
+    public Guid? CustomSharePlanId { get; init; }
+    public int? CustomShareOrdinal { get; init; }
+}
 
 internal static class AccountPaymentSnapshots
 {
@@ -58,9 +63,18 @@ internal static class AccountPaymentSnapshots
     internal static AccountPaymentOperationDto ToOperation(AccountPaymentAttempt attempt)
     {
         var snapshot = Deserialize<AccountPaymentQuoteSnapshot>(attempt.SnapshotJson);
+        if (snapshot.TipMinor != attempt.TipMinor
+            || (snapshot.Mode == AccountPaymentMode.CustomAmount
+                ? snapshot.CustomSharePlanId != attempt.EqualSharePlanId
+                    || snapshot.CustomShareOrdinal != attempt.EqualShareOrdinal
+                : snapshot.Mode == AccountPaymentMode.Equal
+                    ? snapshot.EqualSharePlanId != attempt.EqualSharePlanId
+                        || snapshot.EqualShareOrdinal != attempt.EqualShareOrdinal
+                    : attempt.EqualSharePlanId is not null || attempt.EqualShareOrdinal is not null))
+            throw new ConflictException("The saved payment snapshot differs from its durable tender metadata.");
         if (snapshot.CashSettlement is CashSettlementQuote frozen)
             AccountCashSettlementPolicy.RequireMatches(frozen, attempt.Currency,
-                attempt.PaymentMethod, attempt.AmountMinor);
+                attempt.PaymentMethod, checked(attempt.AmountMinor + attempt.TipMinor));
         AccountCashCaptureReceiptPolicy.ValidateStored(attempt, snapshot);
         var receipt = attempt.CashCollectionReceipt;
         return new AccountPaymentOperationDto(
@@ -71,6 +85,9 @@ internal static class AccountPaymentSnapshots
             snapshot.EqualShareOrdinal, snapshot.Allocations)
         {
             CashSettlement = snapshot.CashSettlement,
+            TipMinor = snapshot.TipMinor,
+            CustomSharePlanId = snapshot.CustomSharePlanId,
+            CustomShareOrdinal = snapshot.CustomShareOrdinal,
             CashReceipt = receipt is null ? null : new CashCollectionReceiptDto(
                 receipt.PolicyVersion, receipt.Currency, receipt.ExactAmountMinor,
                 receipt.AdjustmentMinor, receipt.DueAmountMinor, receipt.ReceivedMinor,
@@ -81,7 +98,12 @@ internal static class AccountPaymentSnapshots
     internal static AccountEqualSharePlanDto ToPlan(AccountEqualSharePlan plan) => new(
         plan.ServiceSessionId, plan.Id, plan.OperationId, plan.AccountRevision,
         plan.TotalMinor, plan.ShareCount, plan.Currency, plan.CreatedAt,
-        plan.InvalidatedAt, ToDtos(ReadScope(plan.ScopeJson)));
+        plan.InvalidatedAt, ToDtos(ReadScope(plan.ScopeJson)))
+    {
+        CustomAmountsMinor = plan.CustomAmountsJson is null
+            ? null
+            : Deserialize<List<long>>(plan.CustomAmountsJson)
+    };
 
     private static JsonSerializerOptions CreateOptions()
     {

@@ -9,15 +9,16 @@ public sealed class AccountPaymentAttemptConfiguration : IEntityTypeConfiguratio
     public void Configure(EntityTypeBuilder<AccountPaymentAttempt> builder)
     {
         builder.ToTable("account_payment_attempts", table => table.HasCheckConstraint(
-            "ck_account_payment_attempt_shape", "amount_minor > 0 AND expected_account_revision > 0 AND version > 0"
+            "ck_account_payment_attempt_shape", "amount_minor > 0 AND tip_minor >= 0 AND expected_account_revision > 0 AND version > 0"
             + " AND (equal_share_ordinal IS NULL OR equal_share_ordinal > 0)"
-            + " AND ((mode = 'Equal' AND equal_share_plan_id IS NOT NULL AND equal_share_ordinal IS NOT NULL)"
-            + " OR (mode <> 'Equal' AND equal_share_plan_id IS NULL AND equal_share_ordinal IS NULL))"));
+            + " AND ((mode IN ('Equal', 'CustomAmount') AND equal_share_plan_id IS NOT NULL AND equal_share_ordinal IS NOT NULL)"
+            + " OR (mode NOT IN ('Equal', 'CustomAmount') AND equal_share_plan_id IS NULL AND equal_share_ordinal IS NULL))"));
         builder.Property(value => value.ActorKind).HasConversion<string>().HasMaxLength(20);
-        builder.Property(value => value.Mode).HasConversion<string>().HasMaxLength(10);
+        builder.Property(value => value.Mode).HasConversion<string>().HasMaxLength(20);
         builder.Property(value => value.State).HasConversion<string>().HasMaxLength(30);
         builder.Property(value => value.PaymentMethod).HasConversion<string>().HasMaxLength(20);
         builder.Property(value => value.Version).IsConcurrencyToken();
+        builder.Property(value => value.TipMinor).IsRequired();
         builder.Property(value => value.Currency).HasMaxLength(3).IsRequired();
         builder.Property(value => value.PayloadHash).HasMaxLength(64).IsRequired();
         builder.Property(value => value.SnapshotJson).HasColumnType("jsonb").IsRequired();

@@ -28,16 +28,17 @@ public class TableServiceSessionConfiguration : IEntityTypeConfiguration<TableSe
             .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
 
         builder.Property(session => session.OpenedAt).IsRequired();
+        builder.Property(session => session.ReleasedBy).HasMaxLength(200);
 
         // A table may have one open visit at a time. Closed visits remain durable for receipts,
         // audit and unambiguous historical membership.
         builder.HasIndex(session => session.TableNumber)
             .IsUnique()
-            .HasFilter("\"status\" = 'Open'");
+            .HasFilter("\"status\" = 'Open' AND \"released_at\" IS NULL");
 
         builder.HasIndex(session => session.TableId)
             .IsUnique()
-            .HasFilter("\"status\" = 'Open' AND \"table_id\" IS NOT NULL");
+            .HasFilter("\"status\" = 'Open' AND \"released_at\" IS NULL AND \"table_id\" IS NOT NULL");
 
         builder.HasIndex(session => session.Status);
         builder.HasIndex(session => session.OpenedAt);

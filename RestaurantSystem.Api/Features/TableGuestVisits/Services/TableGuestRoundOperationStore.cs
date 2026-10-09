@@ -145,6 +145,7 @@ internal sealed class TableGuestRoundOperationStore : ITableGuestRoundOperationS
         EnsureEnabled();
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         if (session.Id != context.ServiceSessionId || session.Status != TableServiceSessionStatus.Open
+            || session.ReleasedAt.HasValue
             || !session.TableId.HasValue || context.OperationId == Guid.Empty
             || context.ExpectedAccountRevision < 1 || context.ParticipantTokenHash.Length != 64
             || !BasketPurchaseFingerprint.IsValidDigest(context.ExpectedBasketFingerprint))

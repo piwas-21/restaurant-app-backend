@@ -6,4 +6,5 @@ public interface ITableServiceSessionReader
 {
     Task<TableServiceSessionDto?> ReadAsync(Guid serviceSessionId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TableServiceSessionDto>> ReadActiveAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<TableServiceSessionDto>> ReadReleasedAsync(CancellationToken cancellationToken);
 }

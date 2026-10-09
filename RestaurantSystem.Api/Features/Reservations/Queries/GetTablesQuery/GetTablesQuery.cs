@@ -108,7 +108,10 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
         var allDineInOrders = _context.Orders
             .AsNoTracking()
             .Where(order => order.Type == OrderType.DineIn && !order.IsDeleted
-                && (order.TableId != null || order.TableNumber != null));
+                && (order.TableId != null || order.TableNumber != null))
+            .Where(order => !order.ServiceSessionId.HasValue
+                || !_context.TableServiceSessions.Any(session => session.Id == order.ServiceSessionId.Value
+                    && session.ReleasedAt != null));
         var liveOrders = allDineInOrders.Where(order => activeOrderStatuses.Contains(order.Status));
         var completedUnpaidOrders = allDineInOrders
             .Where(order => order.Status == OrderStatus.Completed)
@@ -163,7 +166,8 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
 
         var openSessionTables = await _context.TableServiceSessions
             .AsNoTracking()
-            .Where(session => session.Status == TableServiceSessionStatus.Open)
+            .Where(session => session.Status == TableServiceSessionStatus.Open
+                && session.ReleasedAt == null)
             .Select(session => new
             {
                 session.TableId,

@@ -115,13 +115,35 @@ public sealed class AccountPaymentAccountReader(
         var plan = plans.SingleOrDefault();
         if (plan is null) return null;
         var scope = AccountPaymentSnapshots.ReadScope(plan.ScopeJson);
+        var customAmounts = plan.CustomAmountsJson is null
+            ? null
+            : AccountPaymentSnapshots.Deserialize<List<long>>(plan.CustomAmountsJson);
+        var customTotalMatches = true;
+        if (customAmounts is not null)
+        {
+            try
+            {
+                customTotalMatches = customAmounts.Aggregate(0L, (sum, value) => checked(sum + value))
+                    == plan.TotalMinor;
+            }
+            catch (OverflowException)
+            {
+                customTotalMatches = false;
+            }
+        }
         if (scope.Count > maximumSegments || plan.ShareCount < 2 || plan.ShareCount > maximumShares
-            || AccountDebtMath.Total(scope) != plan.TotalMinor || plan.TotalMinor < plan.ShareCount)
+            || AccountDebtMath.Total(scope) != plan.TotalMinor
+            || (customAmounts is null && plan.TotalMinor < plan.ShareCount)
+            || (customAmounts is not null && (customAmounts.Count != plan.ShareCount
+                || customAmounts.Any(value => value <= 0)
+                || !customTotalMatches)))
             throw new ConflictException("The equal-share plan exceeds the configured allocation display limit.");
         var claims = await ReadShareClaimsAsync(sessionId, plan.Id, plan.ShareCount, cancellationToken);
         var slots = Enumerable.Range(1, plan.ShareCount).Select(ordinal =>
         {
-            var share = AccountEqualScopeMath.ForShare(scope, plan.ShareCount, ordinal);
+            var share = customAmounts is null
+                ? AccountEqualScopeMath.ForShare(scope, plan.ShareCount, ordinal)
+                : AccountDebtMath.Amount(scope, customAmounts[ordinal - 1]);
             claims.TryGetValue(ordinal, out var claimState);
             var hasClaim = claims.ContainsKey(ordinal);
             var isAvailable = !hasClaim && IsScopeAvailable(account.Debt.Available, share);
@@ -138,7 +160,9 @@ public sealed class AccountPaymentAccountReader(
             plan.Currency,
             plan.ActorId == actor.ActorId && plan.ActorKind == actor.Kind,
             slots,
-            AccountPaymentSnapshots.ToDtos(scope));
+            AccountPaymentSnapshots.ToDtos(scope),
+            customAmounts is not null,
+            customAmounts);
     }
 
     private async Task<Dictionary<int, AccountPaymentState>> ReadShareClaimsAsync(

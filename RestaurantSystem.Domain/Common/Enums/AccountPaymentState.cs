@@ -13,7 +13,7 @@ public enum AccountPaymentState
     ReconciliationRequired = 8
 }
 
-public enum AccountPaymentMode { Items = 1, Amount = 2, Equal = 3 }
+public enum AccountPaymentMode { Items = 1, Amount = 2, Equal = 3, CustomAmount = 4, Full = 5 }
 public enum AccountPaymentActorKind { Staff = 1, GuestParticipant = 2 }
 
 public static class AccountPaymentStateRules

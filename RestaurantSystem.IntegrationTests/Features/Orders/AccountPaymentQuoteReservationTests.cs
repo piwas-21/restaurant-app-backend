@@ -157,6 +157,44 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
     }
 
     [Fact]
+    public async Task Custom_guest_amounts_are_frozen_and_tip_is_separate_from_reserved_food_debt()
+    {
+        var account = await SeedAccount(10m);
+        var plan = await CreatePlan(account.SessionId,
+            NewPlanRequest(Guid.NewGuid(), 1, 3) with { CustomAmountsMinor = [250, 325, 425] });
+
+        plan.CustomAmountsMinor.Should().BeEquivalentTo([250L, 325L, 425L]);
+        var quote = await CreateQuote(account.SessionId, new CreateAccountPaymentQuoteRequest
+        {
+            OperationId = Guid.NewGuid(),
+            ExpectedAccountRevision = 1,
+            Mode = AccountPaymentMode.CustomAmount,
+            PaymentMethod = PaymentMethod.Cash,
+            CustomSharePlanId = plan.PlanId,
+            CustomShareOrdinal = 2,
+            TipMinor = 125,
+        });
+
+        quote.Mode.Should().Be(AccountPaymentMode.CustomAmount);
+        quote.CustomSharePlanId.Should().Be(plan.PlanId);
+        quote.CustomShareOrdinal.Should().Be(2);
+        quote.AmountMinor.Should().Be(325);
+        quote.TipMinor.Should().Be(125);
+        quote.CashSettlement!.DueAmountMinor.Should().Be(450,
+            "the cash due is food allocation plus tip while the account allocation remains food-only");
+        quote.Allocations.Sum(value => value.AmountMinor).Should().Be(325);
+
+        (await Reserve(account.SessionId, quote.OperationId, expectedVersion: 1, revision: 1))
+            .State.Should().Be(AccountPaymentState.Reserved);
+        await using var verify = fixture.CreateContext();
+        var debt = await new AccountDebtSnapshotReader(verify).ReadAsync(account.SessionId, CancellationToken.None);
+        debt.Debt.ReservedMinor.Should().Be(325);
+        debt.Debt.AvailableMinor.Should().Be(675);
+        (await verify.AccountPaymentAttempts.SingleAsync(value => value.OperationId == quote.OperationId))
+            .TipMinor.Should().Be(125);
+    }
+
+    [Fact]
     public async Task Cashiers_can_claim_shared_equal_plan_slots_without_sharing_operation_lookup()
     {
         var account = await SeedAccount(10m);

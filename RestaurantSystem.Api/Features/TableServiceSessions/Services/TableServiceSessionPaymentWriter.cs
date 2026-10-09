@@ -84,6 +84,7 @@ public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPayme
             Currency = command.Currency,
             PaymentMethod = command.PaymentMethod,
             Amount = command.Amount,
+            TipMinor = command.TipMinor,
             TransactionId = command.TransactionId,
             ReferenceNumber = command.ReferenceNumber,
             CardLastFourDigits = command.CardLastFourDigits,

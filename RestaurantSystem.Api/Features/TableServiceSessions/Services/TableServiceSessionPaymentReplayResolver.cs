@@ -33,6 +33,7 @@ public sealed class TableServiceSessionPaymentReplayResolver : ITableServiceSess
             || operation.ExpectedVersion != command.ExpectedVersion
             || operation.PaymentMethod != command.PaymentMethod
             || operation.Amount != command.Amount
+            || operation.TipMinor != command.TipMinor
             || !string.Equals(operation.Currency, command.Currency, StringComparison.OrdinalIgnoreCase)
             || operation.TransactionId != command.TransactionId
             || operation.ReferenceNumber != command.ReferenceNumber
