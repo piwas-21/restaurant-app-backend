@@ -39,9 +39,10 @@ public partial class FidelityPointsServiceTests
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "PreLoyaltyMigrationFixture"
         };
-        order.Items.Add(item);
-        context.OrderItems.Add(item);
         await context.SaveChangesAsync();
+        await LegacyEntityFixture.InsertAsync(context, item, "section_id");
+        order.Items.Add(item);
+        context.Entry(item).State = EntityState.Unchanged;
 
         var rule = new OrderBillingEarningRuleEvidence(Guid.NewGuid(), "Historical loyalty rule", 0m,
             null, candidatePoints, 1);

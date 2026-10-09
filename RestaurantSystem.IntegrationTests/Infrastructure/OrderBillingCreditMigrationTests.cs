@@ -176,10 +176,27 @@ public sealed class OrderBillingCreditMigrationTests : IAsyncLifetime
             await down.Should().ThrowAsync<PostgresException>()
                 .WithMessage("*Current visit allocation history exists*");
             await using var verify = _fixture.CreateContext();
-            (await verify.TableServiceSessions.AsNoTracking().SingleAsync(value => value.Id == visit.Id))
-                .BillingAllocationVersion.Should().Be(1);
-            var unchanged = await verify.Orders.AsNoTracking().Include(value => value.Items)
-                .SingleAsync(value => value.Id == order.Id);
+            (await verify.TableServiceSessions.AsNoTracking().Where(value => value.Id == visit.Id)
+                .Select(value => value.BillingAllocationVersion).SingleAsync()).Should().Be(1);
+            var unchanged = await verify.Orders.IgnoreAutoIncludes().AsNoTracking()
+                .Where(value => value.Id == order.Id).Select(value => new Order
+                {
+                    Id = value.Id,
+                    Total = value.Total,
+                    Tip = value.Tip,
+                    CreatedBy = value.CreatedBy,
+                    DeliveryFee = value.DeliveryFee,
+                    TotalPaid = value.TotalPaid,
+                    Items = value.Items.Select(item => new OrderItem
+                    {
+                        Id = item.Id,
+                        OrderId = item.OrderId,
+                        CreatedBy = item.CreatedBy,
+                        ParentOrderItemId = item.ParentOrderItemId,
+                        Quantity = item.Quantity,
+                        ItemTotal = item.ItemTotal
+                    }).ToList()
+                }).SingleAsync();
             unchanged.TotalPaid.Should().Be(0m);
             (await verify.OrderPayments.CountAsync(value => value.OrderId == order.Id)).Should().Be(0);
             var charges = FrozenOrderChargeMath.Read(unchanged, new AccountMoney("CHF"));

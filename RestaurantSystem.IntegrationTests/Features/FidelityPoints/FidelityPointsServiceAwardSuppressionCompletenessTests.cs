@@ -56,7 +56,16 @@ public partial class FidelityPointsServiceTests
                 .Where(value => value.OrderId == orderId)
                 .OrderBy(value => value.UnitOrdinal)
                 .FirstAsync();
-            var sourceItem = await context.OrderItems.SingleAsync(value => value.Id == unit.OrderItemId);
+            var sourceItem = await context.OrderItems.AsNoTracking()
+                .Where(value => value.Id == unit.OrderItemId).Select(value => new OrderItem
+                {
+                    Id = value.Id,
+                    ProductName = value.ProductName,
+                    Quantity = value.Quantity,
+                    UnitPrice = value.UnitPrice,
+                    ItemTotal = value.ItemTotal,
+                    CreatedBy = value.CreatedBy
+                }).SingleAsync();
             context.OrderAmendments.Add(CreateCommittedVoid(orderId, Guid.NewGuid(), unit.OrderItemId,
                 unit.UnitOrdinal, 1, sourceItem));
             context.FidelityPointBalances.Add(CreateBalance(_testUserId, 80, 80));
