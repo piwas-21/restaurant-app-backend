@@ -20,10 +20,10 @@ public static class ErrorCodes
     public const string EmailAlreadyExists = "EmailAlreadyExists";
 
     /// <summary>
-    /// Returned when an item cannot be ordered through the basket's current order type. The
-    /// message names the channels the item IS available on, and the frontend re-displays it
-    /// verbatim — this code is what tells it that the message is safe to show a guest, rather
-    /// than it having to trust every 400 on the endpoint.
+    /// Returned when the selected order type is unavailable or an item cannot be ordered through
+    /// that type. For a bound guest visit, the specific message preserves the visit and basket
+    /// rather than suggesting a switch to another order type. The frontend may safely show it to a
+    /// guest rather than trusting every 400 on the endpoint.
     /// </summary>
     public const string OrderTypeNotAvailable = "OrderTypeNotAvailable";
 
