@@ -57,6 +57,20 @@ internal static class TableBillPaymentFlowReader
             .GroupBy(value => value.SessionId)
             .ToDictionary(group => group.Key,
                 group => group.OrderByDescending(value => value.CreatedAt).ThenBy(value => value.PlanId).First());
+
+        var activePlanCandidates = await context.AccountEqualSharePlans.AsNoTracking()
+            .Where(value => sessionIds.Contains(value.ServiceSessionId) && value.InvalidatedAt == null)
+            .Select(value => new FlowCandidate(value.ServiceSessionId, value.CreatedAt,
+                value.CustomAmountsJson == null ? "Equal" : "CustomAmount", value.Id, null))
+            .ToListAsync(cancellationToken);
+        foreach (var group in activePlanCandidates.GroupBy(value => value.SessionId))
+        {
+            if (latestBySession.ContainsKey(group.Key)) continue;
+            if (group.Count() > 1)
+                throw new ConflictException("The table bill has multiple active split plans to reconcile.");
+            latestBySession[group.Key] = group.Single();
+        }
+
         var planIds = latestBySession.Values.Where(value => value.PlanId.HasValue)
             .Select(value => value.PlanId!.Value).Distinct().ToArray();
         if (planIds.Length == 0)
@@ -85,18 +99,34 @@ internal static class TableBillPaymentFlowReader
             }
 
             IReadOnlyList<AccountDebtSegment> scope;
+            long scopeTotal;
             try
             {
                 scope = AccountPaymentSnapshots.ReadScope(plan.ScopeJson);
+                scopeTotal = AccountDebtMath.Total(scope);
             }
-            catch (Exception exception) when (exception is System.Text.Json.JsonException or BadRequestException)
+            catch (Exception exception) when (exception is System.Text.Json.JsonException
+                or BadRequestException or OverflowException)
             {
                 throw new ConflictException("The table bill split plan requires reconciliation.", exception);
             }
             var customAmounts = plan.CustomAmountsJson is null
                 ? null
                 : AccountPaymentSnapshots.Deserialize<List<long>>(plan.CustomAmountsJson);
-            if (plan.ShareCount < 2 || customAmounts is not null && customAmounts.Count != plan.ShareCount)
+            long customTotal;
+            try
+            {
+                customTotal = customAmounts?.Aggregate(0L, (sum, amount) => checked(sum + amount))
+                    ?? plan.TotalMinor;
+            }
+            catch (OverflowException exception)
+            {
+                throw new ConflictException("The table bill split plan requires reconciliation.", exception);
+            }
+            if (plan.ShareCount < 2 || scopeTotal != plan.TotalMinor
+                || customAmounts is null && plan.TotalMinor < plan.ShareCount
+                || customAmounts is not null && (customAmounts.Count != plan.ShareCount
+                    || customAmounts.Any(value => value <= 0) || customTotal != plan.TotalMinor))
                 throw new ConflictException("The table bill split plan requires reconciliation.");
             claimsByPlan.TryGetValue(planId, out var planClaims);
             var guests = Enumerable.Range(1, plan.ShareCount).Select(ordinal =>

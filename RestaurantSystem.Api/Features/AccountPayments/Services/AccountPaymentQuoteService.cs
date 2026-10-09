@@ -187,7 +187,8 @@ public sealed class AccountPaymentQuoteService(
                 throw new BadRequestException("The equal-share position is outside the reviewed plan.");
             var scope = AccountPaymentSnapshots.ReadScope(plan.ScopeJson);
             segments = isCustom
-                ? AccountDebtMath.Amount(scope, ReadCustomShareAmount(plan.CustomAmountsJson!, ordinal!.Value))
+                ? AccountCustomShareScopeMath.ForShare(scope,
+                    AccountPaymentSnapshots.Deserialize<List<long>>(plan.CustomAmountsJson!), ordinal!.Value)
                 : AccountEqualScopeMath.ForShare(scope, plan.ShareCount, ordinal!.Value);
         }
         else
@@ -201,15 +202,6 @@ public sealed class AccountPaymentQuoteService(
         if (segments.Count == 0 || AccountDebtMath.Total(segments) <= 0)
             throw new BadRequestException("The payment scope has no payable value.");
         return segments;
-    }
-
-    private static long ReadCustomShareAmount(string json, int ordinal)
-    {
-        var amounts = AccountPaymentSnapshots.Deserialize<List<long>>(json);
-        if (amounts.Count == 0 || amounts.Any(value => value <= 0)
-            || ordinal < 1 || ordinal > amounts.Count)
-            throw new ConflictException("The custom guest split plan requires reconciliation.");
-        return amounts[ordinal - 1];
     }
 
     private static AccountPaymentOperationDto RequireReplay(

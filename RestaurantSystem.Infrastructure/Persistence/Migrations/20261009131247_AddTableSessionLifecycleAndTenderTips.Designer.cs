@@ -13,8 +13,8 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261009120533_FreeTableForPayableVisit")]
-    partial class FreeTableForPayableVisit
+    [Migration("20261009131247_AddTableSessionLifecycleAndTenderTips")]
+    partial class AddTableSessionLifecycleAndTenderTips
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -757,6 +757,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency");
 
+                    b.Property<string>("CustomAmountsJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("custom_amounts_json");
+
                     b.Property<DateTime?>("InvalidatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("invalidated_at");
@@ -1053,8 +1057,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Mode")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("mode");
 
                     b.Property<Guid>("OperationId")
@@ -1119,6 +1123,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("state");
 
+                    b.Property<long>("TipMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tip_minor");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -1152,7 +1160,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.ToTable("account_payment_attempts", null, t =>
                         {
-                            t.HasCheckConstraint("ck_account_payment_attempt_shape", "amount_minor > 0 AND expected_account_revision > 0 AND version > 0 AND (equal_share_ordinal IS NULL OR equal_share_ordinal > 0) AND ((mode = 'Equal' AND equal_share_plan_id IS NOT NULL AND equal_share_ordinal IS NOT NULL) OR (mode <> 'Equal' AND equal_share_plan_id IS NULL AND equal_share_ordinal IS NULL))");
+                            t.HasCheckConstraint("ck_account_payment_attempt_shape", "amount_minor > 0 AND tip_minor >= 0 AND expected_account_revision > 0 AND version > 0 AND (equal_share_ordinal IS NULL OR equal_share_ordinal > 0) AND ((mode IN ('Equal', 'CustomAmount') AND equal_share_plan_id IS NOT NULL AND equal_share_ordinal IS NOT NULL) OR (mode NOT IN ('Equal', 'CustomAmount') AND equal_share_plan_id IS NULL AND equal_share_ordinal IS NULL))");
                         });
                 });
 
@@ -1581,6 +1589,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
+
+                    b.Property<Guid?>("SectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("section_id");
 
                     b.PrimitiveCollection<string>("SelectedIngredients")
                         .HasColumnType("jsonb")
@@ -7217,6 +7229,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
 
+                    b.Property<Guid?>("SectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("section_id");
+
                     b.Property<string>("SpecialInstructions")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -9818,6 +9834,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<int?>("TableNumber")
                         .HasColumnType("integer")
                         .HasColumnName("table_number");
+
+                    b.Property<long>("TipMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tip_minor");
 
                     b.Property<string>("TransactionId")
                         .HasMaxLength(100)

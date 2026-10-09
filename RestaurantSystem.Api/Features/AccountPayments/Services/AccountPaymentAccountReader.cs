@@ -143,7 +143,7 @@ public sealed class AccountPaymentAccountReader(
         {
             var share = customAmounts is null
                 ? AccountEqualScopeMath.ForShare(scope, plan.ShareCount, ordinal)
-                : AccountDebtMath.Amount(scope, customAmounts[ordinal - 1]);
+                : AccountCustomShareScopeMath.ForShare(scope, customAmounts, ordinal);
             claims.TryGetValue(ordinal, out var claimState);
             var hasClaim = claims.ContainsKey(ordinal);
             var isAvailable = !hasClaim && IsScopeAvailable(account.Debt.Available, share);

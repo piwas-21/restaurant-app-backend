@@ -1,18 +1,40 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class AddTableAccountTipsAndCustomShares : Migration
+    public partial class AddTableSessionLifecycleAndTenderTips : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropIndex(
+                name: "ix_table_service_sessions_table_id",
+                table: "table_service_sessions");
+
+            migrationBuilder.DropIndex(
+                name: "IX_table_service_sessions_table_number",
+                table: "table_service_sessions");
+
             migrationBuilder.DropCheckConstraint(
                 name: "ck_account_payment_attempt_shape",
                 table: "account_payment_attempts");
+
+            migrationBuilder.AddColumn<DateTime>(
+                name: "released_at",
+                table: "table_service_sessions",
+                type: "timestamp with time zone",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "released_by",
+                table: "table_service_sessions",
+                type: "character varying(200)",
+                maxLength: 200,
+                nullable: true);
 
             migrationBuilder.AddColumn<long>(
                 name: "tip_minor",
@@ -44,6 +66,20 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                 type: "jsonb",
                 nullable: true);
 
+            migrationBuilder.CreateIndex(
+                name: "ix_table_service_sessions_table_id",
+                table: "table_service_sessions",
+                column: "table_id",
+                unique: true,
+                filter: "\"status\" = 'Open' AND \"released_at\" IS NULL AND \"table_id\" IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_table_service_sessions_table_number",
+                table: "table_service_sessions",
+                column: "table_number",
+                unique: true,
+                filter: "\"status\" = 'Open' AND \"released_at\" IS NULL");
+
             migrationBuilder.AddCheckConstraint(
                 name: "ck_account_payment_attempt_shape",
                 table: "account_payment_attempts",
@@ -53,9 +89,25 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropIndex(
+                name: "ix_table_service_sessions_table_id",
+                table: "table_service_sessions");
+
+            migrationBuilder.DropIndex(
+                name: "IX_table_service_sessions_table_number",
+                table: "table_service_sessions");
+
             migrationBuilder.DropCheckConstraint(
                 name: "ck_account_payment_attempt_shape",
                 table: "account_payment_attempts");
+
+            migrationBuilder.DropColumn(
+                name: "released_at",
+                table: "table_service_sessions");
+
+            migrationBuilder.DropColumn(
+                name: "released_by",
+                table: "table_service_sessions");
 
             migrationBuilder.DropColumn(
                 name: "tip_minor",
@@ -78,6 +130,20 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                 oldClrType: typeof(string),
                 oldType: "character varying(20)",
                 oldMaxLength: 20);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_table_service_sessions_table_id",
+                table: "table_service_sessions",
+                column: "table_id",
+                unique: true,
+                filter: "\"status\" = 'Open' AND \"table_id\" IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_table_service_sessions_table_number",
+                table: "table_service_sessions",
+                column: "table_number",
+                unique: true,
+                filter: "\"status\" = 'Open'");
 
             migrationBuilder.AddCheckConstraint(
                 name: "ck_account_payment_attempt_shape",

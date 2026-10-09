@@ -77,7 +77,8 @@ public sealed class ClearPendingTableOrdersCommandHandler(
             .Include(value => value.RoutingStates)
             .ToListAsync(cancellationToken);
         if (orders.Any(value => value.Status != OrderStatus.Pending || value.Payments.Count > 0
-                || value.TotalPaid > 0 || value.RoutingStates.Count > 0))
+                || value.TotalPaid > 0 || value.RoutingStates.Count > 0
+                || value.IsKitchenReleased || value.KitchenReleasedAt.HasValue))
             return Refused("Only unprinted pending orders without payments or routing history can be cleared.");
 
         var audit = currentUser.GetAuditIdentifier();
