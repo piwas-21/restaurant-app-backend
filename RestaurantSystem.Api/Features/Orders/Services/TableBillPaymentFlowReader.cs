@@ -36,7 +36,7 @@ internal static class TableBillPaymentFlowReader
             join attemptTime in latestAttemptTimes on new { SessionId = attempt.ServiceSessionId, attempt.CreatedAt }
                 equals new { attemptTime.SessionId, attemptTime.CreatedAt }
             select new FlowCandidate(
-                attempt.ServiceSessionId, attempt.CreatedAt, MapMode(attempt.Mode),
+                attempt.ServiceSessionId, attempt.CreatedAt, true, attempt.Id, MapMode(attempt.Mode),
                 attempt.EqualSharePlanId, attempt.EqualShareOrdinal))
             .ToListAsync(cancellationToken);
 
@@ -50,26 +50,26 @@ internal static class TableBillPaymentFlowReader
             join paymentTime in latestTablePaymentTimes on new
             { SessionId = payment.ServiceSessionId!.Value, payment.CreatedAt }
                 equals new { paymentTime.SessionId, paymentTime.CreatedAt }
-            select new FlowCandidate(payment.ServiceSessionId!.Value, payment.CreatedAt, "Amount", null, null))
+            select new FlowCandidate(payment.ServiceSessionId!.Value, payment.CreatedAt, true, payment.Id,
+                "Amount", null, null))
             .ToListAsync(cancellationToken);
-
-        var latestBySession = attemptCandidates.Concat(tablePaymentCandidates)
-            .GroupBy(value => value.SessionId)
-            .ToDictionary(group => group.Key,
-                group => group.OrderByDescending(value => value.CreatedAt).ThenBy(value => value.PlanId).First());
 
         var activePlanCandidates = await context.AccountEqualSharePlans.AsNoTracking()
             .Where(value => sessionIds.Contains(value.ServiceSessionId) && value.InvalidatedAt == null)
-            .Select(value => new FlowCandidate(value.ServiceSessionId, value.CreatedAt,
+            .Select(value => new FlowCandidate(value.ServiceSessionId, value.CreatedAt, false, value.Id,
                 value.CustomAmountsJson == null ? "Equal" : "CustomAmount", value.Id, null))
             .ToListAsync(cancellationToken);
         foreach (var group in activePlanCandidates.GroupBy(value => value.SessionId))
-        {
-            if (latestBySession.ContainsKey(group.Key)) continue;
             if (group.Count() > 1)
                 throw new ConflictException("The table bill has multiple active split plans to reconcile.");
-            latestBySession[group.Key] = group.Single();
-        }
+
+        var latestBySession = attemptCandidates.Concat(tablePaymentCandidates).Concat(activePlanCandidates)
+            .GroupBy(value => value.SessionId)
+            .ToDictionary(group => group.Key, group => group
+                .OrderByDescending(value => value.CreatedAt)
+                .ThenByDescending(value => value.IsCaptured)
+                .ThenBy(value => value.CandidateId)
+                .First());
 
         var planIds = latestBySession.Values.Where(value => value.PlanId.HasValue)
             .Select(value => value.PlanId!.Value).Distinct().ToArray();
@@ -167,5 +167,11 @@ internal static class TableBillPaymentFlowReader
     };
 
     private sealed record FlowCandidate(
-        Guid SessionId, DateTime CreatedAt, string Mode, Guid? PlanId, int? Ordinal);
+        Guid SessionId,
+        DateTime CreatedAt,
+        bool IsCaptured,
+        Guid CandidateId,
+        string Mode,
+        Guid? PlanId,
+        int? Ordinal);
 }

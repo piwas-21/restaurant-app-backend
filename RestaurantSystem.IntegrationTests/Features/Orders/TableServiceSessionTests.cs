@@ -388,57 +388,36 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Session_bill_keeps_captured_flow_ahead_of_a_later_active_split_plan()
+    public async Task Session_bill_prefers_a_newer_active_split_plan_over_an_older_capture()
     {
         var sessionId = await SeedSessionAsync(79, currency: "CHF");
         var orderId = await SeedOrderAsync(sessionId, 79, 10m, Utc(12, 0));
-        await using (var seed = _fixture.CreateContext())
-        {
-            seed.AccountEqualSharePlans.Add(new AccountEqualSharePlan
-            {
-                Id = Guid.NewGuid(),
-                ServiceSessionId = sessionId,
-                OperationId = Guid.NewGuid(),
-                AccountRevision = 1,
-                TotalMinor = 1000,
-                ShareCount = 2,
-                Currency = "CHF",
-                PayloadHash = new string('a', 64),
-                ScopeJson = JsonSerializer.Serialize(new[]
-                {
-                    new AccountDebtSegment(orderId, null, 1, 1, 1000)
-                }),
-                CreatedAt = Utc(12, 20),
-                CreatedBy = nameof(TableServiceSessionTests)
-            });
-            seed.AccountPaymentAttempts.Add(new AccountPaymentAttempt
-            {
-                Id = Guid.NewGuid(),
-                ServiceSessionId = sessionId,
-                OperationId = Guid.NewGuid(),
-                ActorId = Guid.NewGuid(),
-                ActorKind = AccountPaymentActorKind.Staff,
-                Mode = AccountPaymentMode.Amount,
-                State = AccountPaymentState.Captured,
-                PaymentMethod = PaymentMethod.Cash,
-                Version = 3,
-                ExpectedAccountRevision = 1,
-                AmountMinor = 1000,
-                Currency = "CHF",
-                PayloadHash = new string('b', 64),
-                SnapshotJson = "{}",
-                QuoteExpiresAt = Utc(13, 0),
-                CompletedAt = Utc(12, 10),
-                CreatedAt = Utc(12, 10),
-                CreatedBy = nameof(TableServiceSessionTests)
-            });
-            await seed.SaveChangesAsync();
-        }
+        await SeedFlowCandidatesAsync(sessionId, orderId, planCreatedAt: Utc(12, 20), capturedAt: Utc(12, 10));
 
         var bill = await Assembler().AssembleAsync(sessionId, CancellationToken.None);
 
         bill.Should().NotBeNull();
-        bill!.PaymentFlowMode.Should().Be("Amount");
+        bill!.PaymentFlowMode.Should().Be("Equal");
+        bill.GuestCount.Should().Be(2);
+        bill.GuestAmounts.Select(value => value.Amount).Should().BeEquivalentTo(new[] { 5m, 5m });
+        bill.GuestAmounts.Should().OnlyContain(value => value.Status == "Due");
+    }
+
+    [Theory]
+    [InlineData(20, "Amount")]
+    [InlineData(10, "Amount")]
+    public async Task Session_bill_selects_newest_flow_and_prefers_capture_on_equal_timestamps(
+        int capturedMinute, string expectedMode)
+    {
+        var sessionId = await SeedSessionAsync(80 + capturedMinute, currency: "CHF");
+        var orderId = await SeedOrderAsync(sessionId, 80 + capturedMinute, 10m, Utc(12, 0));
+        await SeedFlowCandidatesAsync(
+            sessionId, orderId, planCreatedAt: Utc(12, 10), capturedAt: Utc(12, capturedMinute));
+
+        var bill = await Assembler().AssembleAsync(sessionId, CancellationToken.None);
+
+        bill.Should().NotBeNull();
+        bill!.PaymentFlowMode.Should().Be(expectedMode);
         bill.GuestCount.Should().BeNull();
         bill.GuestAmounts.Should().BeEmpty();
     }
@@ -1492,6 +1471,48 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         await using var context = _fixture.CreateContext();
         await context.RestaurantInfo.ExecuteUpdateAsync(setters =>
             setters.SetProperty(info => info.Currency, currency));
+    }
+
+    private async Task SeedFlowCandidatesAsync(
+        Guid sessionId, Guid orderId, DateTime planCreatedAt, DateTime capturedAt)
+    {
+        await using var seed = _fixture.CreateContext();
+        seed.AccountEqualSharePlans.Add(new AccountEqualSharePlan
+        {
+            Id = Guid.NewGuid(),
+            ServiceSessionId = sessionId,
+            OperationId = Guid.NewGuid(),
+            AccountRevision = 1,
+            TotalMinor = 1000,
+            ShareCount = 2,
+            Currency = "CHF",
+            PayloadHash = new string('a', 64),
+            ScopeJson = JsonSerializer.Serialize(new[] { new AccountDebtSegment(orderId, null, 1, 1, 1000) }),
+            CreatedAt = planCreatedAt,
+            CreatedBy = nameof(TableServiceSessionTests)
+        });
+        seed.AccountPaymentAttempts.Add(new AccountPaymentAttempt
+        {
+            Id = Guid.NewGuid(),
+            ServiceSessionId = sessionId,
+            OperationId = Guid.NewGuid(),
+            ActorId = Guid.NewGuid(),
+            ActorKind = AccountPaymentActorKind.Staff,
+            Mode = AccountPaymentMode.Amount,
+            State = AccountPaymentState.Captured,
+            PaymentMethod = PaymentMethod.Cash,
+            Version = 3,
+            ExpectedAccountRevision = 1,
+            AmountMinor = 1000,
+            Currency = "CHF",
+            PayloadHash = new string('b', 64),
+            SnapshotJson = "{}",
+            QuoteExpiresAt = Utc(13, 0),
+            CompletedAt = capturedAt,
+            CreatedAt = capturedAt,
+            CreatedBy = nameof(TableServiceSessionTests)
+        });
+        await seed.SaveChangesAsync();
     }
 
     private async Task<Guid> SeedOrderAsync(Guid? sessionId, int table, decimal total, DateTime orderedAt)

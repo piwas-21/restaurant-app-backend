@@ -89,6 +89,35 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM table_service_sessions
+                        WHERE released_at IS NOT NULL OR released_by IS NOT NULL)
+                       OR EXISTS (
+                        SELECT 1 FROM table_service_sessions
+                        WHERE status = 'Open' AND table_number IS NOT NULL
+                        GROUP BY table_number HAVING COUNT(*) > 1)
+                       OR EXISTS (
+                        SELECT 1 FROM table_service_sessions
+                        WHERE status = 'Open' AND table_id IS NOT NULL
+                        GROUP BY table_id HAVING COUNT(*) > 1)
+                       OR EXISTS (
+                        SELECT 1 FROM table_bill_payment_operations WHERE tip_minor <> 0)
+                       OR EXISTS (
+                        SELECT 1 FROM account_payment_attempts
+                        WHERE tip_minor <> 0 OR mode = 'CustomAmount')
+                       OR EXISTS (
+                        SELECT 1 FROM account_equal_share_plans WHERE custom_amounts_json IS NOT NULL)
+                    THEN
+                        RAISE EXCEPTION 'Table session lifecycle, tender-tip, or custom split history must be retained; use a compatible application build and roll forward. Roll back only an unused schema after supported settlement and cleanup.'
+                            USING ERRCODE = '23514';
+                    END IF;
+                END
+                $$;
+                """);
+
             migrationBuilder.DropIndex(
                 name: "ix_table_service_sessions_table_id",
                 table: "table_service_sessions");
