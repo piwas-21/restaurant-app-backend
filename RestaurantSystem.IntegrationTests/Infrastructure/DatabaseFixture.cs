@@ -60,6 +60,8 @@ public class DatabaseFixture : IAsyncLifetime
             TablesToIgnore = new Table[]
             {
                 "__EFMigrationsHistory",
+                "table_occupancy_recovery_operations",
+                "table_occupancy_recovery_dispositions",
                 // Singleton seeded by the AddRestaurantInfo migration —
                 // ignore so per-test reset doesn't wipe it.
                 "RestaurantInfo",
@@ -127,26 +129,71 @@ public class DatabaseFixture : IAsyncLifetime
 
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync();
-        // Test lanes are disposable. Truncation clears the append-only journal without
-        // disabling its production UPDATE/DELETE triggers during any test execution.
-        await using (var clearJournal = new NpgsqlCommand(
-            "TRUNCATE TABLE order_amendment_loyalty_compensation_postings, "
-            + "order_amendment_loyalty_compensation_units, order_amendment_loyalty_reservations, "
-            + "order_amendment_loyalty_owner_holds, order_amendment_loyalty_compensations, "
-            + "order_billing_award_unit_coverages, order_billing_award_witnesses, "
-            + "order_billing_unit_award_suppressions, "
-            + "order_billing_earning_retirements, "
-            + "order_billing_snapshot_owner_links, order_billing_snapshot_units, "
-            + "order_billing_snapshots, order_billing_credits, "
-            + "table_ready_operations, order_amendment_resolution_refusals, "
-            + "order_amendment_resolution_operations, order_amendment_refund_legs, "
-            + "order_amendment_refund_evidence, account_payment_allocation_reversals, "
-            + "order_amendment_refund_attempts, account_cash_refund_evidence, "
-            + "account_cash_refund_intents, account_cash_collection_receipts", connection))
+        var hasRecoveryTables = await HasRecoveryTablesAsync(connection);
+        if (!hasRecoveryTables)
         {
-            await clearJournal.ExecuteNonQueryAsync();
+            await _respawner.ResetAsync(connection);
+            await RestoreTenantCurrencyAsync(connection);
+            return;
         }
-        await _respawner.ResetAsync(connection);
+
+        // Test lanes are disposable. Disable only the no-truncate guards while their append-only
+        // journals are cleared; row UPDATE/DELETE guards remain enabled during each test.
+        await using (var disableRecoveryTruncateGuards = new NpgsqlCommand(
+                         "ALTER TABLE table_occupancy_recovery_operations "
+                         + "DISABLE TRIGGER table_occupancy_recovery_operations_no_truncate; "
+                         + "ALTER TABLE table_occupancy_recovery_dispositions "
+                         + "DISABLE TRIGGER table_occupancy_recovery_dispositions_no_truncate", connection))
+        {
+            await disableRecoveryTruncateGuards.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            await using var clearJournal = new NpgsqlCommand(
+                "TRUNCATE TABLE table_occupancy_recovery_dispositions, table_occupancy_recovery_operations, "
+                + "order_amendment_loyalty_compensation_postings, "
+                + "order_amendment_loyalty_compensation_units, order_amendment_loyalty_reservations, "
+                + "order_amendment_loyalty_owner_holds, order_amendment_loyalty_compensations, "
+                + "order_billing_award_unit_coverages, order_billing_award_witnesses, "
+                + "order_billing_unit_award_suppressions, "
+                + "order_billing_earning_retirements, "
+                + "order_billing_snapshot_owner_links, order_billing_snapshot_units, "
+                + "order_billing_snapshots, order_billing_credits, "
+                + "table_ready_operations, order_amendment_resolution_refusals, "
+                + "order_amendment_resolution_operations, order_amendment_refund_legs, "
+                + "order_amendment_refund_evidence, account_payment_allocation_reversals, "
+                + "order_amendment_refund_attempts, account_cash_refund_evidence, "
+                + "account_cash_refund_intents, account_cash_collection_receipts", connection);
+            await clearJournal.ExecuteNonQueryAsync();
+
+            // Respawn may TRUNCATE FK-dependent tables with CASCADE. Keep the narrowly scoped
+            // TRUNCATE guards disabled until it has reset the rest of this disposable lane.
+            // The append-only row UPDATE/DELETE guards remain active throughout.
+            await _respawner.ResetAsync(connection);
+        }
+        finally
+        {
+            await using var enableRecoveryTruncateGuards = new NpgsqlCommand(
+                "ALTER TABLE table_occupancy_recovery_operations "
+                + "ENABLE TRIGGER table_occupancy_recovery_operations_no_truncate; "
+                + "ALTER TABLE table_occupancy_recovery_dispositions "
+                + "ENABLE TRIGGER table_occupancy_recovery_dispositions_no_truncate", connection);
+            await enableRecoveryTruncateGuards.ExecuteNonQueryAsync();
+        }
+        await RestoreTenantCurrencyAsync(connection);
+    }
+
+    private static async Task<bool> HasRecoveryTablesAsync(NpgsqlConnection connection)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT to_regclass('public.table_occupancy_recovery_operations') IS NOT NULL "
+            + "AND to_regclass('public.table_occupancy_recovery_dispositions') IS NOT NULL", connection);
+        return (bool)(await command.ExecuteScalarAsync())!;
+    }
+
+    private async Task RestoreTenantCurrencyAsync(NpgsqlConnection connection)
+    {
         await using (var seedCurrency = new NpgsqlCommand(
                          "UPDATE \"RestaurantInfo\" SET currency = @currency", connection))
         {
@@ -154,8 +201,8 @@ public class DatabaseFixture : IAsyncLifetime
             if (await seedCurrency.ExecuteNonQueryAsync() != 1)
                 throw new InvalidOperationException("The disposable test database must have one tenant currency row.");
         }
-        await connection.CloseAsync();
 
+        await connection.CloseAsync();
         await using var currencyContext = CreateContext();
         var capturedCurrency = await OrderNativeAcceptedCurrency.ReadTenantCurrencyAsync(
             currencyContext, CancellationToken.None);

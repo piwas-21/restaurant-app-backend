@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.TableServiceSessions.Services;
@@ -31,9 +32,11 @@ internal static class TableReadinessLegacyRules
             cancellationToken);
 
     public static Task<bool> HasAmbiguousLegacyOpenVisitAsync(
-        ApplicationDbContext context, int? tableNumber, CancellationToken cancellationToken) =>
+        ApplicationDbContext context, int? tableNumber, CancellationToken cancellationToken,
+        Guid? excludedSessionId = null) =>
         context.TableServiceSessions.AsNoTracking().AnyAsync(session =>
             session.Status == TableServiceSessionStatus.Open && session.ReleasedAt == null
+            && (!excludedSessionId.HasValue || session.Id != excludedSessionId.Value)
             && session.TableId == null
             && (session.TableNumber == null || session.TableNumber == tableNumber),
             cancellationToken);
@@ -46,16 +49,16 @@ internal static class TableReadinessLegacyRules
         CancellationToken cancellationToken)
     {
         var unassigned = TableServiceSessionCloseRules.ForUnassignedSession(
-            context.Orders.AsNoTracking(), tableId, tableNumber)
+            context.Orders.AsNoTracking(), context.Set<TableOccupancyRecoveryDisposition>(),
+            tableId, tableNumber)
             .Where(order => !order.IsDeleted && order.Type == OrderType.DineIn
                 && order.ServiceSessionId == null);
         if (await unassigned.AnyAsync(
             TableServiceSessionCloseRules.BlockingLegacyQuery(paymentTolerance), cancellationToken))
             return true;
 
-        return await context.Orders.AsNoTracking().Where(order =>
-            !order.IsDeleted && order.Type == OrderType.DineIn
-            && order.ServiceSessionId == null && order.TableId == null && order.TableNumber == null)
-            .AnyAsync(TableServiceSessionCloseRules.BlockingLegacyQuery(paymentTolerance), cancellationToken);
+        // Orders with no table identity remain visible as standalone cashier work. They cannot
+        // safely be attributed to every physical table and therefore do not block this table.
+        return false;
     }
 }

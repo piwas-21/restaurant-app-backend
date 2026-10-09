@@ -24,19 +24,39 @@ public static class TableServiceSessionCloseRules
             order.BillingCreditAmount, order.TotalPaid, order.PaymentStatus, order.OrderNumber,
             order.TableId, order.TableNumber));
 
+    /// <summary>
+    /// Removes only rows whose unassigned table association was archived by recovery. The order,
+    /// its financial evidence and its normal cashier/kitchen projections remain available.
+    /// </summary>
+    public static IQueryable<Order> ExcludeArchivedLegacyOccupancy(
+        IQueryable<Order> orders,
+        IQueryable<TableOccupancyRecoveryDisposition> dispositions) =>
+        orders.Where(order => !dispositions.Any(disposition =>
+            disposition.OrderId == order.Id && disposition.WasLegacyUnassigned));
+
+    /// <summary>
+    /// Finds unresolved old rounds for a known physical table by stable ID or exact numeric-label
+    /// fallback. Rows with neither identity remain standalone work and are never assigned here.
+    /// </summary>
     public static IQueryable<Order> ForUnassignedSession(
-        IQueryable<Order> orders, Guid? tableId, int? tableNumber)
+        IQueryable<Order> orders,
+        IQueryable<TableOccupancyRecoveryDisposition> dispositions,
+        Guid? tableId,
+        int? tableNumber)
     {
+        IQueryable<Order> matching;
         if (tableId.HasValue)
         {
-            return orders.Where(order => order.TableId == tableId
+            matching = orders.Where(order => order.TableId == tableId
                 || (!order.TableId.HasValue && tableNumber.HasValue
                     && order.TableNumber == tableNumber));
         }
 
-        return tableNumber.HasValue
+        else matching = tableNumber.HasValue
             ? orders.Where(order => !order.TableId.HasValue && order.TableNumber == tableNumber)
             : orders.Where(_ => false);
+
+        return ExcludeArchivedLegacyOccupancy(matching, dispositions);
     }
 
     internal static Expression<Func<Order, bool>> BlockingLegacyQuery(decimal paymentTolerance) => order =>
@@ -55,6 +75,14 @@ public static class TableServiceSessionCloseRules
     public static decimal Outstanding(TableServiceSessionOrderState order) =>
         order.Status == OrderStatus.Cancelled || order.IsFullyRefunded
             ? 0m : Math.Max(0m, order.RemainingAmount);
+
+    public static decimal Outstanding(Order order) => Outstanding(FromCharge(
+        order.Status, order.Total, order.BillingCreditAmount, order.TotalPaid,
+        order.PaymentStatus == PaymentStatus.Refunded));
+
+    public static decimal Outstanding(TableOccupancyRecoveryDisposition disposition) => Outstanding(FromCharge(
+        disposition.OriginalStatus, disposition.OriginalTotal, disposition.OriginalBillingCreditAmount,
+        disposition.OriginalTotalPaid, disposition.OriginalPaymentStatus == PaymentStatus.Refunded));
 
     public static TableServiceSessionCloseAssessment Assess(
         IEnumerable<TableServiceSessionOrderState> memberOrders,

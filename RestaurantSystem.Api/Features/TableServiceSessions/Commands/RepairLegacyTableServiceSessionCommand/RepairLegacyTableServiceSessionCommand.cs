@@ -153,7 +153,7 @@ public sealed partial class RepairLegacyTableServiceSessionCommandHandler
         TableIdentity table, CancellationToken cancellationToken)
     {
         var query = TableServiceSessionCloseRules.ForUnassignedSession(
-            _context.Orders, table.Id, table.Number);
+            _context.Orders, _context.Set<TableOccupancyRecoveryDisposition>(), table.Id, table.Number);
         return query
             .Where(order => !order.IsDeleted
                 && order.Type == OrderType.DineIn

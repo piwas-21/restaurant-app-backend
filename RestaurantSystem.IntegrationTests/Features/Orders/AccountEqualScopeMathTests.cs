@@ -40,6 +40,20 @@ public sealed class AccountEqualScopeMathTests
     }
 
     [Fact]
+    public void FiveCentIncrementFloorsFirstTwoCHFOrEURSharesAndLeavesTheRemainderToTheLast()
+    {
+        IReadOnlyList<AccountDebtSegment> scope = [new(OrderId, ItemId, 1, 1, 460)];
+
+        var shares = Enumerable.Range(1, 3)
+            .Select(ordinal => AccountEqualScopeMath.ForShare(scope, 3, ordinal, roundingIncrementMinor: 5))
+            .ToArray();
+
+        shares.Select(AccountDebtMath.Total).Should().Equal(150, 150, 160);
+        shares.Aggregate(scope, (remaining, share) => AccountDebtMath.Subtract(remaining, share))
+            .Should().BeEmpty();
+    }
+
+    [Fact]
     public void ZeroAmountShareAndInvalidOrdinalAreRefused()
     {
         IReadOnlyList<AccountDebtSegment> scope = [new(OrderId, ItemId, 1, 1, 1)];

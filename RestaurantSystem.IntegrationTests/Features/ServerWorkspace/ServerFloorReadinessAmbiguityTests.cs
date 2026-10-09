@@ -45,15 +45,24 @@ public sealed class ServerFloorReadinessAmbiguityTests(DatabaseFixture fixture) 
     [Theory]
     [InlineData(OrderStatus.Preparing)]
     [InlineData(OrderStatus.Completed)]
-    public async Task Unidentified_unpaid_legacy_round_suppresses_ready_without_attributing_its_balance(OrderStatus status)
+    public async Task Unidentified_unpaid_legacy_round_stays_unassigned_without_blocking_physical_readiness(OrderStatus status)
     {
         await AddUnidentifiedOrderAsync(status, paid: false);
         var table = await ReadTableAsync();
-        table.HasLegacyAmbiguity.Should().BeTrue();
-        table.State.Should().Be("Ambiguous");
-        table.PermittedActions.Should().ContainSingle().Which.Should().Be("ReviewLegacy");
+        table.HasLegacyAmbiguity.Should().BeFalse();
+        table.State.Should().Be("NeedsReset");
+        table.PermittedActions.Should().ContainSingle().Which.Should().Be("MarkTableReady");
         table.Legacy.Should().BeNull("unidentified money must not be attributed to every table");
         table.Session.Should().BeNull();
+
+        using var response = await PostAsJsonAsync($"/api/Tables/{_tableId}/ready", new
+        {
+            operationId = Guid.NewGuid(),
+            expectedReadinessVersion = 1
+        });
+        response.EnsureSuccessStatusCode();
+        (await ReadResponseAsync<ApiResponse<TableReadinessOperationDto>>(response))!
+            .Data!.ReadinessState.Should().Be(nameof(TableReadinessState.ReadyForGuests));
     }
 
     [Fact]

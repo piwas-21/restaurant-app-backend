@@ -251,7 +251,8 @@ public sealed class AccountPaymentQuoteService(
         return isCustom
             ? AccountCustomShareScopeMath.ForShare(scope,
                 AccountPaymentSnapshots.Deserialize<List<long>>(plan.CustomAmountsJson!), ordinal!.Value)
-            : AccountEqualScopeMath.ForShare(scope, plan.ShareCount, ordinal!.Value);
+            : AccountEqualScopeMath.ForShare(
+                scope, plan.ShareCount, ordinal!.Value, plan.RoundingIncrementMinor);
     }
 
     private static void RequirePayableScope(

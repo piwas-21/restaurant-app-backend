@@ -1,0 +1,55 @@
+namespace RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
+
+public sealed record TableOccupancyRecoveryOrderDto(
+    Guid OrderId,
+    string OrderNumber,
+    string Disposition,
+    string OriginalStatus,
+    string OriginalPaymentStatus,
+    decimal OriginalTotal,
+    decimal OriginalBillingCreditAmount,
+    decimal OriginalTotalPaid,
+    decimal OriginalRemainingAmount,
+    bool WasLegacyUnassigned,
+    bool WasKitchenReleased,
+    bool HadRoutingHistory);
+
+public sealed record TableOccupancyRecoveryPreviewDto(
+    Guid TableId,
+    string TableNumber,
+    Guid? ServiceSessionId,
+    int? SessionVersion,
+    long? AccountRevision,
+    int ReadinessVersion,
+    string? Currency,
+    string PreviewFingerprint,
+    int OrderCount,
+    int CancelableUnsentCount,
+    int LegacyUnassignedCount,
+    int RoutedOrderCount,
+    int PreparingOrderCount,
+    int ReadyOrderCount,
+    int PaidOrRefundedOrderCount,
+    int ActivePaymentAttemptCount,
+    int PendingPaymentHandoffCount,
+    int CheckoutAttemptCount,
+    decimal PreservedOutstandingAmount,
+    IReadOnlyList<TableOccupancyRecoveryOrderDto> Orders);
+
+public sealed record TableOccupancyRecoveryOperationDto(
+    Guid OperationId,
+    Guid TableId,
+    Guid? ServiceSessionId,
+    string Reason,
+    DateTime RecordedAt,
+    DateTime? VisitReleasedAt,
+    string ReadinessState,
+    int ReadinessVersion,
+    int? SessionVersion,
+    long? AccountRevision,
+    int CancelledUnsentCount,
+    int ArchivedLegacyCount,
+    int RetainedPriorVisitCount,
+    decimal PreservedPaidAmount,
+    decimal PreservedOutstandingAmount,
+    IReadOnlyList<TableOccupancyRecoveryOrderDto> Orders);

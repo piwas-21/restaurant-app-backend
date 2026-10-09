@@ -5,7 +5,7 @@ using RestaurantSystem.Api.Common.Models;
 
 namespace RestaurantSystem.Api.Features.TableGuestVisits.Commands;
 
-public sealed record CreateTableGuestAdmissionCodeCommand(Guid ServiceSessionId)
+public sealed record CreateTableGuestAdmissionCodeCommand(Guid ServiceSessionId, bool PreferShortCode = false)
     : ICommand<ApiResponse<TableGuestAdmissionCodeDto>>;
 
 public sealed class CreateTableGuestAdmissionCodeCommandHandler
@@ -19,6 +19,7 @@ public sealed class CreateTableGuestAdmissionCodeCommandHandler
     public async Task<ApiResponse<TableGuestAdmissionCodeDto>> Handle(
         CreateTableGuestAdmissionCodeCommand command, CancellationToken cancellationToken) =>
         ApiResponse<TableGuestAdmissionCodeDto>.SuccessWithData(
-            await _admissions.CreateCodeAsync(command.ServiceSessionId, cancellationToken),
+            await _admissions.CreateCodeAsync(
+                command.ServiceSessionId, cancellationToken, command.PreferShortCode),
             "Visit admission code created");
 }

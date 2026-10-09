@@ -11,6 +11,7 @@ using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.TableGuestVisits.Dtos;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -69,6 +70,60 @@ public sealed class GuestRoundAvailabilityTests : IntegrationTestBase
         await ConfigureDineInAsync(context, isEnabled: true, enforceOpeningHours: false);
         await ConfigureFridayHoursAsync(context);
         await context.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Admission_code_defaults_to_legacy_length_and_shortens_only_when_requested()
+    {
+        AuthenticateAsRole(UserRole.Server);
+        var sessionResponse = await PostAsJsonAsync("/api/table-service-sessions", new { tableId = _tableId });
+        sessionResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var session = (await ReadResponseAsync<ApiResponse<TableServiceSessionDto>>(sessionResponse))!.Data!;
+
+        var legacyResponse = await PostAsJsonAsync(
+            $"/api/table-guest-visits/{session.ServiceSessionId}/admission-code", new { });
+        legacyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var legacyCode = (await ReadResponseAsync<ApiResponse<TableGuestAdmissionCodeDto>>(legacyResponse))!.Data!;
+        legacyCode.AdmissionCode.Should().MatchRegex("^[0-9A-HJKMNP-TV-Z]{10}$");
+
+        AuthenticateAsAnonymous();
+        var legacyJoinResponse = await PostAsJsonAsync("/api/table-guest-visits/join", new
+        {
+            qrCodeData = _qrCode,
+            admissionCode = legacyCode.AdmissionCode,
+        });
+        legacyJoinResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadResponseAsync<ApiResponse<TableGuestJoinDto>>(legacyJoinResponse))!.Success.Should().BeTrue();
+
+        AuthenticateAsRole(UserRole.Server);
+        var shortResponse = await PostAsJsonAsync(
+            $"/api/table-guest-visits/{session.ServiceSessionId}/admission-code?preferShortCode=true", new { });
+        shortResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var shortCode = (await ReadResponseAsync<ApiResponse<TableGuestAdmissionCodeDto>>(shortResponse))!.Data!;
+        shortCode.AdmissionCode.Should().MatchRegex("^[0-9A-HJKMNP-TV-Z]{6}$");
+
+        AuthenticateAsAnonymous();
+        var shortJoinResponse = await PostAsJsonAsync("/api/table-guest-visits/join", new
+        {
+            qrCodeData = _qrCode,
+            admissionCode = shortCode.AdmissionCode,
+        });
+        shortJoinResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadResponseAsync<ApiResponse<TableGuestJoinDto>>(shortJoinResponse))!.Success.Should().BeTrue();
+
+        await using var verify = DatabaseFixture.CreateContext();
+        var admissions = await verify.TableGuestAdmissions
+            .Where(value => value.ServiceSessionId == session.ServiceSessionId)
+            .ToListAsync();
+        admissions.Should().HaveCount(2);
+        admissions.Should().ContainSingle(value =>
+            TableGuestCredentialCrypto.VerifyAdmissionCode(legacyCode.AdmissionCode, value.CodeHash)
+            && value.RevokedAt.HasValue);
+        admissions.Should().ContainSingle(value =>
+            TableGuestCredentialCrypto.VerifyAdmissionCode(shortCode.AdmissionCode, value.CodeHash)
+            && !value.RevokedAt.HasValue);
+        admissions.All(value => !value.CodeHash.Contains(legacyCode.AdmissionCode)
+            && !value.CodeHash.Contains(shortCode.AdmissionCode)).Should().BeTrue();
     }
 
     [Theory]

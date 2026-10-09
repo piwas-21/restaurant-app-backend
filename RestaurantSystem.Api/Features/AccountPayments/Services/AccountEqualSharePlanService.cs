@@ -84,10 +84,14 @@ public sealed class AccountEqualSharePlanService(
             var account = await new AccountDebtSnapshotReader(context).ReadAsync(sessionId, cancellationToken);
             var scope = account.Debt.Available;
             var total = AccountDebtMath.Total(scope);
-            ValidateScope(scope, total, request);
+            var roundingIncrement = request.CustomAmountsMinor.Count == 0
+                ? AccountShareMath.EqualShareIncrementMinorUnits(account.Money.Currency)
+                : 1;
+            ValidateScope(scope, total, request, roundingIncrement);
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            var plan = CreatePlan(sessionId, request, account, total, hash, now, actor);
+            var plan = CreatePlan(new PlanCreationData(
+                sessionId, request, account, total, roundingIncrement, hash, now, actor));
             InvalidateSupersededPlan(superseded, now, actor);
             context.AccountEqualSharePlans.Add(plan);
             await context.SaveChangesAsync(cancellationToken);
@@ -122,12 +126,18 @@ public sealed class AccountEqualSharePlanService(
     }
 
     private void ValidateScope(
-        IReadOnlyList<AccountDebtSegment> scope, long total, CreateAccountEqualSharePlanRequest request)
+        IReadOnlyList<AccountDebtSegment> scope, long total, CreateAccountEqualSharePlanRequest request,
+        long roundingIncrement)
     {
         if (scope.Count == 0)
             throw new BadRequestException("The reviewed table balance has no payable value.");
-        if (request.CustomAmountsMinor.Count == 0 && total < request.ShareCount)
-            throw new BadRequestException("Every reviewed share must contain at least one minor unit.");
+        if (request.CustomAmountsMinor.Count == 0)
+        {
+            var distribution = AccountShareMath.Equal(total, request.ShareCount, roundingIncrement);
+            if (Enumerable.Range(1, request.ShareCount).Any(ordinal => distribution.At(ordinal) <= 0))
+                throw new BadRequestException(
+                    "The balance is too small for positive equal shares at this currency's cash increment.");
+        }
         if (request.CustomAmountsMinor.Count > 0)
         {
             long customTotal;
@@ -146,33 +156,37 @@ public sealed class AccountEqualSharePlanService(
             throw new BadRequestException("The equal-share scope exceeds the configured segment limit.");
     }
 
-    private static AccountEqualSharePlan CreatePlan(
-        Guid sessionId,
-        CreateAccountEqualSharePlanRequest request,
-        AccountPaymentAccountSnapshot account,
-        long total,
-        string hash,
-        DateTime now,
-        AccountPaymentActor actor) => new()
-        {
-            Id = Guid.NewGuid(),
-            ServiceSessionId = sessionId,
-            OperationId = request.OperationId,
-            AccountRevision = request.ExpectedAccountRevision,
-            TotalMinor = total,
-            ShareCount = request.ShareCount,
-            Currency = account.Money.Currency,
-            PayloadHash = hash,
-            ScopeJson = AccountPaymentSnapshots.Serialize(account.Debt.Available),
-            CustomAmountsJson = request.CustomAmountsMinor.Count > 0
-                ? AccountPaymentSnapshots.Serialize(request.CustomAmountsMinor)
+    private static AccountEqualSharePlan CreatePlan(PlanCreationData data) => new()
+    {
+        Id = Guid.NewGuid(),
+        ServiceSessionId = data.SessionId,
+        OperationId = data.Request.OperationId,
+        AccountRevision = data.Request.ExpectedAccountRevision,
+        TotalMinor = data.Total,
+        ShareCount = data.Request.ShareCount,
+        RoundingIncrementMinor = checked((int)data.RoundingIncrement),
+        Currency = data.Account.Money.Currency,
+        PayloadHash = data.Hash,
+        ScopeJson = AccountPaymentSnapshots.Serialize(data.Account.Debt.Available),
+        CustomAmountsJson = data.Request.CustomAmountsMinor.Count > 0
+                ? AccountPaymentSnapshots.Serialize(data.Request.CustomAmountsMinor)
                 : null,
-            ActorId = actor.ActorId,
-            ActorKind = actor.Kind,
-            SupersedesPlanId = request.SupersedesPlanId,
-            CreatedAt = now,
-            CreatedBy = actor.AuditIdentifier
-        };
+        ActorId = data.Actor.ActorId,
+        ActorKind = data.Actor.Kind,
+        SupersedesPlanId = data.Request.SupersedesPlanId,
+        CreatedAt = data.CreatedAt,
+        CreatedBy = data.Actor.AuditIdentifier
+    };
+
+    private sealed record PlanCreationData(
+        Guid SessionId,
+        CreateAccountEqualSharePlanRequest Request,
+        AccountPaymentAccountSnapshot Account,
+        long Total,
+        long RoundingIncrement,
+        string Hash,
+        DateTime CreatedAt,
+        AccountPaymentActor Actor);
 
     private static void InvalidateSupersededPlan(
         AccountEqualSharePlan? superseded, DateTime now, AccountPaymentActor actor)

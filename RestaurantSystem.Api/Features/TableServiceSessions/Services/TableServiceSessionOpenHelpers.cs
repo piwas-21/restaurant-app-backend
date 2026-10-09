@@ -20,7 +20,8 @@ internal static class TableServiceSessionOpenHelpers
         CancellationToken cancellationToken)
     {
         var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
-            context.Orders.AsNoTracking(), identity.Id, identity.Number);
+            context.Orders.AsNoTracking(), context.Set<TableOccupancyRecoveryDisposition>(),
+            identity.Id, identity.Number);
         var hasBlockingLegacyRound = await legacyQuery
             .Where(order => !order.IsDeleted && order.Type == OrderType.DineIn
                 && order.ServiceSessionId == null)

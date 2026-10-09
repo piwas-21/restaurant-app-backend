@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
+using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -105,13 +106,15 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
             OrderStatus.Ready,
             OrderStatus.PendingApproval
         };
-        var allDineInOrders = _context.Orders
+        var allDineInOrders = TableServiceSessionCloseRules.ExcludeArchivedLegacyOccupancy(
+            _context.Orders
             .AsNoTracking()
             .Where(order => order.Type == OrderType.DineIn && !order.IsDeleted
                 && (order.TableId != null || order.TableNumber != null))
             .Where(order => !order.ServiceSessionId.HasValue
                 || !_context.TableServiceSessions.Any(session => session.Id == order.ServiceSessionId.Value
-                    && session.ReleasedAt != null));
+                    && session.ReleasedAt != null)),
+            _context.TableOccupancyRecoveryDispositions);
         var liveOrders = allDineInOrders.Where(order => activeOrderStatuses.Contains(order.Status));
         var completedUnpaidOrders = allDineInOrders
             .Where(order => order.Status == OrderStatus.Completed)

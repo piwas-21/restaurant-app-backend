@@ -103,7 +103,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Repair_refuses_identityless_blocking_order_without_creating_or_reassigning_records()
+    public async Task Repair_refuses_identityless_order_but_open_keeps_it_standalone()
     {
         var tableId = await SeedTableAsync("T-UNKNOWN");
         var orphanId = await SeedIdentitylessPendingPaidOrderAsync(14m);
@@ -121,15 +121,18 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
 
         await using (var context = _fixture.CreateContext())
         {
-            var open = await OpenHandler(context, readinessEnabled: true).Handle(
+            var open = await OpenHandler(context).Handle(
                 new OpenTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
 
-            open.Success.Should().BeFalse();
-            open.ErrorCode.Should().Be(ErrorCodes.TableServiceSessionAmbiguous);
+            open.Success.Should().BeTrue();
+            open.Data!.TableId.Should().Be(tableId);
+            open.Data.ServiceSessionId.Should().NotBeEmpty();
         }
 
         await using var verify = _fixture.CreateContext();
-        (await verify.TableServiceSessions.CountAsync()).Should().Be(0);
+        var openedVisit = await verify.TableServiceSessions.SingleAsync();
+        openedVisit.TableId.Should().Be(tableId);
+        openedVisit.ReleasedAt.Should().BeNull();
         (await verify.Orders.CountAsync()).Should().Be(1);
         var orphan = await verify.Orders.SingleAsync(order => order.Id == orphanId);
         orphan.Type.Should().Be(OrderType.DineIn);
