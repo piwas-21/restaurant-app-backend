@@ -140,7 +140,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
                 "The open table service session was not found.", ErrorCodes.TableServiceSessionNotFound);
         }
 
-        if (session.Status != TableServiceSessionStatus.Open)
+        if (session.Status != TableServiceSessionStatus.Open || session.ReleasedAt.HasValue)
         {
             throw new BadRequestException(
                 "The table service session is no longer open.", ErrorCodes.TableServiceSessionStale);

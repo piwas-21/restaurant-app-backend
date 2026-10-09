@@ -25,7 +25,7 @@ public sealed partial class OpenTableServiceSessionCommandHandler
 
         var existing = await TableServiceSessionRowLock.LoadAsync(
             _context, existingIds[0], cancellationToken);
-        if (existing?.Status != TableServiceSessionStatus.Open) return null;
+        if (existing?.Status != TableServiceSessionStatus.Open || existing.ReleasedAt.HasValue) return null;
         if (existing.TableId != identity.Id && ReadinessEnabled()) return UnstableVisitResponse();
 
         await transaction.CommitAsync(cancellationToken);

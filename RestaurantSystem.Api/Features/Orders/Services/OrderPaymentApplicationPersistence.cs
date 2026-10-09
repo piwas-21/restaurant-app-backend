@@ -100,6 +100,7 @@ internal static class OrderPaymentApplicationPersistence
             OrderId = order.Id,
             PaymentMethod = tender.PaymentMethod,
             Amount = tender.Amount,
+            TipMinor = tender.TipMinor,
             Status = PaymentStatus.Pending,
             OperationId = tender.OperationId,
             TableBillPaymentOperationId = tender.TableBillPaymentOperationId,

@@ -58,6 +58,24 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
         await stale.Should().ThrowAsync<ConflictException>();
     }
 
+    [Fact]
+    public async Task Quote_replay_treats_an_omitted_tip_as_an_explicit_zero()
+    {
+        var account = await SeedAccount(10m, quantity: 2);
+        var operationId = Guid.NewGuid();
+        var legacyRequest = ItemsQuote(operationId, account, revision: 1, ordinal: 1);
+
+        var first = await CreateQuote(account.SessionId, legacyRequest);
+        var replay = await CreateQuote(account.SessionId, legacyRequest with { TipMinor = 0 });
+
+        replay.Should().BeEquivalentTo(first);
+        replay.TipMinor.Should().Be(0);
+        await using var verify = fixture.CreateContext();
+        (await verify.AccountPaymentAttempts.CountAsync(value => value.OperationId == operationId)).Should().Be(1);
+        (await verify.AccountPaymentAttempts.SingleAsync(value => value.OperationId == operationId))
+            .TipMinor.Should().Be(0);
+    }
+
     [Theory]
     [InlineData(PaymentMethod.DebitCard)]
     [InlineData(PaymentMethod.OnlinePayment)]
@@ -154,6 +172,91 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
         snapshot.Debt.AvailableMinor.Should().Be(833);
         snapshot.Debt.Available.Should().Contain(value => value.OrderId == laterRound.OrderId);
         snapshot.Debt.Available.Should().Contain(value => value.OrderId == account.OrderId);
+    }
+
+    [Fact]
+    public async Task Custom_guest_amounts_are_frozen_and_tip_is_separate_from_reserved_food_debt()
+    {
+        var account = await SeedAccount(10m);
+        var plan = await CreatePlan(account.SessionId,
+            NewPlanRequest(Guid.NewGuid(), 1, 3) with { CustomAmountsMinor = [250, 325, 425] });
+
+        plan.CustomAmountsMinor.Should().BeEquivalentTo([250L, 325L, 425L]);
+        var quote = await CreateQuote(account.SessionId, new CreateAccountPaymentQuoteRequest
+        {
+            OperationId = Guid.NewGuid(),
+            ExpectedAccountRevision = 1,
+            Mode = AccountPaymentMode.CustomAmount,
+            PaymentMethod = PaymentMethod.Cash,
+            CustomSharePlanId = plan.PlanId,
+            CustomShareOrdinal = 2,
+            TipMinor = 125,
+        });
+
+        quote.Mode.Should().Be(AccountPaymentMode.CustomAmount);
+        quote.CustomSharePlanId.Should().Be(plan.PlanId);
+        quote.CustomShareOrdinal.Should().Be(2);
+        quote.AmountMinor.Should().Be(325);
+        quote.TipMinor.Should().Be(125);
+        quote.CashSettlement!.DueAmountMinor.Should().Be(450,
+            "the cash due is food allocation plus tip while the account allocation remains food-only");
+        quote.Allocations.Sum(value => value.AmountMinor).Should().Be(325);
+
+        (await Reserve(account.SessionId, quote.OperationId, expectedVersion: 1, revision: 1))
+            .State.Should().Be(AccountPaymentState.Reserved);
+        await using var verify = fixture.CreateContext();
+        var debt = await new AccountDebtSnapshotReader(verify).ReadAsync(account.SessionId, CancellationToken.None);
+        debt.Debt.ReservedMinor.Should().Be(325);
+        debt.Debt.AvailableMinor.Should().Be(675);
+        (await verify.AccountPaymentAttempts.SingleAsync(value => value.OperationId == quote.OperationId))
+            .TipMinor.Should().Be(125);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Custom_guest_shares_capture_disjoint_amounts_in_either_order(bool reverseOrder)
+    {
+        var account = await SeedAccount(10m);
+        var amounts = new long[] { 250, 325, 425 };
+        var plan = await CreatePlan(account.SessionId,
+            NewPlanRequest(Guid.NewGuid(), 1, amounts.Length) with { CustomAmountsMinor = amounts });
+        var ordinals = reverseOrder ? new[] { 3, 2, 1 } : new[] { 1, 2, 3 };
+        long revision = 1;
+
+        foreach (var ordinal in ordinals)
+        {
+            var quote = await CreateQuote(account.SessionId, new CreateAccountPaymentQuoteRequest
+            {
+                OperationId = Guid.NewGuid(),
+                ExpectedAccountRevision = revision,
+                Mode = AccountPaymentMode.CustomAmount,
+                PaymentMethod = PaymentMethod.CreditCard,
+                CustomSharePlanId = plan.PlanId,
+                CustomShareOrdinal = ordinal
+            });
+            quote.AmountMinor.Should().Be(amounts[ordinal - 1]);
+            quote.Allocations.Sum(value => value.AmountMinor).Should().Be(amounts[ordinal - 1]);
+
+            await Reserve(account.SessionId, quote.OperationId, expectedVersion: 1, revision: revision);
+            var captured = await Capture(account.SessionId, quote.OperationId, expectedVersion: 2,
+                receivedMinor: null);
+            captured.State.Should().Be(AccountPaymentState.Captured);
+            revision++;
+        }
+
+        await using var verify = fixture.CreateContext();
+        var attempts = await verify.AccountPaymentAttempts
+            .Where(value => value.ServiceSessionId == account.SessionId)
+            .Include(value => value.Allocations)
+            .ToListAsync();
+        attempts.Should().HaveCount(3).And.OnlyContain(value => value.State == AccountPaymentState.Captured);
+        attempts.Sum(value => value.Allocations.Sum(allocation => allocation.AmountMinor)).Should().Be(1000);
+        attempts.Select(value => value.AmountMinor).Should().BeEquivalentTo(amounts);
+        var debt = await new AccountDebtSnapshotReader(verify).ReadAsync(account.SessionId, CancellationToken.None);
+        debt.Debt.OutstandingMinor.Should().Be(0);
+        debt.Debt.ReservedMinor.Should().Be(0);
+        debt.Debt.AvailableMinor.Should().Be(0);
     }
 
     [Fact]
@@ -394,7 +497,8 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
                 CancellationToken.None);
     }
 
-    private async Task<AccountPaymentOperationDto> Capture(Guid sessionId, Guid operationId, int expectedVersion)
+    private async Task<AccountPaymentOperationDto> Capture(
+        Guid sessionId, Guid operationId, int expectedVersion, long? receivedMinor = 335)
     {
         await using var context = fixture.CreateContext();
         var currentUser = new Mock<ICurrentUserService>();
@@ -404,7 +508,7 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
             new AccountPaymentCaptureWriter(context, currentUser.Object, TimeProvider.System),
             fidelity.Object, TimeProvider.System, NullLogger<AccountPaymentCaptureService>.Instance);
         return await service.CaptureManualAsync(sessionId, operationId,
-            new CaptureAccountPaymentRequest { ExpectedVersion = expectedVersion, ReceivedMinor = 335 }, CancellationToken.None);
+            new CaptureAccountPaymentRequest { ExpectedVersion = expectedVersion, ReceivedMinor = receivedMinor }, CancellationToken.None);
     }
 
     private static CreateAccountEqualSharePlanRequest NewPlanRequest(

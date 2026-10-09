@@ -222,6 +222,7 @@ public class BasketMappingService : IBasketMappingService
             Id = child.Id,
             ProductId = child.ProductId,
             ProductCustomizationOptionId = child.ProductCustomizationOptionId,
+            SectionId = child.SectionId,
             ProductName = child.Product?.Name,
             ProductVariationId = child.ProductVariationId,
             VariationName = child.ProductVariation?.Name,

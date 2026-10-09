@@ -10,4 +10,7 @@ public sealed record AccountEqualSharePlanDto(
     string Currency,
     DateTime CreatedAt,
     DateTime? InvalidatedAt,
-    IReadOnlyList<AccountPaymentAllocationDto> Scope);
+    IReadOnlyList<AccountPaymentAllocationDto> Scope)
+{
+    public IReadOnlyList<long>? CustomAmountsMinor { get; init; }
+}

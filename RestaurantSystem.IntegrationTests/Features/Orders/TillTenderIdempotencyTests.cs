@@ -41,14 +41,16 @@ public class TillTenderIdempotencyTests : IntegrationTestBase
 
         var first = await Client.PostAsJsonAsync(
             $"/api/Orders/{_orderId}/payments",
-            new { operationId, paymentMethod = "Cash", amount = 10m });
+            new { operationId, paymentMethod = "Cash", amount = 10m, tipMinor = 325L });
         first.IsSuccessStatusCode.Should().BeTrue();
+        var firstBody = await ReadResponseAsync<ApiResponse<OrderDto>>(first);
+        firstBody!.Data!.PaymentTipMinor.Should().Be(325);
 
         // The retry arrives AFTER the first submit committed (and completed the order) —
         // the timeout-after-commit shape. Eligibility no longer holds; idempotency must win.
         var retry = await Client.PostAsJsonAsync(
             $"/api/Orders/{_orderId}/payments",
-            new { operationId, paymentMethod = "Cash", amount = 10m });
+            new { operationId, paymentMethod = "Cash", amount = 10m, tipMinor = 325L });
         retry.IsSuccessStatusCode.Should().BeTrue("the retry of a committed tender is a success, not a failure");
         var retryBody = await ReadResponseAsync<ApiResponse<OrderDto>>(retry);
         retryBody!.Success.Should().BeTrue();
@@ -69,7 +71,7 @@ public class TillTenderIdempotencyTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task A_repeated_operation_with_a_different_payload_is_refused_and_banks_nothing()
+    public async Task An_omitted_tip_replays_as_an_explicit_zero_tip()
     {
         AuthenticateAsAdmin();
         var operationId = Guid.NewGuid();
@@ -79,10 +81,37 @@ public class TillTenderIdempotencyTests : IntegrationTestBase
             new { operationId, paymentMethod = "Cash", amount = 10m });
         first.IsSuccessStatusCode.Should().BeTrue();
 
+        var replay = await Client.PostAsJsonAsync(
+            $"/api/Orders/{_orderId}/payments",
+            new { operationId, paymentMethod = "Cash", amount = 10m, tipMinor = 0L });
+        replay.IsSuccessStatusCode.Should().BeTrue();
+        var replayBody = await ReadResponseAsync<ApiResponse<OrderDto>>(replay);
+        replayBody!.Success.Should().BeTrue("an omitted tip has the same zero-value meaning as explicit zero");
+        replayBody.Message.Should().Be("Payment already recorded");
+
+        await using var context = DatabaseFixture.CreateContext();
+        var tenders = await context.OrderPayments.AsNoTracking()
+            .Where(payment => payment.OrderId == _orderId)
+            .ToListAsync();
+        tenders.Should().ContainSingle();
+        tenders.Single().TipMinor.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_repeated_operation_with_a_different_payload_is_refused_and_banks_nothing()
+    {
+        AuthenticateAsAdmin();
+        var operationId = Guid.NewGuid();
+
+        var first = await Client.PostAsJsonAsync(
+            $"/api/Orders/{_orderId}/payments",
+            new { operationId, paymentMethod = "Cash", amount = 10m, tipMinor = 325L });
+        first.IsSuccessStatusCode.Should().BeTrue();
+
         // Same operation id, different METHOD.
         var byCard = await Client.PostAsJsonAsync(
             $"/api/Orders/{_orderId}/payments",
-            new { operationId, paymentMethod = "CreditCard", amount = 10m });
+            new { operationId, paymentMethod = "CreditCard", amount = 10m, tipMinor = 325L });
         byCard.IsSuccessStatusCode.Should().BeTrue("business refusals ride the response body");
         var cardBody = await ReadResponseAsync<ApiResponse<OrderDto>>(byCard);
         cardBody!.Success.Should().BeFalse();
@@ -92,10 +121,18 @@ public class TillTenderIdempotencyTests : IntegrationTestBase
         // Same operation id, different AMOUNT.
         var forLess = await Client.PostAsJsonAsync(
             $"/api/Orders/{_orderId}/payments",
-            new { operationId, paymentMethod = "Cash", amount = 4m });
+            new { operationId, paymentMethod = "Cash", amount = 4m, tipMinor = 325L });
         var lessBody = await ReadResponseAsync<ApiResponse<OrderDto>>(forLess);
         lessBody!.Success.Should().BeFalse();
         lessBody.ErrorCode.Should().Be(ErrorCodes.PaymentOperationPayloadMismatch);
+
+        var withDifferentTip = await Client.PostAsJsonAsync(
+            $"/api/Orders/{_orderId}/payments",
+            new { operationId, paymentMethod = "Cash", amount = 10m, tipMinor = 326L });
+        var tipBody = await ReadResponseAsync<ApiResponse<OrderDto>>(withDifferentTip);
+        tipBody!.Success.Should().BeFalse();
+        tipBody.ErrorCode.Should().Be(ErrorCodes.PaymentOperationPayloadMismatch,
+            "a retry may not change the tip after the original tender is committed");
 
         await using var context = DatabaseFixture.CreateContext();
         var tenders = await context.OrderPayments.AsNoTracking()
@@ -103,6 +140,33 @@ public class TillTenderIdempotencyTests : IntegrationTestBase
             .ToListAsync();
         tenders.Should().ContainSingle("neither mismatched retry may bank a tender");
         tenders.Single().PaymentMethod.Should().Be(PaymentMethod.Cash, "the original tender stands untouched");
+        tenders.Single().TipMinor.Should().Be(325);
+
+        var order = await context.Orders.AsNoTracking().SingleAsync(o => o.Id == _orderId);
+        order.TotalPaid.Should().Be(10m, "cashier gratuity must not inflate food debt settlement");
+    }
+
+    [Fact]
+    public async Task A_negative_tip_is_rejected_without_banking_a_payment()
+    {
+        AuthenticateAsAdmin();
+        var response = await Client.PostAsJsonAsync(
+            $"/api/Orders/{_orderId}/payments",
+            new { operationId = Guid.NewGuid(), paymentMethod = "Cash", amount = 10m, tipMinor = -1 });
+        var excessiveTip = await Client.PostAsJsonAsync(
+            $"/api/Orders/{_orderId}/payments",
+            new
+            {
+                operationId = Guid.NewGuid(),
+                paymentMethod = "Cash",
+                amount = 10m,
+                tipMinor = OrderPayment.MaximumTipMinor + 1
+            });
+
+        response.IsSuccessStatusCode.Should().BeFalse("minor-unit tips are non-negative exact amounts");
+        excessiveTip.IsSuccessStatusCode.Should().BeFalse("tip input keeps the supported upper bound");
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.OrderPayments.AsNoTracking().CountAsync(p => p.OrderId == _orderId)).Should().Be(0);
     }
 
     [Fact]

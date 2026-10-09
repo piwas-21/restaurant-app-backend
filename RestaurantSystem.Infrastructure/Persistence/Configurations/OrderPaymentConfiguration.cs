@@ -15,6 +15,14 @@ public class OrderPaymentConfiguration : IEntityTypeConfiguration<OrderPayment>
         builder.Property(p => p.RefundedAmount)
             .HasColumnType("decimal(10,2)");
 
+        builder.Property(p => p.TipMinor)
+            .HasDefaultValue(0L)
+            .IsRequired();
+
+        builder.Property(p => p.RefundedTipMinor)
+            .HasDefaultValue(0L)
+            .IsRequired();
+
         builder.Property(p => p.PaymentMethod)
             .HasConversion<string>()
             .HasMaxLength(20)

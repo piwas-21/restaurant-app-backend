@@ -166,6 +166,111 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TenderReport_SeparatesStaffTipAndUsesCaptureAndRefundDates()
+    {
+        var payment = BuildPayment(PaymentMethod.Cash, 20m, PaymentStatus.PartiallyRefunded);
+        payment.Currency = "chf";
+        payment.TipMinor = 300;
+        payment.RefundedTipMinor = 100;
+        payment.RefundedAmount = 0m;
+        payment.PaymentDate = StartOfDay.AddHours(10);
+        payment.RefundDate = StartOfDay.AddHours(11);
+
+        await using (var seed = _fixture.CreateContext())
+        {
+            // The order was placed yesterday but both money movements happened in this report
+            // window. Tender totals must follow their own event timestamps, not the order date.
+            seed.Orders.Add(BuildOrder(
+                "ZR-STAFF-TIP",
+                StartOfDay.AddDays(-1),
+                OrderStatus.Completed,
+                subTotal: 20m,
+                total: 20m,
+                payments: new[] { payment }));
+            await seed.SaveChangesAsync();
+        }
+
+        var report = await RunHandlerAsync();
+
+        report.TotalTransactions.Should().Be(0, "the order itself belongs to the previous day");
+        report.TotalTips.Should().Be(0m, "legacy order-level guest tips retain their existing meaning");
+        report.StaffTipsCollected.Should().ContainSingle();
+        report.StaffTipsCollected[0].Currency.Should().Be("CHF");
+        report.StaffTipsCollected[0].AmountMinor.Should().Be(300);
+        report.StaffTipsRefunded.Should().ContainSingle();
+        report.StaffTipsRefunded[0].Currency.Should().Be("CHF");
+        report.StaffTipsRefunded[0].AmountMinor.Should().Be(100);
+        report.NetCashCollected.Should().ContainSingle();
+        report.NetCashCollected[0].Currency.Should().Be("CHF");
+        report.NetCashCollected[0].AmountMinor.Should().Be(2_200,
+            "CHF 20 order settlement + CHF 3 tip - CHF 1 tip refund");
+        report.PaymentsByMethod.Should().ContainSingle();
+        report.PaymentsByMethod[0].PaymentMethod.Should().Be(nameof(PaymentMethod.Cash));
+        report.PaymentsByMethod[0].Currency.Should().Be("CHF");
+        report.PaymentsByMethod[0].OrderAmount.Should().Be(20m);
+        report.PaymentsByMethod[0].TipAmount.Should().Be(3m);
+        report.PaymentsByMethod[0].TotalAmount.Should().Be(23m,
+            "the payment method gross includes the staff tip while retaining it as a separate field");
+    }
+
+    [Fact]
+    public async Task TenderReport_FullyRefundedCashTenderKeepsBothMovementsInNetCash()
+    {
+        var payment = BuildFullyRefundedPayment(PaymentMethod.Cash, 20m);
+        payment.Currency = "CHF";
+        payment.TipMinor = 300;
+        payment.RefundedTipMinor = 300;
+        payment.RefundDate = StartOfDay.AddHours(11);
+
+        await using (var seed = _fixture.CreateContext())
+        {
+            seed.Orders.Add(BuildOrder(
+                "ZRTIP-REFUND",
+                StartOfDay.AddHours(9),
+                OrderStatus.Completed,
+                subTotal: 20m,
+                total: 20m,
+                payments: new[] { payment }));
+            await seed.SaveChangesAsync();
+        }
+
+        var report = await RunHandlerAsync();
+
+        report.PaymentsByMethod.Should().ContainSingle().Which.TotalAmount.Should().Be(23m);
+        report.StaffTipsCollected.Should().ContainSingle().Which.AmountMinor.Should().Be(300);
+        report.StaffTipsRefunded.Should().ContainSingle().Which.AmountMinor.Should().Be(300);
+        report.NetCashCollected.Should().ContainSingle().Which.AmountMinor.Should().Be(0,
+            "the cash capture and its later refund are both real till movements");
+    }
+
+    [Fact]
+    public async Task TenderReport_CancelledOrderDoesNotHideCashAndTipAlreadyCollected()
+    {
+        var payment = BuildPayment(PaymentMethod.Cash, 20m, PaymentStatus.Completed);
+        payment.Currency = "CHF";
+        payment.TipMinor = 300;
+
+        await using (var seed = _fixture.CreateContext())
+        {
+            seed.Orders.Add(BuildOrder(
+                "ZRCANCEL-TIP",
+                StartOfDay.AddHours(9),
+                OrderStatus.Cancelled,
+                subTotal: 20m,
+                total: 20m,
+                payments: new[] { payment }));
+            await seed.SaveChangesAsync();
+        }
+
+        var report = await RunHandlerAsync();
+
+        report.PaymentsByMethod.Should().BeEmpty("cancelled orders remain excluded from the sales breakdown");
+        report.StaffTipsCollected.Should().ContainSingle().Which.AmountMinor.Should().Be(300);
+        report.NetCashCollected.Should().ContainSingle().Which.AmountMinor.Should().Be(2_300,
+            "the till movement remains visible even when the order was later cancelled");
+    }
+
+    [Fact]
     public async Task PendingPayment_ExcludedFromPaymentsByMethod()
     {
         // The other side of IsCaptured: cash stays Pending until a cashier
@@ -501,7 +606,7 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
             PaymentMethod = method,
             Amount = amount,
             Status = status,
-            PaymentDate = DateTime.UtcNow,
+            PaymentDate = StartOfDay,
             IsRefunded = false,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "GetZReportQueryHandlerTests",
@@ -519,10 +624,10 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
             PaymentMethod = method,
             Amount = amount,
             Status = PaymentStatus.Refunded,
-            PaymentDate = DateTime.UtcNow,
+            PaymentDate = StartOfDay,
             IsRefunded = true,
             RefundedAmount = amount,
-            RefundDate = DateTime.UtcNow,
+            RefundDate = StartOfDay,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "GetZReportQueryHandlerTests",
         };
@@ -541,10 +646,10 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
             PaymentMethod = method,
             Amount = amount,
             Status = PaymentStatus.PartiallyRefunded,
-            PaymentDate = DateTime.UtcNow,
+            PaymentDate = StartOfDay,
             IsRefunded = false,
             RefundedAmount = refundedAmount,
-            RefundDate = DateTime.UtcNow,
+            RefundDate = StartOfDay,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "GetZReportQueryHandlerTests",
         };

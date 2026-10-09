@@ -6,12 +6,15 @@ using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServiceSessionPaymentCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CancelTableServicePaymentHandoffCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTableServiceSessionCommand;
+using RestaurantSystem.Api.Features.TableServiceSessions.Commands.ClearPendingTableOrdersCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.OpenTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.RequestTableServicePaymentHandoffCommand;
+using RestaurantSystem.Api.Features.TableServiceSessions.Commands.ReleaseTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.RepairLegacyTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetActiveTableServiceSessionsQuery;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetPendingTableServicePaymentHandoffsQuery;
+using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetReleasedTableServiceSessionsQuery;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetTableServiceSessionPaymentOperationQuery;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetTableServiceSessionQuery;
 
@@ -34,6 +37,11 @@ public sealed class TableServiceSessionsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<TableServiceSessionDto>>>> List()
         => Ok(await _mediator.SendQuery(new GetActiveTableServiceSessionsQuery()));
+
+    [HttpGet("released")]
+    [RequireAdminOrCashier]
+    public async Task<ActionResult<ApiResponse<List<TableServiceSessionDto>>>> ListReleased()
+        => Ok(await _mediator.SendQuery(new GetReleasedTableServiceSessionsQuery()));
 
     [HttpGet("payment-handoffs")]
     [RequireAdminOrCashier]
@@ -92,6 +100,32 @@ public sealed class TableServiceSessionsController : ControllerBase
         Guid serviceSessionId, [FromBody] CloseTableServiceSessionCommand command)
     {
         command.ServiceSessionId = serviceSessionId;
+        return Ok(await _mediator.SendCommand(command));
+    }
+
+    [HttpPost("{serviceSessionId:guid}/release")]
+    public async Task<ActionResult<ApiResponse<TableServiceSessionDto>>> Release(
+        Guid serviceSessionId, [FromBody] ReleaseTableServiceSessionCommand command)
+    {
+        command.ServiceSessionId = serviceSessionId;
+        return Ok(await _mediator.SendCommand(command));
+    }
+
+    [HttpPost("{serviceSessionId:guid}/clear-pending-orders")]
+    [RequireAdminOrCashier]
+    public async Task<ActionResult<ApiResponse<ClearedTableOrdersDto>>> ClearPendingOrders(
+        Guid serviceSessionId, [FromBody] ClearPendingTableOrdersCommand command)
+    {
+        command.ServiceSessionId = serviceSessionId;
+        return Ok(await _mediator.SendCommand(command));
+    }
+
+    [HttpPost("legacy/{tableNumber:int}/clear-pending-orders")]
+    [RequireAdminOrCashier]
+    public async Task<ActionResult<ApiResponse<ClearedTableOrdersDto>>> ClearLegacyPendingOrders(
+        int tableNumber, [FromBody] ClearPendingTableOrdersCommand command)
+    {
+        command.TableNumber = tableNumber;
         return Ok(await _mediator.SendCommand(command));
     }
 }

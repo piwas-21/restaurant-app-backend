@@ -14,6 +14,8 @@ public sealed class AccountEqualSharePlan : Entity
     public string Currency { get; set; } = string.Empty;
     public string PayloadHash { get; set; } = string.Empty;
     public string ScopeJson { get; set; } = string.Empty;
+    /// <summary>Optional immutable per-guest amounts; null keeps the legacy equal split behavior.</summary>
+    public string? CustomAmountsJson { get; set; }
     /// <summary>Typed owner for idempotent replay; null on legacy plans whose owner cannot be proven.</summary>
     public Guid? ActorId { get; set; }
     /// <summary>Typed owner category; null on legacy plans whose owner cannot be proven.</summary>

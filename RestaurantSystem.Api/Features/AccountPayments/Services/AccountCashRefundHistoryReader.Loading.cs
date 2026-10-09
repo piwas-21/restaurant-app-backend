@@ -146,6 +146,6 @@ internal static partial class AccountCashRefundHistoryReader
             receipt.PaymentMethod, receipt.ExactAmountMinor, receipt.AdjustmentMinor,
             receipt.DueAmountMinor);
         AccountCashSettlementPolicy.RequireMatches(original, attempt.Currency,
-            attempt.PaymentMethod, attempt.AmountMinor);
+            attempt.PaymentMethod, checked(attempt.AmountMinor + attempt.TipMinor));
     }
 }

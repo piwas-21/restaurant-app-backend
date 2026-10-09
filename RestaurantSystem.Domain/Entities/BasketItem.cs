@@ -8,6 +8,8 @@ public class BasketItem : Entity
     public Guid? ProductId { get; set; }
     public Guid? ProductVariationId { get; set; }
     public Guid? MenuId { get; set; }
+    /// <summary>Frozen membership of a validated bundle choice; no catalog FK.</summary>
+    public Guid? SectionId { get; set; }
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal ItemTotal { get; set; }

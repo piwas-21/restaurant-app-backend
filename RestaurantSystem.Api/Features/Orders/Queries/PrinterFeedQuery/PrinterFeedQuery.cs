@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Devices.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -23,7 +25,9 @@ namespace RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
 public record PrinterFeedQuery(
     DateTime? ModifiedSince,
     string? Language = null,
-    string? DeviceId = null) : IQuery<List<OrderDto>>
+    string? DeviceId = null,
+    string? OrderCursor = null,
+    DateTime? RequiredQueueRecoveryCutoff = null) : IQuery<List<OrderDto>>
 {
     public const int MaxOrdersPerPoll = 50;
 }
@@ -41,13 +45,17 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
         IOrderMappingService mappingService,
         IOrderDisplayTranslator displayTranslator,
         IOrderRoutingService routing,
-        ILogger<PrinterFeedQueryHandler> logger)
+        ILogger<PrinterFeedQueryHandler> logger,
+        IOptions<OrderRoutingSettings> routingSettings,
+        TimeProvider timeProvider)
     {
         _context = context;
         _mappingService = mappingService;
         _displayTranslator = displayTranslator;
         _routing = routing;
         _logger = logger;
+        _routingSettings = routingSettings.Value;
+        _timeProvider = timeProvider;
     }
 
     public async Task<List<OrderDto>> Handle(PrinterFeedQuery query, CancellationToken cancellationToken)
@@ -59,7 +67,9 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
 
         var routing = await PrepareRoutingAsync(deviceId, cancellationToken);
         var ordersQuery = BuildOrdersQuery(routing);
-        ordersQuery = ApplyModifiedSince(ordersQuery, query.ModifiedSince);
+        ordersQuery = ApplyModifiedSince(
+            ordersQuery, query.ModifiedSince, deviceId, ResolveRecoveryCutoff(query));
+        ordersQuery = ApplyOrderCursor(ordersQuery, query.OrderCursor);
         ordersQuery = ApplyLanguageIncludes(ordersQuery, query.Language);
         var orders = await ReadOrdersAsync(ordersQuery, cancellationToken);
 
@@ -161,17 +171,6 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
 
         return routing.RoutingActivated
             ? ordersQuery.Where(o => !o.RoutingStates.Any())
-            : ordersQuery;
-    }
-
-    private static IQueryable<Order> ApplyModifiedSince(
-        IQueryable<Order> ordersQuery, DateTime? modifiedSince)
-    {
-        // A cursor with no offset binds Unspecified; normalize it before comparing to timestamptz.
-        var modifiedSinceUtc = QueryInstant.AsUtc(modifiedSince);
-        return modifiedSinceUtc.HasValue
-            ? ordersQuery.Where(o => o.CreatedAt > modifiedSinceUtc.Value
-                || (o.UpdatedAt.HasValue && o.UpdatedAt.Value > modifiedSinceUtc.Value))
             : ordersQuery;
     }
 

@@ -27,15 +27,18 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
 
     private readonly ApplicationDbContext _context;
     private readonly ITenantClock _clock;
+    private readonly IOrderDisplayCurrencyResolver _currencyResolver;
     private readonly ILogger<GetZReportQueryHandler> _logger;
 
     public GetZReportQueryHandler(
         ApplicationDbContext context,
         ITenantClock clock,
-        ILogger<GetZReportQueryHandler> logger)
+        ILogger<GetZReportQueryHandler> logger,
+        IOrderDisplayCurrencyResolver? currencyResolver = null)
     {
         _context = context;
         _clock = clock;
+        _currencyResolver = currencyResolver ?? new OrderDisplayCurrencyResolver(context);
         _logger = logger;
     }
 
@@ -110,19 +113,11 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
         var cancelledOrdersCount = cancelledOrders.Count;
         var cancelledOrdersTotal = cancelledOrders.Sum(o => o.Total);
 
-        // --- Payment method breakdown (captured payments from sales orders) ---
-        var paymentsByMethod = salesOrders
-            .SelectMany(o => o.Payments)
-            .Where(p => p.Status.IsCaptured())
-            .GroupBy(p => p.PaymentMethod)
-            .Select(g => new ZReportPaymentMethodDto
-            {
-                PaymentMethod = g.Key.ToString(),
-                TransactionCount = g.Count(),
-                TotalAmount = g.Sum(p => p.Amount)
-            })
-            .OrderByDescending(p => p.TotalAmount)
-            .ToList();
+        // Payment activity follows tender capture/refund time, which can differ from the order
+        // date (for example, an open ticket paid after midnight). Staff gratuity is kept separate
+        // from the existing order-level TotalTips and from the settled order amount.
+        var tenderTotals = await ZReportTenderTotalsReader.ReadAsync(
+            _context, startOfDay, startOfNextDay, _currencyResolver, cancellationToken);
 
         // --- Sales by order type ---
         var salesByOrderType = salesOrders
@@ -156,6 +151,9 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
             TotalTax = totalTax,
             TotalTips = totalTips,
             TotalDeliveryFees = totalDeliveryFees,
+            StaffTipsCollected = tenderTotals.StaffTipsCollected.ToList(),
+            StaffTipsRefunded = tenderTotals.StaffTipsRefunded.ToList(),
+            NetCashCollected = tenderTotals.NetCashCollected.ToList(),
             Discounts = new ZReportDiscountsDto
             {
                 TotalDiscounts = totalDiscounts,
@@ -171,7 +169,7 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
             AccountCashMovements = accountCashMovements,
             CancelledOrdersCount = cancelledOrdersCount,
             CancelledOrdersTotal = cancelledOrdersTotal,
-            PaymentsByMethod = paymentsByMethod,
+            PaymentsByMethod = tenderTotals.PaymentsByMethod.ToList(),
             SalesByOrderType = salesByOrderType,
             SalesByProductType = salesByProductType,
             TopSellingItems = topSellingItems

@@ -5,9 +5,14 @@ namespace RestaurantSystem.Domain.Entities;
 
 public class OrderPayment : Entity
 {
+    /// <summary>Maximum per-tender minor amount supported by decimal(10,2) bill values.</summary>
+    public const long MaximumTipMinor = 9_999_999_999L;
+
     public Guid OrderId { get; set; }
     public PaymentMethod PaymentMethod { get; set; }
     public decimal Amount { get; set; }
+    /// <summary>Cashier-collected gratuity, separate from the food amount and order debt.</summary>
+    public long TipMinor { get; set; }
     public PaymentStatus Status { get; set; }
 
     // Transaction details
@@ -43,6 +48,8 @@ public class OrderPayment : Entity
     // For refunds
     public bool IsRefunded { get; set; }
     public decimal? RefundedAmount { get; set; }
+    /// <summary>Cashier-refunded portion of <see cref="TipMinor"/>.</summary>
+    public long RefundedTipMinor { get; set; }
     public DateTime? RefundDate { get; set; }
     public string? RefundReason { get; set; }
 

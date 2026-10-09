@@ -56,6 +56,7 @@ public class BasketToOrderTranslatorTests
     public void MapsBundleChild_ForcesZeroCustomizationPrice_AndKeepsInstructions()
     {
         var childProductId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
         var basketItems = new List<BasketItemDto>
         {
             new()
@@ -71,6 +72,7 @@ public class BasketToOrderTranslatorTests
                     new()
                     {
                         ProductId = childProductId,
+                        SectionId = sectionId,
                         Quantity = 1,
                         UnitPrice = 1.99m,
                         // A non-zero child customization on the basket must NOT propagate — it is
@@ -85,6 +87,7 @@ public class BasketToOrderTranslatorTests
         var child = _translator.Translate(basketItems).Single().ChildItems!.Single();
 
         child.ProductId.Should().Be(childProductId);
+        child.SectionId.Should().Be(sectionId);
         child.UnitPrice.Should().Be(1.99m);
         child.CustomizationPrice.Should().Be(0m);
         child.SpecialInstructions.Should().Be("No ice");

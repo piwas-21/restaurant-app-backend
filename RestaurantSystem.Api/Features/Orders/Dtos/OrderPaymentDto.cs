@@ -13,6 +13,8 @@ public record OrderPaymentDto
 
     public string PaymentMethod { get; set; } = null!;
     public decimal Amount { get; set; }
+    /// <summary>Cashier-collected gratuity in minor currency units, separate from <see cref="Amount"/>.</summary>
+    public long TipMinor { get; set; }
     public string Status { get; set; } = null!;
 
     // Transaction details
@@ -29,6 +31,8 @@ public record OrderPaymentDto
     // Refund info
     public bool IsRefunded { get; set; }
     public decimal? RefundedAmount { get; set; }
+    /// <summary>Cashier-refunded gratuity in minor currency units.</summary>
+    public long RefundedTipMinor { get; set; }
     public DateTime? RefundDate { get; set; }
     public DateTime? CreatedAt { get; set; }
     public string? RefundReason { get; set; }

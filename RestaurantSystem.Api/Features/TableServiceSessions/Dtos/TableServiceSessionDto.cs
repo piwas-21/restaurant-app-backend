@@ -15,6 +15,9 @@ public record TableServiceSessionDto
     public long AccountRevision { get; init; }
     public DateTime OpenedAt { get; init; }
     public DateTime? ClosedAt { get; init; }
+    public DateTime? ReleasedAt { get; init; }
+    public string? ReleasedBy { get; init; }
+    public bool IsTableReleased { get; init; }
     public int RoundCount { get; init; }
     public int AgeMinutes { get; init; }
     public decimal Outstanding { get; init; }
@@ -23,6 +26,7 @@ public record TableServiceSessionDto
     public bool CanRequestPaymentHandoff { get; init; }
     public bool HasPendingPaymentHandoff { get; init; }
     public bool CanClose { get; init; }
+    public bool CanReleaseTable { get; init; }
     public bool HasUnassignedActiveOrders { get; init; }
     public int LegacyActiveOrderCount { get; init; }
     public TableBillDto Bill { get; init; } = new();

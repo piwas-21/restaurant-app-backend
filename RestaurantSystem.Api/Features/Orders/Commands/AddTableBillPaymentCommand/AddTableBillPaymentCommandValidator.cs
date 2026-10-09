@@ -22,6 +22,10 @@ public class AddTableBillPaymentCommandValidator : AbstractValidator<AddTableBil
             .GreaterThan(0)
             .WithMessage("Payment amount must be greater than 0");
 
+        RuleFor(x => x.TipMinor)
+            .Must(value => value is null or >= 0 and <= 9_999_999_999)
+            .WithMessage("Payment tip must be zero or a supported positive minor-unit amount.");
+
         RuleFor(x => x.Currency)
             .Matches("^[a-zA-Z]{3}$")
             .When(x => x.Currency != null)

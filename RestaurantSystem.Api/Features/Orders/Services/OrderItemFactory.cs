@@ -242,6 +242,7 @@ public partial class OrderItemFactory : IOrderItemFactory
             // A kind belongs to a CHILD row. Discarded on a root even if a caller sent one, so the
             // column cannot come to mean two things (#318).
             Kind = parentItem != null ? itemDto.Kind : null,
+            SectionId = await ResolveChoiceSectionAsync(parentItem, itemDto, cancellationToken),
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _currentUserService.GetAuditIdentifier(),
         };

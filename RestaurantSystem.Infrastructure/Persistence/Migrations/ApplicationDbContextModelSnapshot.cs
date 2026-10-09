@@ -754,6 +754,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency");
 
+                    b.Property<string>("CustomAmountsJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("custom_amounts_json");
+
                     b.Property<DateTime?>("InvalidatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("invalidated_at");
@@ -1050,8 +1054,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Mode")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("mode");
 
                     b.Property<Guid>("OperationId")
@@ -1116,6 +1120,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("state");
 
+                    b.Property<long>("TipMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tip_minor");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -1149,7 +1157,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.ToTable("account_payment_attempts", null, t =>
                         {
-                            t.HasCheckConstraint("ck_account_payment_attempt_shape", "amount_minor > 0 AND expected_account_revision > 0 AND version > 0 AND (equal_share_ordinal IS NULL OR equal_share_ordinal > 0) AND ((mode = 'Equal' AND equal_share_plan_id IS NOT NULL AND equal_share_ordinal IS NOT NULL) OR (mode <> 'Equal' AND equal_share_plan_id IS NULL AND equal_share_ordinal IS NULL))");
+                            t.HasCheckConstraint("ck_account_payment_attempt_shape", "amount_minor > 0 AND tip_minor >= 0 AND expected_account_revision > 0 AND version > 0 AND (equal_share_ordinal IS NULL OR equal_share_ordinal > 0) AND ((mode IN ('Equal', 'CustomAmount') AND equal_share_plan_id IS NOT NULL AND equal_share_ordinal IS NOT NULL) OR (mode NOT IN ('Equal', 'CustomAmount') AND equal_share_plan_id IS NULL AND equal_share_ordinal IS NULL))");
                         });
                 });
 
@@ -1578,6 +1586,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
+
+                    b.Property<Guid?>("SectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("section_id");
 
                     b.PrimitiveCollection<string>("SelectedIngredients")
                         .HasColumnType("jsonb")
@@ -7214,6 +7226,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
 
+                    b.Property<Guid?>("SectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("section_id");
+
                     b.Property<string>("SpecialInstructions")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -7527,6 +7543,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("decimal(10,2)")
                         .HasColumnName("refunded_amount");
 
+                    b.Property<long>("RefundedTipMinor")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("refunded_tip_minor");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -7536,6 +7558,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("TableBillPaymentOperationId")
                         .HasColumnType("uuid")
                         .HasColumnName("table_bill_payment_operation_id");
+
+                    b.Property<long>("TipMinor")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("tip_minor");
 
                     b.Property<string>("TransactionId")
                         .HasMaxLength(100)
@@ -9816,6 +9844,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("table_number");
 
+                    b.Property<long>("TipMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tip_minor");
+
                     b.Property<string>("TransactionId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -10348,6 +10380,15 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("opened_at");
 
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.Property<string>("ReleasedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("released_by");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -10385,11 +10426,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("TableId")
                         .IsUnique()
                         .HasDatabaseName("ix_table_service_sessions_table_id")
-                        .HasFilter("\"status\" = 'Open' AND \"table_id\" IS NOT NULL");
+                        .HasFilter("\"status\" = 'Open' AND \"released_at\" IS NULL AND \"table_id\" IS NOT NULL");
 
                     b.HasIndex("TableNumber")
                         .IsUnique()
-                        .HasFilter("\"status\" = 'Open'");
+                        .HasFilter("\"status\" = 'Open' AND \"released_at\" IS NULL");
 
                     b.ToTable("table_service_sessions");
                 });

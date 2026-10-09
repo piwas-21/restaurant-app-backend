@@ -49,7 +49,8 @@ public sealed class TableGuestAccountReader : ITableGuestAccountReader
             var session = await _context.TableServiceSessions.AsNoTracking()
                 .SingleOrDefaultAsync(value => value.Id == serviceSessionId, cancellationToken);
             var now = _timeProvider.GetUtcNow().UtcDateTime;
-            if (session?.Status != TableServiceSessionStatus.Open || !session.TableId.HasValue
+            if (session?.Status != TableServiceSessionStatus.Open || session.ReleasedAt.HasValue
+                || !session.TableId.HasValue
                 || !await HasActiveParticipantAsync(serviceSessionId, tokenHash, now, cancellationToken))
             {
                 throw Unavailable();
@@ -100,7 +101,7 @@ public sealed class TableGuestAccountReader : ITableGuestAccountReader
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         return _context.TableServiceSessions.AsNoTracking().AnyAsync(session =>
             session.Id == serviceSessionId
-            && session.Status == TableServiceSessionStatus.Open
+            && session.Status == TableServiceSessionStatus.Open && session.ReleasedAt == null
             && session.TableId.HasValue
             && _context.Set<TableGuestParticipant>().Any(participant =>
                 participant.ServiceSessionId == serviceSessionId
