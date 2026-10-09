@@ -15,9 +15,10 @@ public static class TableGuestCredentialCrypto
     private const int ParticipantSecretLength = 32;
     private const string CrockfordAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
-    public static (string Code, string Hash) CreateAdmissionCode()
+    public static (string Code, string Hash) CreateAdmissionCode(bool preferShortCode = false)
     {
-        var random = RandomNumberGenerator.GetBytes(CurrentAdmissionCodeLength);
+        var codeLength = preferShortCode ? CurrentAdmissionCodeLength : AdmissionCodeLength;
+        var random = RandomNumberGenerator.GetBytes(codeLength);
         var code = new string(random.Select(value => CrockfordAlphabet[value & 31]).ToArray());
         return (code, HashAdmissionCode(code));
     }

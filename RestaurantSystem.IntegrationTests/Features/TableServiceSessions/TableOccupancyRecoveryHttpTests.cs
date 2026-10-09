@@ -21,13 +21,18 @@ namespace RestaurantSystem.IntegrationTests.Features.TableServiceSessions;
 [Collection("Database Lane 4")]
 public sealed class TableOccupancyRecoveryHttpTests(DatabaseFixture fixture) : IntegrationTestBase(fixture)
 {
-    protected override void ConfigureTestServices(IServiceCollection services) =>
+    private readonly MutableTimeProvider _timeProvider = new();
+
+    protected override void ConfigureTestServices(IServiceCollection services)
+    {
+        services.AddSingleton<TimeProvider>(_timeProvider);
         services.PostConfigure<TenantFeatureSettings>(settings =>
         {
             settings.ServerWorkspaceV2 = true;
             settings.TableGuestVisitsV1 = true;
             settings.TableVisitReadinessV1 = true;
         });
+    }
 
     [Fact]
     public async Task Number_only_legacy_visit_can_be_released_then_readied_and_reopened_without_rewriting_history()
@@ -59,6 +64,11 @@ public sealed class TableOccupancyRecoveryHttpTests(DatabaseFixture fixture) : I
             confirmRecovery = true,
             reason = "Release a verified number-only legacy visit"
         };
+        var clockTicks = TimeProvider.System.GetUtcNow().UtcTicks;
+        var microsecondTicks = TimeSpan.TicksPerMicrosecond;
+        var fixedUtcNow = new DateTimeOffset(
+            clockTicks - clockTicks % microsecondTicks + 6, TimeSpan.Zero);
+        _timeProvider.SetUtcNow(fixedUtcNow);
         using var recoveryHttp = await PostAsJsonAsync(
             $"/api/Tables/{seeded.TableId}/occupancy-recovery", request);
         recoveryHttp.EnsureSuccessStatusCode();
@@ -71,6 +81,9 @@ public sealed class TableOccupancyRecoveryHttpTests(DatabaseFixture fixture) : I
         recovery.PreservedPaidAmount.Should().Be(1m);
         recovery.PreservedOutstandingAmount.Should().Be(29m);
         recovery.VisitReleasedAt.Should().NotBeNull();
+        recovery.RecordedAt.Should().Be(fixedUtcNow.UtcDateTime.AddTicks(-6));
+        (recovery.RecordedAt.Ticks % microsecondTicks).Should().Be(0);
+        recovery.VisitReleasedAt.Should().Be(recovery.RecordedAt);
 
         var ownerReceipt = await GetFromJsonAsync<ApiResponse<TableOccupancyRecoveryOperationDto>>(
             $"/api/Tables/{seeded.TableId}/occupancy-recovery/operations/{request.operationId}");
@@ -522,4 +535,13 @@ public sealed class TableOccupancyRecoveryHttpTests(DatabaseFixture fixture) : I
 
     private sealed record SeededCapturedVisit(
         Guid TableId, Guid SessionId, Guid PaidOrderId, Guid UnsentOrderId);
+
+    private sealed class MutableTimeProvider : TimeProvider
+    {
+        private long _utcTicks = TimeProvider.System.GetUtcNow().UtcTicks;
+
+        public void SetUtcNow(DateTimeOffset value) => Interlocked.Exchange(ref _utcTicks, value.UtcTicks);
+
+        public override DateTimeOffset GetUtcNow() => new(Interlocked.Read(ref _utcTicks), TimeSpan.Zero);
+    }
 }

@@ -38,7 +38,7 @@ public sealed class TableGuestAdmissionService : ITableGuestAdmissionService
     }
 
     public async Task<TableGuestAdmissionCodeDto> CreateCodeAsync(
-        Guid serviceSessionId, CancellationToken cancellationToken)
+        Guid serviceSessionId, CancellationToken cancellationToken, bool preferShortCode = false)
     {
         EnsureEnabled();
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
@@ -65,7 +65,7 @@ public sealed class TableGuestAdmissionService : ITableGuestAdmissionService
         }
 
         var expiresAt = now.AddHours(_settings.AdmissionLifetimeHours);
-        var credential = TableGuestCredentialCrypto.CreateAdmissionCode();
+        var credential = TableGuestCredentialCrypto.CreateAdmissionCode(preferShortCode);
         _context.Set<TableGuestAdmission>().Add(new TableGuestAdmission
         {
             Id = Guid.NewGuid(),

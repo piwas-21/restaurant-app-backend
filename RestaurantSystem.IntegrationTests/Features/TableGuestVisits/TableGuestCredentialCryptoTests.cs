@@ -10,11 +10,15 @@ public sealed class TableGuestCredentialCryptoTests
     {
         var first = TableGuestCredentialCrypto.CreateAdmissionCode();
         var second = TableGuestCredentialCrypto.CreateAdmissionCode();
+        var shortCode = TableGuestCredentialCrypto.CreateAdmissionCode(preferShortCode: true);
 
-        first.Code.Should().HaveLength(TableGuestCredentialCrypto.CurrentAdmissionCodeLength);
-        first.Code.Should().MatchRegex("^[0-9A-HJKMNP-TV-Z]{6}$");
+        first.Code.Should().HaveLength(TableGuestCredentialCrypto.AdmissionCodeLength);
+        first.Code.Should().MatchRegex("^[0-9A-HJKMNP-TV-Z]{10}$");
+        shortCode.Code.Should().HaveLength(TableGuestCredentialCrypto.CurrentAdmissionCodeLength);
+        shortCode.Code.Should().MatchRegex("^[0-9A-HJKMNP-TV-Z]{6}$");
         first.Hash.Should().NotContain(first.Code);
         TableGuestCredentialCrypto.VerifyAdmissionCode(first.Code.ToLowerInvariant(), first.Hash).Should().BeTrue();
+        TableGuestCredentialCrypto.VerifyAdmissionCode(shortCode.Code, shortCode.Hash).Should().BeTrue();
         TableGuestCredentialCrypto.VerifyAdmissionCode(second.Code, first.Hash).Should().BeFalse();
         TableGuestCredentialCrypto.HashAdmissionCode(first.Code).Should().NotBe(first.Hash);
         const string previouslyIssuedCode = "123456789A";

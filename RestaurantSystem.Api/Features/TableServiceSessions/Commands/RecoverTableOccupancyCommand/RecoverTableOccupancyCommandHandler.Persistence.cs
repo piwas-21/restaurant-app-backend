@@ -64,7 +64,10 @@ public sealed partial class RecoverTableOccupancyCommandHandler
                 StringComparison.OrdinalIgnoreCase))
             return LockedRecoveryResult.Failed(StalePreview());
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var utcNow = timeProvider.GetUtcNow().UtcDateTime;
+        var now = new DateTime(
+            utcNow.Ticks / TimeSpan.TicksPerMicrosecond * TimeSpan.TicksPerMicrosecond,
+            DateTimeKind.Utc);
         var audit = currentUser.GetAuditIdentifier();
         var cancelledMemberOrders = 0;
         var dispositions = new List<TableOccupancyRecoveryDisposition>(snapshot.Orders.Count);
