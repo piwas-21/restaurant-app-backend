@@ -21,6 +21,8 @@ public record RefundPaymentCommand : ICommand<ApiResponse<OrderPaymentDto>>
     public int? ExpectedVersion { get; set; }
 
     public decimal RefundAmount { get; set; }
+    /// <summary>Cashier-refunded gratuity in minor currency units; omitted means zero.</summary>
+    public long RefundTipMinor { get; set; }
     public string RefundReason { get; set; } = null!;
 }
 
@@ -103,10 +105,11 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
                 ErrorCodes.OrderVersionConflict);
         }
 
-        var paymentDto = CreatePaymentDto(payment);
+        var paymentDto = RefundPaymentDtoMapper.Map(payment);
 
-        _logger.LogInformation("Payment {PaymentId} refunded for amount {RefundAmount} by user {UserId}",
-            payment.Id, command.RefundAmount, _currentUserService.UserId);
+        _logger.LogInformation(
+            "Payment {PaymentId} refunded for food amount {RefundAmount} and tip minor amount {RefundTipMinor} by user {UserId}",
+            payment.Id, command.RefundAmount, command.RefundTipMinor, _currentUserService.UserId);
 
         return ApiResponse<OrderPaymentDto>.SuccessWithData(paymentDto, "Payment refunded successfully");
     }
@@ -128,19 +131,32 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
             return ApiResponse<OrderPaymentDto>.Failure("Payment has already been refunded");
         }
 
-        return command.RefundAmount > payment.Amount
-            ? ApiResponse<OrderPaymentDto>.Failure(
-                $"Refund amount cannot exceed payment amount of {payment.Amount}")
+        if (command.RefundAmount < 0 || command.RefundTipMinor < 0
+            || (command.RefundAmount == 0 && command.RefundTipMinor == 0))
+        {
+            return ApiResponse<OrderPaymentDto>.Failure("Enter a positive food refund or tip refund amount");
+        }
+
+        if (command.RefundAmount > payment.Amount)
+        {
+            return ApiResponse<OrderPaymentDto>.Failure(
+                $"Refund amount cannot exceed payment amount of {payment.Amount}");
+        }
+
+        return command.RefundTipMinor > payment.TipMinor
+            ? ApiResponse<OrderPaymentDto>.Failure("Refunded tip cannot exceed the tip collected for this payment")
             : null;
     }
 
     private void ApplyRefund(OrderPayment payment, RefundPaymentCommand command)
     {
-        payment.IsRefunded = command.RefundAmount == payment.Amount;
+        payment.IsRefunded = command.RefundAmount == payment.Amount
+            && command.RefundTipMinor == payment.TipMinor;
         payment.RefundedAmount = command.RefundAmount;
+        payment.RefundedTipMinor = command.RefundTipMinor;
         payment.RefundDate = DateTime.UtcNow;
         payment.RefundReason = command.RefundReason;
-        payment.Status = command.RefundAmount == payment.Amount
+        payment.Status = payment.IsRefunded
             ? PaymentStatus.Refunded
             : PaymentStatus.PartiallyRefunded;
         payment.UpdatedAt = DateTime.UtcNow;
@@ -176,23 +192,4 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
         order.UpdatedBy = _currentUserService.GetAuditIdentifier();
     }
 
-    private static OrderPaymentDto CreatePaymentDto(OrderPayment payment) => new()
-    {
-        Id = payment.Id,
-        OrderId = payment.OrderId,
-        PaymentMethod = payment.PaymentMethod.ToString(),
-        Amount = payment.Amount,
-        Status = payment.Status.ToString(),
-        TransactionId = payment.TransactionId,
-        ReferenceNumber = payment.ReferenceNumber,
-        PaymentDate = payment.PaymentDate,
-        CardLastFourDigits = payment.CardLastFourDigits,
-        CardType = payment.CardType,
-        PaymentGateway = payment.PaymentGateway,
-        PaymentNotes = payment.PaymentNotes,
-        IsRefunded = payment.IsRefunded,
-        RefundedAmount = payment.RefundedAmount,
-        RefundDate = payment.RefundDate,
-        RefundReason = payment.RefundReason
-    };
 }

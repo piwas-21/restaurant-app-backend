@@ -13,8 +13,8 @@ public interface IOrderPaymentReplayResolver
 {
     /// <summary>
     /// Null = no committed tender carries this operation id (the normal first-submit path).
-    /// Otherwise: same order, method and amount → the ORIGINAL result, replayed; same order
-    /// with a different method or amount →
+    /// Otherwise: same order, method, amount and tip → the ORIGINAL result, replayed; same order
+    /// with a different method, amount or tip →
     /// <see cref="OrderPaymentApplicationOutcome.OperationPayloadMismatch"/>; a different
     /// order → <see cref="OrderPaymentApplicationOutcome.OperationIdReused"/>. Runs before
     /// the write path and again after a lost unique-index race, so both answers come from
@@ -70,7 +70,9 @@ public class OrderPaymentReplayResolver : IOrderPaymentReplayResolver
             return PaymentApplicationResult.Failed(OrderPaymentApplicationOutcome.OperationIdReused);
         }
 
-        if (existing.PaymentMethod != tender.PaymentMethod || existing.Amount != tender.Amount)
+        if (existing.PaymentMethod != tender.PaymentMethod
+            || existing.Amount != tender.Amount
+            || existing.TipMinor != tender.TipMinor)
         {
             return PaymentApplicationResult.Failed(OrderPaymentApplicationOutcome.OperationPayloadMismatch);
         }

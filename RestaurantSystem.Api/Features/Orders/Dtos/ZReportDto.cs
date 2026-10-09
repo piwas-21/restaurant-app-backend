@@ -11,8 +11,15 @@ public record ZReportDto
     public decimal NetSales { get; init; }
     public decimal TotalBillingCredits { get; init; }
     public decimal TotalTax { get; init; }
+    /// <summary>Legacy guest/order-level tip total; staff tender gratuities are reported separately below.</summary>
     public decimal TotalTips { get; init; }
     public decimal TotalDeliveryFees { get; init; }
+    /// <summary>Cashier/server gratuities collected with captured tenders, grouped by currency.</summary>
+    public List<ZReportCurrencyAmountDto> StaffTipsCollected { get; init; } = new();
+    /// <summary>Cashier/server gratuities explicitly refunded during the report window.</summary>
+    public List<ZReportCurrencyAmountDto> StaffTipsRefunded { get; init; } = new();
+    /// <summary>Net cash tender movement for the window; excludes opening float and physical cash counts.</summary>
+    public List<ZReportCurrencyAmountDto> NetCashCollected { get; init; } = new();
 
     // Discounts
     public ZReportDiscountsDto Discounts { get; init; } = new();
@@ -51,8 +58,22 @@ public record ZReportRefundsDto
 public record ZReportPaymentMethodDto
 {
     public string PaymentMethod { get; init; } = null!;
+    public string? Currency { get; init; }
     public int TransactionCount { get; init; }
+    /// <summary>Gross order settlement amount, which can include guest tip, tax and fees.</summary>
+    public decimal OrderAmount { get; init; }
+    /// <summary>Additional staff gratuity captured with these tenders.</summary>
+    public decimal TipAmount { get; init; }
+    /// <summary>Gross order settlement plus additional staff gratuity, before refunds.</summary>
     public decimal TotalAmount { get; init; }
+}
+
+public record ZReportCurrencyAmountDto
+{
+    /// <summary>ISO currency code, or null when old tender data has no declared currency.</summary>
+    public string? Currency { get; init; }
+    /// <summary>Exact minor-unit total. Net cash movements may be negative on a refund-only day.</summary>
+    public long AmountMinor { get; init; }
 }
 
 public record ZReportOrderTypeDto

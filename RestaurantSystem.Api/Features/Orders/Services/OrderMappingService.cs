@@ -70,6 +70,8 @@ public partial class OrderMappingService : IOrderMappingService
             BillingCreditAmount = order.BillingCreditAmount,
             TotalPaid = order.TotalPaid,
             RemainingAmount = order.PayableTotal - order.TotalPaid,
+            PaymentTipMinor = order.Payments?.Where(payment => payment.Status.IsCaptured())
+                .Sum(payment => payment.TipMinor - payment.RefundedTipMinor) ?? 0,
             IsFullyPaid = order.IsFullyPaid,
             IsKitchenReleased = order.IsKitchenReleased,
             KitchenReleasedAt = order.KitchenReleasedAt,
@@ -124,6 +126,7 @@ public partial class OrderMappingService : IOrderMappingService
             OperationId = payment.OperationId,
             PaymentMethod = payment.PaymentMethod.ToString(),
             Amount = payment.Amount,
+            TipMinor = payment.TipMinor,
             Status = payment.Status.ToString(),
             TransactionId = payment.TransactionId,
             PaymentDate = payment.PaymentDate,
@@ -139,6 +142,7 @@ public partial class OrderMappingService : IOrderMappingService
             // decision, not a mapping oversight to fix in passing.
             PaymentGateway = payment.PaymentGateway,
             RefundedAmount = payment.RefundedAmount,
+            RefundedTipMinor = payment.RefundedTipMinor,
             RefundDate = payment.RefundDate,
             RefundReason = payment.RefundReason,
             CreatedAt = payment.CreatedAt

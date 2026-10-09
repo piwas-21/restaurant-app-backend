@@ -29,6 +29,10 @@ public record AddPaymentToOrderCommand : ICommand<ApiResponse<OrderDto>>
 
     public PaymentMethod PaymentMethod { get; set; }
     public decimal Amount { get; set; }
+    /// <summary>Optional cashier-collected gratuity in minor currency units; omitted means zero.</summary>
+    public long? TipMinor { get; set; }
+    [JsonIgnore]
+    internal long EffectiveTipMinor => TipMinor ?? 0;
     public string? TransactionId { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? CardLastFourDigits { get; set; }
@@ -92,6 +96,7 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
                 OperationId = command.OperationId,
                 PaymentMethod = command.PaymentMethod,
                 Amount = command.Amount,
+                TipMinor = command.EffectiveTipMinor,
                 TransactionId = command.TransactionId,
                 ReferenceNumber = command.ReferenceNumber,
                 CardLastFourDigits = command.CardLastFourDigits,
@@ -113,7 +118,7 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
             // refusal: the frontend branches on the code instead of substring-matching the
             // message (ErrorCodes is the stable contract, wording is not).
             return ApiResponse<OrderDto>.FailureWithCode(
-                "This payment was already submitted with a different amount or payment method. "
+                "This payment was already submitted with a different amount, tip or payment method. "
                 + "The original payment stands — refresh the order before continuing.",
                 ErrorCodes.PaymentOperationPayloadMismatch);
         }

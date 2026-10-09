@@ -4,6 +4,7 @@ using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Queries.GetZReportQuery;
@@ -171,6 +172,42 @@ public class ZReportTenantDayTests : IntegrationTestBase
             .Should().Be(tenantToday, "the till's today is the restaurant's, not the server's");
     }
 
+    [Fact]
+    public async Task Get_report_keeps_legacy_table_tips_with_missing_currency_in_an_unknown_bucket()
+    {
+        _clock = new FixedTenantClock("UTC");
+        var capturedAt = BusinessDay.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddHours(11);
+        await using (var seed = DatabaseFixture.CreateContext())
+        {
+            seed.TableBillPaymentOperations.AddRange(
+                LegacyTableTender(PaymentMethod.Cash, 225, capturedAt),
+                LegacyTableTender(PaymentMethod.CreditCard, 150, capturedAt.AddMinutes(1)));
+            await seed.SaveChangesAsync();
+        }
+
+        AuthenticateAsAdmin();
+        var requestedDate = BusinessDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var response = await Client.GetAsync($"/api/Orders/z-report?date={requestedDate}");
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        var envelope = await ReadResponseAsync<ApiResponse<ZReportDto>>(response);
+        var successfulEnvelope = envelope!;
+        successfulEnvelope.Success.Should().BeTrue();
+        var report = successfulEnvelope.Data!;
+
+        report.PaymentsByMethod.Should().HaveCount(2);
+        report.PaymentsByMethod.Should().ContainSingle(value => value.Currency == null
+            && value.PaymentMethod == nameof(PaymentMethod.Cash) && value.TipAmount == 2.25m
+            && value.TotalAmount == 2.25m);
+        report.PaymentsByMethod.Should().ContainSingle(value => value.Currency == null
+            && value.PaymentMethod == nameof(PaymentMethod.CreditCard) && value.TipAmount == 1.50m
+            && value.TotalAmount == 1.50m);
+        report.StaffTipsCollected.Should().ContainSingle(value => value.Currency == null
+            && value.AmountMinor == 375);
+        report.NetCashCollected.Should().ContainSingle(value => value.Currency == null
+            && value.AmountMinor == 225);
+    }
+
     private async Task<ZReportDto> RunHandlerAsync(DateOnly date)
     {
         await using var context = DatabaseFixture.CreateContext();
@@ -215,4 +252,18 @@ public class ZReportTenantDayTests : IntegrationTestBase
         CreatedBy = nameof(ZReportTenantDayTests),
         IsDeleted = false,
     };
+
+    private static TableBillPaymentOperation LegacyTableTender(
+        PaymentMethod method, long tipMinor, DateTime capturedAt) => new()
+        {
+            Id = Guid.NewGuid(),
+            OperationId = Guid.NewGuid(),
+            TableNumber = 71,
+            PaymentMethod = method,
+            Amount = 10m,
+            Currency = null,
+            TipMinor = tipMinor,
+            CreatedAt = capturedAt,
+            CreatedBy = nameof(ZReportTenantDayTests),
+        };
 }

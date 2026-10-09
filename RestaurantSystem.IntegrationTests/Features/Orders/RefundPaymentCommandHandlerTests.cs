@@ -177,12 +177,100 @@ public class RefundPaymentCommandHandlerTests : IAsyncLifetime
         payment.RefundedAmount.Should().Be(50m);
     }
 
+    [Fact]
+    public async Task Tip_only_refund_keeps_food_payment_and_balance_unchanged()
+    {
+        var (orderId, paymentId) = await SeedPaidOrderAsync(total: 50m, tipMinor: 350);
+
+        var response = await RefundAsync(orderId, paymentId, amount: 0m, tipMinor: 125);
+
+        response.Success.Should().BeTrue();
+        response.Data!.TipMinor.Should().Be(350);
+        response.Data.RefundedTipMinor.Should().Be(125);
+        response.Data.Status.Should().Be(nameof(PaymentStatus.PartiallyRefunded));
+
+        await using var ctx = _fixture.CreateContext();
+        var payment = await ctx.OrderPayments.SingleAsync(p => p.Id == paymentId);
+        var order = await ctx.Orders.SingleAsync(o => o.Id == orderId);
+        payment.RefundedAmount.Should().Be(0m);
+        payment.RefundedTipMinor.Should().Be(125);
+        payment.IsRefunded.Should().BeFalse("the food amount and remaining tip have not both been returned");
+        order.TotalPaid.Should().Be(50m, "refunding gratuity does not reverse the food debt payment");
+        order.RemainingAmount.Should().Be(0m);
+        order.PaymentStatus.Should().Be(PaymentStatus.Completed);
+    }
+
+    [Fact]
+    public async Task Tip_only_refund_is_a_single_refund_event_and_refuses_a_later_food_return()
+    {
+        var (orderId, paymentId) = await SeedPaidOrderAsync(total: 50m, tipMinor: 350);
+
+        var first = await RefundAsync(orderId, paymentId, amount: 0m, tipMinor: 125);
+        first.Success.Should().BeTrue();
+        first.Data!.Status.Should().Be(nameof(PaymentStatus.PartiallyRefunded));
+
+        var later = await RefundAsync(orderId, paymentId, amount: 50m, tipMinor: 225);
+
+        later.Success.Should().BeFalse("the tender supports one recorded refund event; choose all returns together");
+        later.Errors.Should().Contain("Can only refund completed payments");
+        await using var ctx = _fixture.CreateContext();
+        var payment = await ctx.OrderPayments.SingleAsync(p => p.Id == paymentId);
+        payment.Status.Should().Be(PaymentStatus.PartiallyRefunded);
+        payment.RefundedAmount.Should().Be(0m);
+        payment.RefundedTipMinor.Should().Be(125);
+        var order = await ctx.Orders.SingleAsync(o => o.Id == orderId);
+        order.TotalPaid.Should().Be(50m);
+        order.RemainingAmount.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task Full_food_refund_does_not_mark_tender_refunded_while_tip_is_retained()
+    {
+        var (orderId, paymentId) = await SeedPaidOrderAsync(total: 50m, tipMinor: 350);
+
+        var response = await RefundAsync(orderId, paymentId, amount: 50m);
+
+        response.Success.Should().BeTrue();
+        response.Data!.Status.Should().Be(nameof(PaymentStatus.PartiallyRefunded));
+        response.Data.IsRefunded.Should().BeFalse();
+        response.Data.RefundedTipMinor.Should().Be(0);
+
+        await using var ctx = _fixture.CreateContext();
+        var payment = await ctx.OrderPayments.SingleAsync(p => p.Id == paymentId);
+        payment.Status.Should().Be(PaymentStatus.PartiallyRefunded);
+        payment.IsRefunded.Should().BeFalse();
+        payment.RefundedAmount.Should().Be(50m);
+        var order = await ctx.Orders.SingleAsync(o => o.Id == orderId);
+        order.TotalPaid.Should().Be(0m);
+        order.RemainingAmount.Should().Be(50m);
+        order.PaymentStatus.Should().Be(PaymentStatus.Pending);
+    }
+
+    [Fact]
+    public async Task Full_food_and_tip_refund_marks_the_tender_fully_refunded()
+    {
+        var (orderId, paymentId) = await SeedPaidOrderAsync(total: 50m, tipMinor: 350);
+
+        var response = await RefundAsync(orderId, paymentId, amount: 50m, tipMinor: 350);
+
+        response.Success.Should().BeTrue();
+        response.Data!.Status.Should().Be(nameof(PaymentStatus.Refunded));
+        response.Data.IsRefunded.Should().BeTrue();
+        response.Data.RefundedTipMinor.Should().Be(350);
+
+        await using var ctx = _fixture.CreateContext();
+        var order = await ctx.Orders.SingleAsync(o => o.Id == orderId);
+        order.TotalPaid.Should().Be(0m);
+        order.RemainingAmount.Should().Be(50m);
+        order.PaymentStatus.Should().Be(PaymentStatus.Refunded);
+    }
+
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
 
     private async Task<RestaurantSystem.Api.Common.Models.ApiResponse<RestaurantSystem.Api.Features.Orders.Dtos.OrderPaymentDto>>
-        RefundAsync(Guid orderId, Guid paymentId, decimal amount)
+        RefundAsync(Guid orderId, Guid paymentId, decimal amount, long tipMinor = 0)
     {
         await using var ctx = _fixture.CreateContext();
 
@@ -203,6 +291,7 @@ public class RefundPaymentCommandHandlerTests : IAsyncLifetime
                 OrderId = orderId,
                 PaymentId = paymentId,
                 RefundAmount = amount,
+                RefundTipMinor = tipMinor,
                 RefundReason = "Test refund",
             },
             CancellationToken.None);
@@ -213,7 +302,8 @@ public class RefundPaymentCommandHandlerTests : IAsyncLifetime
     /// refund is only ever issued against (the handler refuses anything that
     /// is not <see cref="PaymentStatus.Completed"/>).
     /// </summary>
-    private async Task<(Guid OrderId, Guid PaymentId)> SeedPaidOrderAsync(decimal total, DateTime? orderDateUtc = null)
+    private async Task<(Guid OrderId, Guid PaymentId)> SeedPaidOrderAsync(
+        decimal total, DateTime? orderDateUtc = null, long tipMinor = 0)
     {
         var orderId = Guid.NewGuid();
         var paymentId = Guid.NewGuid();
@@ -241,8 +331,9 @@ public class RefundPaymentCommandHandlerTests : IAsyncLifetime
                     OrderId = orderId,
                     PaymentMethod = PaymentMethod.CreditCard,
                     Amount = total,
+                    TipMinor = tipMinor,
                     Status = PaymentStatus.Completed,
-                    PaymentDate = DateTime.UtcNow,
+                    PaymentDate = orderDateUtc ?? DateTime.UtcNow,
                     IsRefunded = false,
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = nameof(RefundPaymentCommandHandlerTests),

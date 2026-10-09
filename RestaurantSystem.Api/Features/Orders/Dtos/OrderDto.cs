@@ -50,6 +50,8 @@ public partial record OrderDto
     // Payment Summary
     public decimal TotalPaid { get; set; }
     public decimal RemainingAmount { get; set; }
+    /// <summary>Net cashier-collected gratuity across captured tenders, in minor currency units.</summary>
+    public long PaymentTipMinor { get; set; }
     public bool IsFullyPaid { get; set; }
 
     // Staff counter release state. Additive so older clients can ignore it.

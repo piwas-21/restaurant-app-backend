@@ -27,6 +27,8 @@ public record OrderPaymentTender
 {
     public PaymentMethod PaymentMethod { get; init; }
     public decimal Amount { get; init; }
+    /// <summary>Cashier-collected gratuity in minor units. It is never included in the food balance.</summary>
+    public long TipMinor { get; init; }
     public string? TransactionId { get; init; }
     public string? ReferenceNumber { get; init; }
     public string? CardLastFourDigits { get; init; }

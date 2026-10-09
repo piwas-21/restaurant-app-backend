@@ -61,8 +61,46 @@ public sealed class ZReportTableAccountTipReaderTests : IAsyncLifetime
             "the report window is half-open and captured account state is required");
     }
 
+    [Fact]
+    public async Task Missing_or_invalid_currency_is_preserved_as_unknown()
+    {
+        var start = new DateTime(2026, 10, 9, 10, 0, 0, DateTimeKind.Utc);
+        var capturedAt = start.AddHours(1);
+        var sessionId = Guid.NewGuid();
+        await using (var seed = _fixture.CreateContext())
+        {
+            seed.TableServiceSessions.Add(new TableServiceSession
+            {
+                Id = sessionId,
+                TableNumber = 65,
+                Currency = "CHF",
+                Status = TableServiceSessionStatus.Open,
+                Version = 1,
+                AccountRevision = 1,
+                OpenedAt = capturedAt,
+                CreatedAt = capturedAt,
+                CreatedBy = nameof(ZReportTableAccountTipReaderTests),
+            });
+            seed.TableBillPaymentOperations.AddRange(
+                TableOperation(66, PaymentMethod.Cash, null, 125, capturedAt),
+                TableOperation(67, PaymentMethod.CreditCard, "???", 75, capturedAt));
+            seed.AccountPaymentAttempts.Add(AccountAttempt(sessionId, AccountPaymentState.Captured,
+                PaymentMethod.Cash, "???", 50, capturedAt.AddMinutes(1)));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = _fixture.CreateContext();
+        var totals = await ZReportTableAccountTipReader.ReadAsync(
+            context, start, start.AddHours(8), CancellationToken.None);
+
+        totals.Should().ContainSingle(value => value.Currency == null
+            && value.PaymentMethod == PaymentMethod.Cash && value.TipMinor == 175);
+        totals.Should().ContainSingle(value => value.Currency == null
+            && value.PaymentMethod == PaymentMethod.CreditCard && value.TipMinor == 75);
+    }
+
     private static TableBillPaymentOperation TableOperation(
-        int tableNumber, PaymentMethod method, string currency, long tipMinor, DateTime createdAt) => new()
+        int tableNumber, PaymentMethod method, string? currency, long tipMinor, DateTime createdAt) => new()
         {
             Id = Guid.NewGuid(),
             OperationId = Guid.NewGuid(),
