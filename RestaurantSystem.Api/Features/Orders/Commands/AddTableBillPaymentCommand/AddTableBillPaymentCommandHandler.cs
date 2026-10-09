@@ -47,6 +47,7 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
 
     public async Task<ApiResponse<TableBillDto>> Handle(AddTableBillPaymentCommand command, CancellationToken cancellationToken)
     {
+        command.TipMinor ??= 0L;
         var replay = await _replayResolver.ResolveAsync(command, cancellationToken);
         if (replay is not null)
         {
@@ -117,7 +118,7 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
             Currency = command.Currency,
             PaymentMethod = command.PaymentMethod,
             Amount = command.Amount,
-            TipMinor = command.TipMinor,
+            TipMinor = command.TipMinor ?? 0L,
             TransactionId = command.TransactionId,
             ReferenceNumber = command.ReferenceNumber,
             CardLastFourDigits = command.CardLastFourDigits,

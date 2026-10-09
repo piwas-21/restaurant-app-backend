@@ -25,7 +25,7 @@ public sealed record CreateAccountPaymentQuoteRequest
     public int? EqualShareOrdinal { get; init; }
     public Guid? CustomSharePlanId { get; init; }
     public int? CustomShareOrdinal { get; init; }
-    public long TipMinor { get; init; }
+    public long? TipMinor { get; init; }
 }
 
 public sealed record CreateAccountEqualSharePlanRequest

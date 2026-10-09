@@ -1081,11 +1081,23 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var mismatch = await PayAsync(sessionId, 1, 5m, "CHF", operationId: operationId, tipMinor: 126);
         mismatch.Success.Should().BeFalse();
 
+        var legacyOperationId = Guid.NewGuid();
+        var omittedTip = await PayAsync(sessionId, 2, 1m, "CHF", operationId: legacyOperationId);
+        var explicitZeroReplay = await PayAsync(
+            sessionId, 2, 1m, "CHF", operationId: legacyOperationId, tipMinor: 0);
+        omittedTip.Success.Should().BeTrue();
+        explicitZeroReplay.Success.Should().BeTrue(
+            "omitted tips from older callers and an explicit zero have the same operation fingerprint");
+
         await using var verify = _fixture.CreateContext();
-        var payment = await verify.OrderPayments.SingleAsync(value => value.OrderId == orderId);
+        var payment = await verify.OrderPayments.SingleAsync(value =>
+            value.OrderId == orderId && value.TableBillPaymentOperationId != null
+            && value.TableBillPaymentOperation!.OperationId == operationId);
         payment.Amount.Should().Be(5m, "gratuity must not be added to food-debt allocation");
         var operation = await verify.TableBillPaymentOperations.SingleAsync(value => value.OperationId == operationId);
         operation.TipMinor.Should().Be(125);
+        (await verify.TableBillPaymentOperations.SingleAsync(value => value.OperationId == legacyOperationId))
+            .TipMinor.Should().Be(0);
     }
 
     [Fact]
@@ -1298,7 +1310,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
 
     private async Task<ApiResponse<TableServiceSessionDto>> PayAsync(
         Guid sessionId, int expectedVersion, decimal amount, string? currency = null,
-        DbCommandInterceptor? interceptor = null, Guid? operationId = null, long tipMinor = 0)
+        DbCommandInterceptor? interceptor = null, Guid? operationId = null, long? tipMinor = null)
     {
         await using var context = interceptor is null
             ? _fixture.CreateContext()

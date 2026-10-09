@@ -31,7 +31,7 @@ public record AddTableBillPaymentCommand : ICommand<ApiResponse<TableBillDto>>
     public required PaymentMethod PaymentMethod { get; set; }
     public required decimal Amount { get; set; }
     /// <summary>Gratuity collected with this table tender, in exact currency minor units.</summary>
-    public long TipMinor { get; set; }
+    public long? TipMinor { get; set; }
     public string? Currency { get; set; }
     [JsonRequired]
     public Guid OperationId { get; set; }

@@ -58,6 +58,24 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
         await stale.Should().ThrowAsync<ConflictException>();
     }
 
+    [Fact]
+    public async Task Quote_replay_treats_an_omitted_tip_as_an_explicit_zero()
+    {
+        var account = await SeedAccount(10m, quantity: 2);
+        var operationId = Guid.NewGuid();
+        var legacyRequest = ItemsQuote(operationId, account, revision: 1, ordinal: 1);
+
+        var first = await CreateQuote(account.SessionId, legacyRequest);
+        var replay = await CreateQuote(account.SessionId, legacyRequest with { TipMinor = 0 });
+
+        replay.Should().BeEquivalentTo(first);
+        replay.TipMinor.Should().Be(0);
+        await using var verify = fixture.CreateContext();
+        (await verify.AccountPaymentAttempts.CountAsync(value => value.OperationId == operationId)).Should().Be(1);
+        (await verify.AccountPaymentAttempts.SingleAsync(value => value.OperationId == operationId))
+            .TipMinor.Should().Be(0);
+    }
+
     [Theory]
     [InlineData(PaymentMethod.DebitCard)]
     [InlineData(PaymentMethod.OnlinePayment)]

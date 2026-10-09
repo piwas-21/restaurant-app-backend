@@ -43,11 +43,15 @@ public static class TableServiceSessionRowLock
             .Where(session => session.Id == serviceSessionId)
             .Select(session => new { session.TableId, session.TableNumber })
             .SingleOrDefaultAsync(cancellationToken);
-        var table = located?.TableId is Guid tableId
-            ? await LoadTableAsync(context, tableId, cancellationToken)
-            : located?.TableNumber is int tableNumber
-                ? await LoadTableByNumberAsync(context, tableNumber, cancellationToken)
-                : null;
+        Table? table = null;
+        if (located?.TableId is Guid tableId)
+        {
+            table = await LoadTableAsync(context, tableId, cancellationToken);
+        }
+        else if (located?.TableNumber is int tableNumber)
+        {
+            table = await LoadTableByNumberAsync(context, tableNumber, cancellationToken);
+        }
         var session = await LoadAsync(context, serviceSessionId, cancellationToken);
         var identityChanged = session is not null && (located is null
             || session.TableId != located.TableId

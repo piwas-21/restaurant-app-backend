@@ -20,7 +20,7 @@ public sealed class AddTableServiceSessionPaymentCommandValidator
             .GreaterThan(0)
             .WithMessage("Payment amount must be greater than 0");
         RuleFor(command => command.TipMinor)
-            .InclusiveBetween(0, 9_999_999_999)
+            .Must(value => value is null or >= 0 and <= 9_999_999_999)
             .WithMessage("Payment tip must be zero or a supported positive minor-unit amount.");
         RuleFor(command => command.Currency)
             .Matches("^[a-zA-Z]{3}$")

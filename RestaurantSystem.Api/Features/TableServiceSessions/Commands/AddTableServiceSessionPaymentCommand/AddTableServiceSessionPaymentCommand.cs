@@ -22,7 +22,7 @@ public record AddTableServiceSessionPaymentCommand : ICommand<ApiResponse<TableS
     [JsonRequired]
     public decimal Amount { get; set; }
     /// <summary>Gratuity collected with this tender, in exact currency minor units.</summary>
-    public long TipMinor { get; set; }
+    public long? TipMinor { get; set; }
     public string? Currency { get; set; }
     public string? TransactionId { get; set; }
     public string? ReferenceNumber { get; set; }

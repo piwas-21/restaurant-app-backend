@@ -26,69 +26,104 @@ public sealed class ClearPendingTableOrdersCommandHandler(
     public async Task<ApiResponse<ClearedTableOrdersDto>> Handle(
         ClearPendingTableOrdersCommand command, CancellationToken cancellationToken)
     {
-        if (command.ServiceSessionId.HasValue == command.TableNumber.HasValue
-            || command.TableNumber is <= 0
-            || command.ServiceSessionId == Guid.Empty)
+        if (!HasOneValidTarget(command))
             return Refused("Select exactly one valid table visit or legacy table number.");
 
         await using var transaction = await context.Database.BeginTransactionAsync(
             command.ServiceSessionId.HasValue ? IsolationLevel.ReadCommitted : IsolationLevel.Serializable,
             cancellationToken);
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        TableServiceSession? session = null;
-        Table? table = null;
-        IQueryable<Order> orderQuery;
-        if (command.ServiceSessionId is Guid sessionId)
-        {
-            var locked = await TableServiceSessionRowLock.LoadForLifecycleAsync(context, sessionId, cancellationToken);
-            session = locked.Session;
-            if (session is null) return NotFound();
-            if (locked.IdentityChanged || session.TableId.HasValue && locked.Table?.Id != session.TableId.Value)
-                return Stale(session.Version);
-            if (session.Status != TableServiceSessionStatus.Open)
-                return Refused("A closed table visit cannot clear pending orders.");
-            if (command.ExpectedVersion is null || command.ExpectedVersion != session.Version)
-                return Stale(session.Version);
-            if (await TableServicePaymentHandoffRules.HasPendingAsync(context, session.Id, cancellationToken))
-                return Refused("Resolve the pending cashier collection request before clearing this table.");
-            if (await context.AccountPaymentAttempts.AnyAsync(value => value.ServiceSessionId == session.Id
-                    && value.State != AccountPaymentState.Failed && value.State != AccountPaymentState.Released,
-                    cancellationToken))
-                return Refused("Resolve all account payment attempts before clearing this table.");
-            table = locked.Table;
-            orderQuery = context.Orders.Where(value => value.ServiceSessionId == session.Id);
-        }
-        else
-        {
-            var tableNumber = command.TableNumber!.Value;
-            table = await TableServiceSessionRowLock.LoadTableByNumberAsync(
-                context, tableNumber, cancellationToken);
-            if (table is null)
-                return Refused("Resolve the legacy table identity before clearing its pending orders.");
-            if (await context.TableServiceSessions.AnyAsync(value => value.TableNumber == tableNumber
-                    && value.Status == TableServiceSessionStatus.Open, cancellationToken))
-                return Refused("Use the explicit visit instead of the legacy table-number action.");
-            orderQuery = context.Orders.Where(value => value.TableNumber == tableNumber
-                && value.ServiceSessionId == null && value.Type == OrderType.DineIn);
-        }
+        var targetResult = await ResolveTargetAsync(command, cancellationToken);
+        if (targetResult.Error is not null) return targetResult.Error;
 
-        var orders = await orderQuery.Where(value => !value.IsDeleted && value.Status != OrderStatus.Cancelled)
-            .Include(value => value.Payments)
-            .Include(value => value.RoutingStates)
-            .ToListAsync(cancellationToken);
-        if (orders.Any(value => value.Status != OrderStatus.Pending || value.Payments.Count > 0
-                || value.TotalPaid > 0 || value.RoutingStates.Count > 0
-                || value.IsKitchenReleased || value.KitchenReleasedAt.HasValue))
+        var target = targetResult.Target!;
+        var orders = await LoadOrdersAsync(target, cancellationToken);
+        if (orders.Any(IsProtectedOrder))
             return Refused("Only unprinted pending orders without payments or routing history can be cleared.");
 
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var audit = currentUser.GetAuditIdentifier();
+        CancelOrders(orders, now, audit);
+        var releasedAt = await ReleaseSessionAsync(target.Session, now, audit, cancellationToken);
+        ResetTable(target.Table);
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return ApiResponse<ClearedTableOrdersDto>.SuccessWithData(new ClearedTableOrdersDto(
+            target.Session?.Id, command.TableNumber ?? target.Session?.TableNumber, orders.Count, now, releasedAt),
+            "Pending table orders cleared without dispatching them.");
+    }
+
+    private async Task<TargetResolution> ResolveTargetAsync(
+        ClearPendingTableOrdersCommand command, CancellationToken cancellationToken) =>
+        command.ServiceSessionId is Guid sessionId
+            ? await ResolveSessionTargetAsync(sessionId, command.ExpectedVersion, cancellationToken)
+            : await ResolveLegacyTargetAsync(command.TableNumber!.Value, cancellationToken);
+
+    private async Task<TargetResolution> ResolveSessionTargetAsync(
+        Guid sessionId, int? expectedVersion, CancellationToken cancellationToken)
+    {
+        var locked = await TableServiceSessionRowLock.LoadForLifecycleAsync(context, sessionId, cancellationToken);
+        var session = locked.Session;
+        if (session is null) return TargetResolution.Failed(NotFound());
+        if (locked.IdentityChanged || (session.TableId.HasValue && locked.Table?.Id != session.TableId.Value))
+            return TargetResolution.Failed(Stale(session.Version));
+        if (session.Status != TableServiceSessionStatus.Open)
+            return TargetResolution.Failed(Refused("A closed table visit cannot clear pending orders."));
+        if (expectedVersion is null || expectedVersion != session.Version)
+            return TargetResolution.Failed(Stale(session.Version));
+        if (await TableServicePaymentHandoffRules.HasPendingAsync(context, session.Id, cancellationToken))
+            return TargetResolution.Failed(Refused(
+                "Resolve the pending cashier collection request before clearing this table."));
+        if (await HasActivePaymentAttemptAsync(session.Id, cancellationToken))
+            return TargetResolution.Failed(Refused("Resolve all account payment attempts before clearing this table."));
+
+        return TargetResolution.Resolved(new ClearTarget(
+            session, locked.Table, context.Orders.Where(order => order.ServiceSessionId == session.Id)));
+    }
+
+    private async Task<TargetResolution> ResolveLegacyTargetAsync(
+        int tableNumber, CancellationToken cancellationToken)
+    {
+        var table = await TableServiceSessionRowLock.LoadTableByNumberAsync(context, tableNumber, cancellationToken);
+        if (table is null)
+            return TargetResolution.Failed(Refused("Resolve the legacy table identity before clearing its pending orders."));
+        if (await HasOpenVisitForTableAsync(tableNumber, cancellationToken))
+            return TargetResolution.Failed(Refused("Use the explicit visit instead of the legacy table-number action."));
+
+        var orders = context.Orders.Where(order => order.TableNumber == tableNumber
+            && order.ServiceSessionId == null && order.Type == OrderType.DineIn);
+        return TargetResolution.Resolved(new ClearTarget(null, table, orders));
+    }
+
+    private async Task<bool> HasActivePaymentAttemptAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        await context.AccountPaymentAttempts.AnyAsync(value => value.ServiceSessionId == sessionId
+            && value.State != AccountPaymentState.Failed && value.State != AccountPaymentState.Released,
+            cancellationToken);
+
+    private async Task<bool> HasOpenVisitForTableAsync(int tableNumber, CancellationToken cancellationToken) =>
+        await context.TableServiceSessions.AnyAsync(value => value.TableNumber == tableNumber
+            && value.Status == TableServiceSessionStatus.Open, cancellationToken);
+
+    private static async Task<List<Order>> LoadOrdersAsync(ClearTarget target, CancellationToken cancellationToken) =>
+        await target.Orders.Where(order => !order.IsDeleted && order.Status != OrderStatus.Cancelled)
+            .Include(order => order.Payments)
+            .Include(order => order.RoutingStates)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+    private static bool IsProtectedOrder(Order order) =>
+        order.Status != OrderStatus.Pending || order.Payments.Count > 0 || order.TotalPaid > 0
+        || order.RoutingStates.Count > 0 || order.IsKitchenReleased || order.KitchenReleasedAt.HasValue;
+
+    private static void CancelOrders(IEnumerable<Order> orders, DateTime now, string audit)
+    {
         foreach (var order in orders)
         {
             order.Status = OrderStatus.Cancelled;
             order.CancellationReason = ClearReason;
             order.UpdatedAt = now;
             order.UpdatedBy = audit;
-            context.OrderStatusHistories.Add(new OrderStatusHistory
+            order.StatusHistory.Add(new OrderStatusHistory
             {
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
@@ -100,31 +135,35 @@ public sealed class ClearPendingTableOrdersCommandHandler(
                 CreatedBy = audit
             });
         }
-
-        DateTime? releasedAt = session?.ReleasedAt;
-        if (session is not null)
-        {
-            if (!session.ReleasedAt.HasValue)
-            {
-                await guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
-                session.ReleasedAt = now;
-                session.ReleasedBy = audit;
-                releasedAt = now;
-            }
-            session.RecordAccountChange();
-        }
-        if (table is not null)
-        {
-            table.ReadinessState = TableReadinessState.NeedsReset;
-            table.ReadinessVersion++;
-        }
-
-        await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return ApiResponse<ClearedTableOrdersDto>.SuccessWithData(new ClearedTableOrdersDto(
-            session?.Id, command.TableNumber ?? session?.TableNumber, orders.Count, now, releasedAt),
-            "Pending table orders cleared without dispatching them.");
     }
+
+    private async Task<DateTime?> ReleaseSessionAsync(
+        TableServiceSession? session, DateTime now, string audit, CancellationToken cancellationToken)
+    {
+        if (session is null) return null;
+        var releasedAt = session.ReleasedAt;
+        if (!releasedAt.HasValue)
+        {
+            await guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
+            session.ReleasedAt = now;
+            session.ReleasedBy = audit;
+            releasedAt = now;
+        }
+        session.RecordAccountChange();
+        return releasedAt;
+    }
+
+    private static void ResetTable(Table? table)
+    {
+        if (table is null) return;
+        table.ReadinessState = TableReadinessState.NeedsReset;
+        table.ReadinessVersion++;
+    }
+
+    private static bool HasOneValidTarget(ClearPendingTableOrdersCommand command) =>
+        command.ServiceSessionId.HasValue != command.TableNumber.HasValue
+        && (command.TableNumber is null or > 0)
+        && command.ServiceSessionId != Guid.Empty;
 
     private static ApiResponse<ClearedTableOrdersDto> NotFound() =>
         ApiResponse<ClearedTableOrdersDto>.FailureWithCode(
@@ -136,4 +175,12 @@ public sealed class ClearPendingTableOrdersCommandHandler(
 
     private static ApiResponse<ClearedTableOrdersDto> Refused(string message) =>
         ApiResponse<ClearedTableOrdersDto>.FailureWithCode(message, ErrorCodes.TableServiceSessionNotClosable);
+
+    private sealed record ClearTarget(TableServiceSession? Session, Table? Table, IQueryable<Order> Orders);
+
+    private sealed record TargetResolution(ClearTarget? Target, ApiResponse<ClearedTableOrdersDto>? Error)
+    {
+        public static TargetResolution Resolved(ClearTarget target) => new(target, null);
+        public static TargetResolution Failed(ApiResponse<ClearedTableOrdersDto> error) => new(null, error);
+    }
 }

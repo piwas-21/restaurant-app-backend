@@ -50,6 +50,7 @@ public sealed class AddTableServiceSessionPaymentCommandHandler
     public async Task<ApiResponse<TableServiceSessionDto>> Handle(
         AddTableServiceSessionPaymentCommand command, CancellationToken cancellationToken)
     {
+        command.TipMinor ??= 0L;
         command.Currency = CurrencyCode.Normalize(command.Currency);
         var replay = await _replays.ResolveAsync(command, cancellationToken);
         if (replay is not null)
