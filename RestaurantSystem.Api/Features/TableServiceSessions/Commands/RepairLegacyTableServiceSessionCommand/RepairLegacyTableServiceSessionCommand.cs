@@ -23,7 +23,7 @@ public record RepairLegacyTableServiceSessionCommand : ICommand<ApiResponse<Tabl
     public string? Currency { get; init; }
 }
 
-public sealed class RepairLegacyTableServiceSessionCommandHandler
+public sealed partial class RepairLegacyTableServiceSessionCommandHandler
     : ICommandHandler<RepairLegacyTableServiceSessionCommand, ApiResponse<TableServiceSessionDto>>
 {
     private readonly ApplicationDbContext _context;
@@ -148,15 +148,6 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
         var result = await _reader.ReadAsync(session.Id, cancellationToken);
         return ToResponse(result, legacyOrders.Count);
     }
-
-    private static ApiResponse<TableServiceSessionDto> ToResponse(TableServiceSessionDto? result, int adoptedOrderCount)
-        => result is null
-            ? ApiResponse<TableServiceSessionDto>.FailureWithCode(
-                "The repaired table service session could not be read back.",
-                ErrorCodes.TableServiceSessionNotFound)
-            : ApiResponse<TableServiceSessionDto>.SuccessWithData(result, adoptedOrderCount == 0
-                ? "Table service session already resolved"
-                : "Legacy table orders adopted into the table service session");
 
     private Task<List<Order>> FindBlockingLegacyOrdersAsync(
         TableIdentity table, CancellationToken cancellationToken)
