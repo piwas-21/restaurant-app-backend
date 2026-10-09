@@ -16,6 +16,7 @@ internal static class TableBillPaymentFlowReader
     private const string EqualMode = "Equal";
     private const string CustomAmountMode = "CustomAmount";
     private const int MinorUnitsPerCurrencyUnit = 100;
+    private const string PlanReconciliationMessage = "The table bill split plan requires reconciliation.";
 
     private static readonly AccountPaymentState[] HoldingStates =
     [
@@ -169,7 +170,7 @@ internal static class TableBillPaymentFlowReader
         }
         catch (Exception exception) when (exception is System.Text.Json.JsonException or BadRequestException)
         {
-            throw new ConflictException("The table bill split plan requires reconciliation.", exception);
+            throw new ConflictException(PlanReconciliationMessage, exception);
         }
     }
 
@@ -181,7 +182,7 @@ internal static class TableBillPaymentFlowReader
         }
         catch (Exception exception) when (exception is System.Text.Json.JsonException or BadRequestException)
         {
-            throw new ConflictException("The table bill split plan requires reconciliation.", exception);
+            throw new ConflictException(PlanReconciliationMessage, exception);
         }
     }
 
@@ -199,7 +200,7 @@ internal static class TableBillPaymentFlowReader
         }
         catch (OverflowException exception)
         {
-            throw new ConflictException("The table bill split plan requires reconciliation.", exception);
+            throw new ConflictException(PlanReconciliationMessage, exception);
         }
 
         var invalidCustomAmounts = customAmounts is not null
@@ -207,7 +208,7 @@ internal static class TableBillPaymentFlowReader
                 || customTotal != plan.TotalMinor);
         if (plan.ShareCount < 2 || scopeTotal != plan.TotalMinor
             || (customAmounts is null && plan.TotalMinor < plan.ShareCount) || invalidCustomAmounts)
-            throw new ConflictException("The table bill split plan requires reconciliation.");
+            throw new ConflictException(PlanReconciliationMessage);
     }
 
     private static TableBillGuestAmountDto BuildGuestAmount(

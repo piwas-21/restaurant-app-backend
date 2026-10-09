@@ -75,8 +75,9 @@ public sealed class AccountPaymentQuoteService(
             RequireCapacityForQuote(capacity, segments.Count);
             var now = timeProvider.GetUtcNow().UtcDateTime;
             var quoteExpires = now.AddMinutes(settings.QuoteLifetimeMinutes);
-            var attempt = CreateAttempt(sessionId, request, actor, hash, amount, tipMinor,
-                account.Money.Currency, quoteExpires, now, segments, cashSettlement);
+            var attempt = CreateAttempt(
+                new QuoteIdentity(sessionId, request, actor, hash),
+                new QuoteFinancials(amount, tipMinor, account.Money.Currency, quoteExpires, now, segments, cashSettlement));
             context.AccountPaymentAttempts.Add(attempt);
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -155,36 +156,35 @@ public sealed class AccountPaymentQuoteService(
             throw new ConflictException("The table account exceeds the supported financial history limit.");
     }
 
-    private static AccountPaymentAttempt CreateAttempt(
-        Guid sessionId, CreateAccountPaymentQuoteRequest request, AccountPaymentActor actor, string hash, long amount,
-        long tipMinor, string currency, DateTime quoteExpires, DateTime now,
-        IReadOnlyList<AccountDebtSegment> segments, CashSettlementQuote? cashSettlement)
+    private static AccountPaymentAttempt CreateAttempt(QuoteIdentity identity, QuoteFinancials financials)
     {
         var attempt = new AccountPaymentAttempt
         {
             Id = Guid.NewGuid(),
-            ServiceSessionId = sessionId,
-            OperationId = request.OperationId,
-            ActorId = actor.ActorId,
-            ActorKind = actor.Kind,
-            Mode = request.Mode,
+            ServiceSessionId = identity.SessionId,
+            OperationId = identity.Request.OperationId,
+            ActorId = identity.Actor.ActorId,
+            ActorKind = identity.Actor.Kind,
+            Mode = identity.Request.Mode,
             State = AccountPaymentState.Quoted,
-            PaymentMethod = request.PaymentMethod,
+            PaymentMethod = identity.Request.PaymentMethod,
             Version = 1,
-            ExpectedAccountRevision = request.ExpectedAccountRevision,
-            AmountMinor = amount,
-            TipMinor = tipMinor,
-            Currency = currency,
-            PayloadHash = hash,
-            QuoteExpiresAt = quoteExpires,
-            EqualSharePlanId = AttemptSharePlanId(request),
-            EqualShareOrdinal = AttemptShareOrdinal(request),
-            CreatedAt = now,
-            CreatedBy = actor.AuditIdentifier
+            ExpectedAccountRevision = identity.Request.ExpectedAccountRevision,
+            AmountMinor = financials.AmountMinor,
+            TipMinor = financials.TipMinor,
+            Currency = financials.Currency,
+            PayloadHash = identity.Hash,
+            QuoteExpiresAt = financials.QuoteExpiresAt,
+            EqualSharePlanId = AttemptSharePlanId(identity.Request),
+            EqualShareOrdinal = AttemptShareOrdinal(identity.Request),
+            CreatedAt = financials.CreatedAt,
+            CreatedBy = identity.Actor.AuditIdentifier
         };
-        attempt.Allocations = AccountPaymentSnapshots.Allocations(attempt.Id, segments, actor.AuditIdentifier);
+        attempt.Allocations = AccountPaymentSnapshots.Allocations(
+            attempt.Id, financials.Segments, identity.Actor.AuditIdentifier);
         attempt.SnapshotJson = AccountPaymentSnapshots.Serialize(CreateQuoteSnapshot(
-            request, amount, tipMinor, currency, quoteExpires, segments, cashSettlement));
+            identity.Request, financials.AmountMinor, financials.TipMinor, financials.Currency,
+            financials.QuoteExpiresAt, financials.Segments, financials.CashSettlement));
         return attempt;
     }
 
@@ -282,4 +282,11 @@ public sealed class AccountPaymentQuoteService(
         if (string.IsNullOrWhiteSpace(session.Currency))
             throw new ConflictException("The table visit has no declared currency for payment quotes.");
     }
+
+    private sealed record QuoteIdentity(
+        Guid SessionId, CreateAccountPaymentQuoteRequest Request, AccountPaymentActor Actor, string Hash);
+
+    private sealed record QuoteFinancials(
+        long AmountMinor, long TipMinor, string Currency, DateTime QuoteExpiresAt, DateTime CreatedAt,
+        IReadOnlyList<AccountDebtSegment> Segments, CashSettlementQuote? CashSettlement);
 }
