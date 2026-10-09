@@ -417,6 +417,11 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == order.Id);
 
+        var snapshot = await context.OrderBillingSnapshots.AsNoTracking()
+            .SingleAsync(value => value.OrderId == order.Id);
+        snapshot.Currency.Should().Be("CHF");
+        snapshot.TotalMinor.Should().Be((long)(order.Total * 100m));
+
         orderInDb!.Items.Should().HaveCount(4);
         orderInDb.Items.Where(i => i.ParentOrderItemId != null).Should().HaveCount(2);
         orderInDb.Items

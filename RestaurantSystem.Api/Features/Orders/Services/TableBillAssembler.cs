@@ -241,7 +241,9 @@ public class TableBillAssembler : ITableBillAssembler
         bill.Tax = bill.Orders.Sum(o => o.Tax);
         bill.Discount = bill.Orders.Sum(o => o.Discount);
         bill.Tip = bill.Orders.Sum(o => o.Tip);
-        bill.Total = bill.Orders.Sum(o => o.Total);
+        bill.BillingCreditAmount = bill.Orders.Sum(o => o.BillingCreditAmount);
+        bill.OriginalTotal = bill.BillingCreditAmount > 0 ? bill.Orders.Sum(o => o.Total) : null;
+        bill.Total = bill.Orders.Sum(o => o.PayableTotal ?? o.Total);
         bill.TotalPaid = bill.Orders.Sum(o => o.TotalPaid);
         bill.Remaining = bill.Orders.Sum(o => Math.Max(0, o.RemainingAmount));
     }

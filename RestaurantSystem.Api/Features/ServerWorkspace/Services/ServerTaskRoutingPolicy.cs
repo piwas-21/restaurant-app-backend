@@ -1,17 +1,14 @@
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Api.Features.KitchenBoard.Services;
 
 namespace RestaurantSystem.Api.Features.ServerWorkspace.Services;
 
 internal static class ServerTaskRoutingPolicy
 {
     public static bool HasRequiredException(Order order) =>
-        order.IsKitchenReleased && order.RoutingStates.Count == 0
-        || order.RoutingStates.Any(state => state.IsRequired && IsException(state));
+        KitchenBoardWorkRules.HasRequiredRoutingException(order);
 
     public static bool IsException(OrderRoutingState state) =>
-        state.Status is DevicePrintStatus.Failed
-            or DevicePrintStatus.NotConfigured
-            or DevicePrintStatus.Unknown
-            or DevicePrintStatus.Skipped;
+        KitchenBoardWorkRules.IsRoutingException(state.Status);
 }

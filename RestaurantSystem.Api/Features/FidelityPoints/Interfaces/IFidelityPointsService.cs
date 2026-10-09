@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Api.Features.FidelityPoints.Models;
 
 namespace RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 
@@ -9,10 +10,9 @@ public interface IFidelityPointsService
     /// </summary>
     Task<int> CalculatePointsForOrderAsync(decimal orderTotal, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Award points to a user for an order
-    /// </summary>
-    Task<FidelityPointsTransaction> AwardPointsAsync(Guid userId, Guid orderId, int points, decimal orderTotal, CancellationToken cancellationToken = default);
+    /// <summary>Applies the accepted snapshot's earning allocation after reading the persisted order.</summary>
+    Task<FidelityPointsAwardResult> AwardAcceptedOrderAsync(
+        Guid orderId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Redeem points for a discount on an order

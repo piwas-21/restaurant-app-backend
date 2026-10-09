@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Features.FidelityPoints.Models;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -116,33 +117,12 @@ public class OrderPaymentApplicator : IOrderPaymentApplicator
 
     private async Task AwardFidelityPointsIfCompletedAsync(Order order, CancellationToken cancellationToken)
     {
-        if (!order.UserId.HasValue || order.FidelityPointsEarned <= 0 ||
-            (order.PaymentStatus != PaymentStatus.Completed && order.PaymentStatus != PaymentStatus.Overpaid))
-        {
-            return;
-        }
-
-        // Check if points already awarded
-        var alreadyAwarded = await _context.FidelityPointsTransactions
-            .AnyAsync(t => t.OrderId == order.Id && t.TransactionType == TransactionType.Earned, cancellationToken);
-
-        if (alreadyAwarded)
-        {
-            return;
-        }
-
         try
         {
-            await _fidelityPointsService.AwardPointsAsync(
-                order.UserId.Value,
-                order.Id,
-                order.FidelityPointsEarned,
-                order.SubTotal,
-                cancellationToken);
-
-            _logger.LogInformation(
-                "Awarded {Points} fidelity points to user {UserId} for order {OrderNumber} after payment completion",
-                order.FidelityPointsEarned, order.UserId, order.OrderNumber);
+            var result = await _fidelityPointsService.AwardAcceptedOrderAsync(order.Id, cancellationToken);
+            if (result.Disposition == FidelityPointsAwardDisposition.Awarded)
+                _logger.LogInformation("Awarded {Points} fidelity points for order {OrderNumber} after payment completion",
+                    result.AppliedPoints, order.OrderNumber);
         }
         catch (Exception ex)
             when (PostgresConcurrencyAborts.IsMatch(ex, out _) && _context.Database.CurrentTransaction is not null)

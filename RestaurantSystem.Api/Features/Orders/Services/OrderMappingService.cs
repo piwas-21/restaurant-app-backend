@@ -66,8 +66,10 @@ public class OrderMappingService : IOrderMappingService
             FidelityPointsDiscount = order.FidelityPointsDiscount,
             Tip = order.Tip,
             Total = order.Total,
+            PayableTotal = order.BillingCreditAmount > 0 ? order.PayableTotal : null,
+            BillingCreditAmount = order.BillingCreditAmount,
             TotalPaid = order.TotalPaid,
-            RemainingAmount = order.RemainingAmount,
+            RemainingAmount = order.PayableTotal - order.TotalPaid,
             IsFullyPaid = order.IsFullyPaid,
             IsKitchenReleased = order.IsKitchenReleased,
             KitchenReleasedAt = order.KitchenReleasedAt,
@@ -124,6 +126,8 @@ public class OrderMappingService : IOrderMappingService
             Status = order.Status.ToString(),
             PaymentStatus = order.PaymentStatus.ToString(),
             Total = order.Total,
+            PayableTotal = order.BillingCreditAmount > 0 ? order.PayableTotal : null,
+            BillingCreditAmount = order.BillingCreditAmount,
             OrderDate = order.OrderDate,
             // Root rows only, so this stays consistent with OrderDto.Items — a 1-line combo
             // with 3 components is 1 item, not 4.

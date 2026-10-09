@@ -216,10 +216,9 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
     }
 
     /// <remarks>
-    /// The already-awarded check mirrors <c>AddPaymentToOrderCommandHandler</c>'s. The claim above
-    /// makes settlement itself run once, but it does not stop a cashier having taken the money at
-    /// the till first — that path awards the points and leaves the order Completed, so settling a
-    /// Stripe payment on top of it would award them a second time.
+    /// The settlement claim makes this Stripe settlement run once. Loyalty delegates by order ID
+    /// to the award authority, which validates and replays an exact prior cashier award rather
+    /// than treating the presence of an Earned row as proof that the award is valid.
     /// </remarks>
     private async Task AwardPointsAsync(Order order, CancellationToken cancellationToken)
     {
@@ -229,10 +228,8 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
         }
 
         // Never on an order that is over. A cashier can cancel while the diner is still at Stripe,
-        // and AwardEarnedPointsAsync gates only on order.PaymentStatus — which settlement has just
-        // set to Completed — so without this a cancelled order earns points, and refunding it does
-        // not take them back. Asked of the transition table, the same way EnsurePayable asks "is
-        // this order finished", rather than listing terminal statuses a second time.
+        // so preserve the settlement eligibility guard before delegating to the award authority.
+        // Ask the same transition table as EnsurePayable rather than duplicating terminal statuses.
         if (!OrderStatusTransitions.IsValid(order.Status, OrderStatus.Cancelled))
         {
             _logger.LogWarning(
@@ -241,15 +238,7 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
             return;
         }
 
-        var alreadyAwarded = await _context.FidelityPointsTransactions.AnyAsync(
-            t => t.OrderId == order.Id && t.TransactionType == TransactionType.Earned, cancellationToken);
-
-        if (alreadyAwarded)
-        {
-            return;
-        }
-
-        await _fidelity.AwardEarnedPointsAsync(order, order.UserId, cancellationToken);
+        await _fidelity.AwardEarnedPointsAsync(order, cancellationToken);
     }
 
     public async Task<CheckoutSettlementDto> DescribeAsync(Guid orderId, CancellationToken cancellationToken)

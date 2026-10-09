@@ -3,8 +3,10 @@ using RestaurantSystem.Api.Features.AccountPayments.Services;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.DeleteOrderCommand;
 
@@ -54,6 +56,11 @@ public class DeleteOrderCommandHandler : ICommandHandler<DeleteOrderCommand, Api
         }
 
         await AccountPaymentLedgerGuard.RequireOrderCorrectionAsync(_context, order.Id, cancellationToken);
+        if (order.BillingCreditAmount > 0
+            || await _context.OrderBillingCredits.AnyAsync(credit => credit.SourceOrderId == order.Id, cancellationToken)
+            || await _context.OrderAmendments.AnyAsync(amendment => amendment.State == OrderAmendmentState.Committed
+                && (amendment.SourceOrderId == order.Id || amendment.SupplementOrderId == order.Id), cancellationToken))
+            throw new ConflictException("Orders with committed amendments or billing-credit history cannot be deleted.");
         var now = DateTime.UtcNow;
         var auditIdentifier = _currentUserService.GetAuditIdentifier();
         var activeReservations = await _context.TableReservations

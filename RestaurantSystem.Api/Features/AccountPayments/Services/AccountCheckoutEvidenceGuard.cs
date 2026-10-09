@@ -177,7 +177,7 @@ internal static class AccountCheckoutEvidenceGuard
         }
     }
 
-    private static bool HasProviderCaptureIdentity(AccountPaymentAttempt attempt, OrderPayment payment) =>
+    internal static bool HasProviderCaptureIdentity(AccountPaymentAttempt attempt, OrderPayment payment) =>
         string.Equals(payment.PaymentGateway, "Stripe", StringComparison.OrdinalIgnoreCase)
         && !string.IsNullOrWhiteSpace(attempt.ProviderAccountId)
         && attempt.ProviderAccountId.StartsWith("acct_", StringComparison.Ordinal)

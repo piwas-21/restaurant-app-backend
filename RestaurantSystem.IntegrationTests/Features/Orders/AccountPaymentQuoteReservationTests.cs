@@ -404,7 +404,7 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
             new AccountPaymentCaptureWriter(context, currentUser.Object, TimeProvider.System),
             fidelity.Object, TimeProvider.System, NullLogger<AccountPaymentCaptureService>.Instance);
         return await service.CaptureManualAsync(sessionId, operationId,
-            new CaptureAccountPaymentRequest { ExpectedVersion = expectedVersion }, CancellationToken.None);
+            new CaptureAccountPaymentRequest { ExpectedVersion = expectedVersion, ReceivedMinor = 335 }, CancellationToken.None);
     }
 
     private static CreateAccountEqualSharePlanRequest NewPlanRequest(
@@ -526,8 +526,13 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
 
     private sealed class TestActorResolver(Guid actorId) : IAccountPaymentActorResolver
     {
+        public bool CanStartCollection => true;
+        public void RequireNewCollection()
+        {
+            // These payment lifecycle fixtures grant staff authority; policy is covered separately.
+        }
         public AccountPaymentActor ResolveStaffActor() =>
-            new(actorId, AccountPaymentActorKind.Staff, actorId.ToString());
+            new(actorId, AccountPaymentActorKind.Staff, actorId.ToString(), UserRole.Cashier);
     }
 }
 

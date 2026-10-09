@@ -60,14 +60,14 @@ public sealed partial class AccountCheckoutJournalTests
         await using var context = DatabaseFixture.CreateContext();
         var fidelity = new Mock<IOrderFidelityCoordinator>();
         var ranWithoutTransaction = false;
-        fidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(),
+        fidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(),
             It.IsAny<CancellationToken>())).Returns(() =>
             {
                 ranWithoutTransaction = context.Database.CurrentTransaction is null;
                 return Task.CompletedTask;
             });
         await Poster(context, fidelity: fidelity.Object).PostAsync(journal, CancellationToken.None);
-        fidelity.Verify(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(),
+        fidelity.Verify(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(),
             It.IsAny<CancellationToken>()), Times.Once);
         ranWithoutTransaction.Should().BeTrue();
     }
@@ -224,7 +224,7 @@ public sealed partial class AccountCheckoutJournalTests
         RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext context, IAccountPaymentCaptureWriter? writer = null, IOrderFidelityCoordinator? fidelity = null)
     {
         var defaultFidelity = new Mock<IOrderFidelityCoordinator>();
-        defaultFidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(),
+        defaultFidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(),
             It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var mapping = new Mock<IOrderMappingService>();
         mapping.Setup(value => value.MapToOrderDtoAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))

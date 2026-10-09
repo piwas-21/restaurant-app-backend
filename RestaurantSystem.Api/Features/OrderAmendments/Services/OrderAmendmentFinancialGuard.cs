@@ -24,6 +24,7 @@ public static class OrderAmendmentFinancialGuard
 
         if (resolutions.Any(IsUnresolved))
             throw PendingResolution();
+        await OrderBillingCreditConsistency.AssertAsync(context, new[] { sourceOrderId }, cancellationToken);
     }
 
     public static async Task AssertNoPendingSessionResolutionAsync(
@@ -40,20 +41,19 @@ public static class OrderAmendmentFinancialGuard
 
         if (resolutions.Any(IsUnresolved))
             throw PendingResolution();
+        var orderIds = await context.Orders.AsNoTracking()
+            .Where(order => order.ServiceSessionId == serviceSessionId)
+            .Select(order => order.Id).ToListAsync(cancellationToken);
+        await OrderBillingCreditConsistency.AssertAsync(context, orderIds, cancellationToken);
     }
 
     internal static bool IsUnresolved(string? json) =>
         string.IsNullOrWhiteSpace(json) || HasUnresolvedOutcome(json);
 
-    internal static void AssertResolved(string? json)
+    internal static OrderAmendmentFinancialPreviewDto ReadValidSnapshot(string? json)
     {
-        if (IsUnresolved(json))
+        if (string.IsNullOrWhiteSpace(json))
             throw PendingResolution();
-    }
-
-    private static bool HasUnresolvedOutcome(string json)
-    {
-        OrderAmendmentFinancialPreviewDto resolution;
         try
         {
             using var document = JsonDocument.Parse(json);
@@ -68,20 +68,34 @@ public static class OrderAmendmentFinancialGuard
                 || !HasInteger(root, "netAccountDeltaMinor")
                 || !HasInteger(root, "potentialCreditMinor")
                 || !HasCurrency(root))
-                return true;
+                throw PendingResolution();
 
-            resolution = OrderAmendmentJson.Deserialize<OrderAmendmentFinancialPreviewDto>(json);
+            var resolution = OrderAmendmentJson.Deserialize<OrderAmendmentFinancialPreviewDto>(json);
+            if (resolution.AddedAmountMinor < 0 || resolution.RemovedUnitValueMinor < 0
+                || resolution.PotentialCreditMinor != resolution.RemovedUnitValueMinor
+                || resolution.NetAccountDeltaMinor != resolution.AddedAmountMinor - resolution.RemovedUnitValueMinor)
+                throw PendingResolution();
+            return resolution;
         }
         catch (JsonException)
         {
-            return true;
+            throw PendingResolution();
         }
+    }
 
-        return resolution.AddedAmountMinor < 0
-            || resolution.RemovedUnitValueMinor < 0
-            || resolution.PotentialCreditMinor != resolution.RemovedUnitValueMinor
-            || resolution.NetAccountDeltaMinor != resolution.AddedAmountMinor - resolution.RemovedUnitValueMinor
-            || (resolution.ResolutionStatus == OrderAmendmentFinancialResolutionStatus.NotRequired
+    internal static void AssertResolved(string? json)
+    {
+        if (IsUnresolved(json))
+            throw PendingResolution();
+    }
+
+    private static bool HasUnresolvedOutcome(string json)
+    {
+        OrderAmendmentFinancialPreviewDto resolution;
+        try { resolution = ReadValidSnapshot(json); }
+        catch (ConflictException) { return true; }
+
+        return (resolution.ResolutionStatus == OrderAmendmentFinancialResolutionStatus.NotRequired
                 && (resolution.CreditState != OrderAmendmentCreditState.None
                     || resolution.LoyaltyState != OrderAmendmentLoyaltyState.None
                     || resolution.RefundState != OrderAmendmentRefundState.None))

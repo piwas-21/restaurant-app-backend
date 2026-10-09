@@ -9,6 +9,7 @@ public record ZReportDto
     public int TotalTransactions { get; init; }
     public decimal GrossSales { get; init; }
     public decimal NetSales { get; init; }
+    public decimal TotalBillingCredits { get; init; }
     public decimal TotalTax { get; init; }
     public decimal TotalTips { get; init; }
     public decimal TotalDeliveryFees { get; init; }
@@ -18,6 +19,9 @@ public record ZReportDto
 
     // Refunds
     public ZReportRefundsDto Refunds { get; init; } = new();
+
+    // Table-account cash movement; explicitly excludes the rest of the restaurant till.
+    public ZReportAccountCashMovementDto? AccountCashMovements { get; init; }
 
     // Cancellations
     public int CancelledOrdersCount { get; init; }

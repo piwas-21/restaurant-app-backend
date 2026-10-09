@@ -381,7 +381,8 @@ public sealed class TableServicePaymentHandoffTests : IAsyncLifetime
     {
         await using var context = _fixture.CreateContext();
         var reader = Reader(context);
-        return await new CloseTableServiceSessionCommandHandler(context, reader).Handle(
+        return await new CloseTableServiceSessionCommandHandler(
+            context, reader, new RestaurantSystem.Api.Features.TableGuestVisits.Services.TableGuestVisitRevoker(context)).Handle(
             new CloseTableServiceSessionCommand
             {
                 ServiceSessionId = sessionId,

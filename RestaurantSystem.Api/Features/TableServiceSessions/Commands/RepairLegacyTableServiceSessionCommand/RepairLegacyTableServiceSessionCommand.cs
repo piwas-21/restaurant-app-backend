@@ -108,6 +108,7 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
                 TableNumber = table.Number,
                 Currency = CurrencyCode.Normalize(requestedCurrency) ?? CurrencyCode.Normalize(tenantCurrency),
                 Version = 1,
+                BillingAllocationVersion = 0,
                 OpenedAt = now,
                 CreatedAt = now,
                 CreatedBy = _currentUser.GetAuditIdentifier(),
@@ -171,7 +172,7 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
             .Where(order => order.Status != OrderStatus.Completed
                 && order.Status != OrderStatus.Cancelled
                 || order.Status == OrderStatus.Completed
-                && order.RemainingAmount > _paymentTolerance)
+                && order.Total - order.BillingCreditAmount - order.TotalPaid > _paymentTolerance)
             .ToListAsync(cancellationToken);
     }
 
@@ -191,10 +192,9 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
 
     private static TableIdentity ToIdentity(Table table)
     {
-        var isCanonicalNumber = int.TryParse(
-            table.TableNumber, NumberStyles.None, CultureInfo.InvariantCulture, out var number)
-            && number > 0
-            && number.ToString(CultureInfo.InvariantCulture) == table.TableNumber;
-        return new TableIdentity(table.Id, table.TableNumber, isCanonicalNumber ? number : null);
+        return new TableIdentity(table.Id, table.TableNumber,
+            int.TryParse(table.TableNumber, NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+            && number > 0 && number.ToString(CultureInfo.InvariantCulture) == table.TableNumber
+                ? number : null);
     }
 }

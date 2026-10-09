@@ -18,6 +18,13 @@ public class OrderOperationalNoteConfiguration : IEntityTypeConfiguration<OrderO
         builder.Property(note => note.ClientOperationId).IsRequired();
         builder.Property(note => note.KitchenTarget).HasConversion<string>().HasMaxLength(20);
         builder.Property(note => note.KitchenChangesJson).HasColumnType("jsonb");
+        builder.Property(note => note.KitchenBoardSequence)
+            .HasDefaultValueSql("next_kitchen_board_change_sequence()")
+            .ValueGeneratedOnAddOrUpdate();
+        builder.Property<DateTime>("FeedEventAt")
+            .HasComputedColumnSql("COALESCE(withdrawn_at, created_at)", stored: true);
+        builder.HasIndex("FeedEventAt", nameof(OrderOperationalNote.Id));
+        builder.HasIndex(note => note.KitchenBoardSequence).IsUnique();
 
         builder.HasIndex(note => new { note.OrderId, note.CreatedAt });
         // Each tenant has its own database. This key is therefore tenant-scoped while making a retry

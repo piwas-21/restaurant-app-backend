@@ -35,7 +35,8 @@ public class GetDevicesQueryHandler
                 d.ApiBaseUrl,
                 d.KitchenPrinter,
                 d.CashierPrinter,
-                d.CreatedAt))
+                d.CreatedAt,
+                d.SupportsUpdateAuthorization))
             .ToListAsync(cancellationToken);
 
         return ApiResponse<List<DeviceSummaryDto>>.SuccessWithData(devices);

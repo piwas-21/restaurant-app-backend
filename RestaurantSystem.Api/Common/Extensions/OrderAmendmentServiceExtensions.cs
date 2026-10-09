@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Common.Extensions;
 
@@ -8,10 +9,21 @@ public static class OrderAmendmentServiceExtensions
 {
     public static IServiceCollection AddOrderAmendmentServices(this IServiceCollection services)
     {
+        services.AddOptions<OrderAmendmentResolutionSettings>()
+            .BindConfiguration(OrderAmendmentResolutionSettings.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddScoped<IOrderAmendmentFinancialResolution, OrderAmendmentFinancialResolutionService>();
+        services.AddScoped<IOrderAmendmentResolutionPolicy, OrderAmendmentResolutionPolicy>();
+        services.AddScoped<IOrderAmendmentResolutionService, OrderAmendmentResolutionService>();
+        services.AddScoped<IOrderAmendmentQuotePreviewBuilder, OrderAmendmentQuotePreviewBuilder>();
+        services.AddScoped<IOrderAmendmentRefundProvider, StripeOrderAmendmentRefundProvider>();
+        services.AddScoped<IOrderAmendmentResolutionFinalizer, OrderAmendmentResolutionFinalizer>();
+        services.AddScoped<IOrderBillingAdjustmentWriter, OrderBillingAdjustmentWriter>();
         services.AddScoped<IOrderAmendmentQuoteService, OrderAmendmentQuoteService>();
         services.AddScoped<IOrderAmendmentCommitService, OrderAmendmentCommitService>();
         services.AddScoped<IOrderAmendmentQueryService, OrderAmendmentQueryService>();
+        services.AddScoped<IOrderAmendmentEligibilityService, OrderAmendmentEligibilityService>();
         services.AddScoped<OrderAmendmentSupplementBuilder>();
         services.AddScoped<OrderAmendmentChangeBuilder>();
         services.AddScoped<OrderAmendmentCommitMaterializer>();

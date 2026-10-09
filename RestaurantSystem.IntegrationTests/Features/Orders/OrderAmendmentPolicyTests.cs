@@ -2,6 +2,7 @@ using FluentAssertions;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using Moq;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Commands;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
@@ -122,7 +123,7 @@ public sealed class OrderAmendmentPolicyTests
         });
         var resolver = new Mock<IOrderDisplayCurrencyResolver>();
         resolver.Setup(value => value.Resolve(source)).Returns("CHF");
-        var service = new OrderAmendmentFinancialResolutionService(resolver.Object);
+        var service = new OrderAmendmentFinancialResolutionService(resolver.Object, Mock.Of<IOrderBillingAdjustmentWriter>());
 
         var firstUnit = await service.PreviewAsync(source,
             [Void(lineId, start: 1, quantity: 1)], null, CancellationToken.None);
@@ -151,7 +152,7 @@ public sealed class OrderAmendmentPolicyTests
         };
         var resolver = new Mock<IOrderDisplayCurrencyResolver>();
         resolver.Setup(value => value.Resolve(source)).Returns("CHF");
-        var service = new OrderAmendmentFinancialResolutionService(resolver.Object);
+        var service = new OrderAmendmentFinancialResolutionService(resolver.Object, Mock.Of<IOrderBillingAdjustmentWriter>());
 
         var preview = await service.PreviewAsync(source, [], supplement, CancellationToken.None);
 
@@ -166,7 +167,7 @@ public sealed class OrderAmendmentPolicyTests
         var source = SourceOrder();
         var resolver = new Mock<IOrderDisplayCurrencyResolver>();
         resolver.Setup(value => value.Resolve(source)).Returns((string?)null);
-        var service = new OrderAmendmentFinancialResolutionService(resolver.Object);
+        var service = new OrderAmendmentFinancialResolutionService(resolver.Object, Mock.Of<IOrderBillingAdjustmentWriter>());
         var itemId = Guid.NewGuid();
         var item = new OrderItemDto { Id = itemId, ProductName = "Soup", Quantity = 1 };
 
@@ -201,7 +202,7 @@ public sealed class OrderAmendmentPolicyTests
         });
         var resolver = new Mock<IOrderDisplayCurrencyResolver>();
         resolver.Setup(value => value.Resolve(source)).Returns("CHF");
-        var service = new OrderAmendmentFinancialResolutionService(resolver.Object);
+        var service = new OrderAmendmentFinancialResolutionService(resolver.Object, Mock.Of<IOrderBillingAdjustmentWriter>());
 
         var preview = await service.PreviewAsync(source,
             [Void(lineId, start: 1, quantity: 1)], null, CancellationToken.None);
@@ -227,7 +228,7 @@ public sealed class OrderAmendmentPolicyTests
         var request = AdditionRequest(source);
 
         var exception = Assert.Throws<ConflictException>(() =>
-            OrderAmendmentPolicy.ValidateOrderContext(source, request));
+            OrderAmendmentPolicy.ValidateOrderContext(source, request, NoRefundAuthority()));
 
         exception.Message.Should().Contain("refund activity");
     }
@@ -248,7 +249,8 @@ public sealed class OrderAmendmentPolicyTests
         });
 
         Assert.Throws<ConflictException>(() =>
-            OrderAmendmentPolicy.ValidateOrderContext(source, AdditionRequest(source)));
+            OrderAmendmentPolicy.ValidateOrderContext(
+                source, AdditionRequest(source), NoRefundAuthority()));
     }
 
     [Fact]
@@ -266,7 +268,8 @@ public sealed class OrderAmendmentPolicyTests
         });
 
         Assert.Throws<ConflictException>(() =>
-            OrderAmendmentPolicy.ValidateOrderContext(source, AdditionRequest(source)));
+            OrderAmendmentPolicy.ValidateOrderContext(
+                source, AdditionRequest(source), NoRefundAuthority()));
     }
 
     [Fact]
@@ -351,9 +354,9 @@ public sealed class OrderAmendmentPolicyTests
             Additions = [addition]
         };
 
-        OrderAmendmentPolicy.ValidateOrderContext(source, consented);
+        OrderAmendmentPolicy.ValidateOrderContext(source, consented, NoRefundAuthority());
         Assert.Throws<BadRequestException>(() => OrderAmendmentPolicy.ValidateOrderContext(
-            source, consented with { LocalProviderSupplementConsent = false }));
+            source, consented with { LocalProviderSupplementConsent = false }, NoRefundAuthority()));
         Assert.Throws<BadRequestException>(() => OrderAmendmentPolicy.ValidateOrderContext(
             source, consented with
             {
@@ -362,7 +365,7 @@ public sealed class OrderAmendmentPolicyTests
                     OrderItemId = Guid.NewGuid(), Kind = OrderAmendmentChangeKind.Void,
                     StartOrdinal = 1, Quantity = 1
                 }]
-            }));
+            }, NoRefundAuthority()));
     }
 
     private static QuoteOrderAmendmentCommand QuoteRequest(OrderAmendmentLineChangeRequest change) =>
@@ -377,6 +380,9 @@ public sealed class OrderAmendmentPolicyTests
         ExpectedOrderVersion = source.Version,
         Additions = [new CreateOrderItemDto { ProductId = Guid.NewGuid(), Quantity = 1 }]
     };
+
+    private static OrderAmendmentRefundAuthoritySnapshot NoRefundAuthority() =>
+        new(new AccountMoney("CHF"), new Dictionary<Guid, long>());
 
     private static OrderAmendmentChangeSnapshot Void(Guid itemId, int start, int quantity)
     {

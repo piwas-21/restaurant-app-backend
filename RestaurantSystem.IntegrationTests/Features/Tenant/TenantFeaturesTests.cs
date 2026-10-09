@@ -23,6 +23,7 @@ public class TenantFeaturesTests
         features.TableAccountV1.Should().BeFalse();
         features.OrderAmendmentsV1.Should().BeFalse();
         features.TableGuestVisitsV1.Should().BeFalse();
+        features.TableVisitReadinessV1.Should().BeFalse();
         features.TableAccountPaymentsV1.Should().BeFalse();
         features.TableGuestAccountPaymentsV1.Should().BeFalse();
         features.EnforceSauceMinimum.Should().BeFalse();
@@ -35,6 +36,33 @@ public class TenantFeaturesTests
         var features = Create(new TenantFeatureSettings { ServerWorkspaceV2 = true });
 
         features.ServerWorkspaceV2.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Table_readiness_rollout_requires_server_workspace_and_guest_visit_prerequisites()
+    {
+        var missingWorkspace = () => Create(new TenantFeatureSettings
+        {
+            TableGuestVisitsV1 = true,
+            TableVisitReadinessV1 = true,
+        });
+        var missingGuestVisits = () => Create(new TenantFeatureSettings
+        {
+            ServerWorkspaceV2 = true,
+            TableVisitReadinessV1 = true,
+        });
+
+        missingWorkspace.Should().Throw<InvalidOperationException>()
+            .WithMessage("*requires ServerWorkspaceV2 and TableGuestVisitsV1*");
+        missingGuestVisits.Should().Throw<InvalidOperationException>()
+            .WithMessage("*requires ServerWorkspaceV2 and TableGuestVisitsV1*");
+
+        Create(new TenantFeatureSettings
+        {
+            ServerWorkspaceV2 = true,
+            TableGuestVisitsV1 = true,
+            TableVisitReadinessV1 = true,
+        }).TableVisitReadinessV1.Should().BeTrue();
     }
 
     [Fact]
@@ -62,6 +90,7 @@ public class TenantFeaturesTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     [$"{TenantFeatureSettings.SectionName}:ServerWorkspaceV2"] = "maybe",
+                    [$"{TenantFeatureSettings.SectionName}:TableVisitReadinessV1"] = "maybe",
                     [$"{TenantFeatureSettings.SectionName}:EnforceSauceMinimum"] = "maybe",
                     [$"{TenantFeatureSettings.SectionName}:OptionSetMaterializationEnabled"] = "maybe",
                 })
@@ -87,7 +116,9 @@ public class TenantFeaturesTests
             TableAccountV1 = enabled,
             OrderAmendmentsV1 = enabled,
             TableGuestVisitsV1 = enabled,
+            TableVisitReadinessV1 = enabled,
             TableAccountPaymentsV1 = enabled,
+            ServerAccountCollectionV1 = enabled,
             TableGuestAccountPaymentsV1 = enabled,
             EnforceSauceMinimum = enabled,
             OptionSetMaterializationEnabled = enabled,
@@ -104,7 +135,9 @@ public class TenantFeaturesTests
         body.Data.TableAccountV1.Should().Be(enabled);
         body.Data.OrderAmendmentsV1.Should().Be(enabled);
         body.Data.TableGuestVisitsV1.Should().Be(enabled);
+        body.Data.TableVisitReadinessV1.Should().Be(enabled);
         body.Data.TableAccountPaymentsV1.Should().Be(enabled);
+        body.Data.ServerAccountCollectionV1.Should().Be(enabled);
         body.Data.TableGuestAccountPaymentsV1.Should().Be(enabled);
         body.Data.EnforceSauceMinimum.Should().Be(enabled);
         body.Data.OptionSetMaterializationEnabled.Should().Be(enabled);

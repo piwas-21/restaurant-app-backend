@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 using Respawn;
 using Respawn.Graph;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
@@ -20,6 +21,8 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// </summary>
 public class DatabaseFixture : IAsyncLifetime
 {
+    private const string TestTenantCurrency = "CHF";
+
     /// <summary>
     /// The next transaction id the cluster will assign. Only a WRITING transaction consumes one,
     /// so an unchanged value proves the database has not been touched.
@@ -124,7 +127,40 @@ public class DatabaseFixture : IAsyncLifetime
 
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync();
+        // Test lanes are disposable. Truncation clears the append-only journal without
+        // disabling its production UPDATE/DELETE triggers during any test execution.
+        await using (var clearJournal = new NpgsqlCommand(
+            "TRUNCATE TABLE order_amendment_loyalty_compensation_postings, "
+            + "order_amendment_loyalty_compensation_units, order_amendment_loyalty_reservations, "
+            + "order_amendment_loyalty_owner_holds, order_amendment_loyalty_compensations, "
+            + "order_billing_award_unit_coverages, order_billing_award_witnesses, "
+            + "order_billing_unit_award_suppressions, "
+            + "order_billing_earning_retirements, "
+            + "order_billing_snapshot_owner_links, order_billing_snapshot_units, "
+            + "order_billing_snapshots, order_billing_credits, "
+            + "table_ready_operations, order_amendment_resolution_refusals, "
+            + "order_amendment_resolution_operations, order_amendment_refund_legs, "
+            + "order_amendment_refund_evidence, account_payment_allocation_reversals, "
+            + "order_amendment_refund_attempts, account_cash_refund_evidence, "
+            + "account_cash_refund_intents, account_cash_collection_receipts", connection))
+        {
+            await clearJournal.ExecuteNonQueryAsync();
+        }
         await _respawner.ResetAsync(connection);
+        await using (var seedCurrency = new NpgsqlCommand(
+                         "UPDATE \"RestaurantInfo\" SET currency = @currency", connection))
+        {
+            seedCurrency.Parameters.AddWithValue("currency", TestTenantCurrency);
+            if (await seedCurrency.ExecuteNonQueryAsync() != 1)
+                throw new InvalidOperationException("The disposable test database must have one tenant currency row.");
+        }
+        await connection.CloseAsync();
+
+        await using var currencyContext = CreateContext();
+        var capturedCurrency = await OrderNativeAcceptedCurrency.ReadTenantCurrencyAsync(
+            currencyContext, CancellationToken.None);
+        if (!string.Equals(capturedCurrency, TestTenantCurrency, StringComparison.Ordinal))
+            throw new InvalidOperationException("The native tenant currency reader did not observe the test seed.");
     }
 
     /// <summary>

@@ -32,19 +32,19 @@ public sealed partial class CloseTableServiceSessionCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly ITableServiceSessionReader _reader;
     private readonly TimeProvider _timeProvider;
-    private readonly ITableGuestVisitRevoker? _guestVisits;
+    private readonly ITableGuestVisitRevoker _guestVisits;
     private readonly ITenantFeatures? _features;
 
     public CloseTableServiceSessionCommandHandler(
         ApplicationDbContext context,
         ITableServiceSessionReader reader,
+        ITableGuestVisitRevoker guestVisits,
         TimeProvider? timeProvider = null,
         IOptions<TableServiceSessionSettings>? settings = null,
-        ITableGuestVisitRevoker? guestVisits = null,
         ITenantFeatures? features = null)
     {
         _context = context;
-        _guestVisits = guestVisits;
+        _guestVisits = guestVisits ?? throw new ArgumentNullException(nameof(guestVisits));
         _features = features;
         _reader = reader;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -62,11 +62,18 @@ public sealed partial class CloseTableServiceSessionCommandHandler
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            var session = await TableServiceSessionRowLock.LoadAsync(
+            var lockedRows = await TableServiceSessionRowLock.LoadForLifecycleAsync(
                 _context, command.ServiceSessionId, cancellationToken);
+            var session = lockedRows.Session;
             if (session is null)
             {
                 return NotFound();
+            }
+
+            if (lockedRows.IdentityChanged
+                || session.TableId.HasValue && lockedRows.Table?.Id != session.TableId.Value)
+            {
+                return Stale(session.Version);
             }
 
             // Retrying a close after its commit is safe and does not require the client to retain the
@@ -93,43 +100,19 @@ public sealed partial class CloseTableServiceSessionCommandHandler
             await AccountPaymentCloseGuard.RequireClosableAsync(
                 _context, session.Id, _features, cancellationToken);
 
-            var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
-                _context.Orders, session.TableId, session.TableNumber);
-            var legacyOrders = await legacyQuery
-                .Where(order => !order.IsDeleted
-                    && order.Type == OrderType.DineIn
-                    && order.ServiceSessionId == null)
-                .Select(order => new { order.Status, order.RemainingAmount, order.PaymentStatus })
-                .ToListAsync(cancellationToken);
-            var memberRows = await _context.Orders
-                .Where(order => !order.IsDeleted && order.ServiceSessionId == session.Id)
-                .Select(order => new { order.Status, order.RemainingAmount, order.PaymentStatus, order.OrderNumber })
-                .ToListAsync(cancellationToken);
-            var assessment = TableServiceSessionCloseRules.Assess(
-                memberRows.Select(order =>
-                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount, order.PaymentStatus == PaymentStatus.Refunded)),
-                legacyOrders.Select(order =>
-                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount, order.PaymentStatus == PaymentStatus.Refunded)),
-                _paymentTolerance);
-            if (assessment.LegacyActiveOrderCount > 0)
+            var kitchenCorrectionFailure = await CheckKitchenBoardCloseAsync(session, cancellationToken);
+            if (kitchenCorrectionFailure is not null) return kitchenCorrectionFailure;
+
+            var orderFailure = await CheckOrderBalancesAsync(session, cancellationToken);
+            if (orderFailure is not null) return orderFailure;
+
+            await _guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
+            if (lockedRows.Table is not null)
             {
-                return Ambiguous();
+                lockedRows.Table.ReadinessState = TableReadinessState.NeedsReset;
+                lockedRows.Table.ReadinessVersion++;
             }
 
-            var unresolved = memberRows
-                .Where(order => TableServiceSessionCloseRules.IsUnresolvedMemberOrder(
-                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount, order.PaymentStatus == PaymentStatus.Refunded)))
-                .Select(order => order.OrderNumber)
-                .ToList();
-            if (assessment.Outstanding > _paymentTolerance || unresolved.Count > 0)
-            {
-                return Unresolved(assessment.Outstanding, unresolved);
-            }
-
-            if (_guestVisits is not null)
-            {
-                await _guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
-            }
             session.Status = TableServiceSessionStatus.Closed;
             session.ClosedAt = now;
             session.RecordAccountChange();

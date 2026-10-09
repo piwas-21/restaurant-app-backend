@@ -96,21 +96,45 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<ChannelOrderDecision> ChannelOrderDecisions { get; set; }
         public DbSet<OrderNumberSequence> OrderNumberSequences { get; set; }
         public DbSet<TableServiceSession> TableServiceSessions { get; set; }
+        public DbSet<TableReadyOperation> TableReadyOperations { get; set; }
         public DbSet<OrderChange> OrderChanges { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
+        public DbSet<OrderBillingSnapshot> OrderBillingSnapshots { get; set; }
+        public DbSet<OrderBillingSnapshotUnit> OrderBillingSnapshotUnits { get; set; }
+        public DbSet<OrderBillingSnapshotOwnerLink> OrderBillingSnapshotOwnerLinks { get; set; }
+        public DbSet<OrderBillingEarningRetirement> OrderBillingEarningRetirements { get; set; }
+        public DbSet<OrderBillingAwardWitness> OrderBillingAwardWitnesses { get; set; }
+        public DbSet<OrderBillingUnitAwardSuppression> OrderBillingUnitAwardSuppressions { get; set; }
+        public DbSet<OrderBillingAwardUnitCoverage> OrderBillingAwardUnitCoverages { get; set; }
         public DbSet<OrderItemIngredient> OrderItemIngredients { get; set; }
         public DbSet<OrderPayment> OrderPayments { get; set; }
         public DbSet<TableBillPaymentOperation> TableBillPaymentOperations { get; set; }
         public DbSet<OrderAmendment> OrderAmendments { get; set; }
+        public DbSet<OrderBillingCredit> OrderBillingCredits { get; set; }
+        public DbSet<OrderAmendmentResolutionOperation> OrderAmendmentResolutionOperations { get; set; }
+        public DbSet<OrderAmendmentResolutionRefusal> OrderAmendmentResolutionRefusals { get; set; }
+        public DbSet<OrderAmendmentLoyaltyCompensation> OrderAmendmentLoyaltyCompensations { get; set; }
+        public DbSet<OrderAmendmentLoyaltyCompensationUnit> OrderAmendmentLoyaltyCompensationUnits { get; set; }
+        public DbSet<OrderAmendmentLoyaltyCompensationPosting> OrderAmendmentLoyaltyCompensationPostings { get; set; }
+        public DbSet<OrderAmendmentLoyaltyReservation> OrderAmendmentLoyaltyReservations { get; set; }
+        public DbSet<OrderAmendmentLoyaltyOwnerHold> OrderAmendmentLoyaltyOwnerHolds { get; set; }
+        public DbSet<OrderAmendmentRefundLeg> OrderAmendmentRefundLegs { get; set; }
+        public DbSet<OrderAmendmentRefundAttempt> OrderAmendmentRefundAttempts { get; set; }
+        public DbSet<OrderAmendmentRefundEvidence> OrderAmendmentRefundEvidence { get; set; }
+        public DbSet<AccountPaymentAllocationReversal> AccountPaymentAllocationReversals { get; set; }
         public DbSet<TableGuestAdmission> TableGuestAdmissions { get; set; }
         public DbSet<TableGuestParticipant> TableGuestParticipants { get; set; }
         public DbSet<TableGuestRoundOperation> TableGuestRoundOperations { get; set; }
         public DbSet<AccountPaymentAttempt> AccountPaymentAttempts { get; set; }
         public DbSet<AccountPaymentAllocation> AccountPaymentAllocations { get; set; }
+        public DbSet<AccountCashCollectionReceipt> AccountCashCollectionReceipts { get; set; }
+        public DbSet<AccountCashRefundIntent> AccountCashRefundIntents { get; set; }
+        public DbSet<AccountCashRefundEvidence> AccountCashRefundEvidence { get; set; }
         public DbSet<AccountEqualSharePlan> AccountEqualSharePlans { get; set; }
         public DbSet<AccountCheckoutJournal> AccountCheckoutJournals { get; set; }
         public DbSet<TableServicePaymentHandoff> TableServicePaymentHandoffs { get; set; }
         public DbSet<OrderOperationalNote> OrderOperationalNotes { get; set; }
+        public DbSet<KitchenBoardWorkCompletion> KitchenBoardWorkCompletions { get; set; }
         public DbSet<OrderRoutingState> OrderRoutingStates { get; set; }
         public DbSet<StaffOrderOperation> StaffOrderOperations { get; set; }
         public DbSet<OrderCheckoutSession> OrderCheckoutSessions { get; set; }
@@ -367,6 +391,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         private void ApplyAuditInformation()
         {
             ChangeTracker.DetectChanges();
+            OrderBillingCreditInvariant.AssertAppendOnly(ChangeTracker);
 
             var now = DateTime.UtcNow;
             var userId = _auditIdentity?.GetAuditIdentifier() ?? "System";

@@ -34,6 +34,7 @@ public sealed class AccountPaymentAccountReader(
         if (sessionId == Guid.Empty)
             throw new BadRequestException("A table visit is required.");
 
+        actors.RequireNewCollection();
         var actor = actors.ResolveStaffActor();
         return await ReadAsync(sessionId, actor, null, cancellationToken);
     }
@@ -86,7 +87,8 @@ public sealed class AccountPaymentAccountReader(
             plan,
             attempts,
             new AccountPaymentLimitsDto(settings.MaximumSelectedUnits, settings.MaximumEqualShares,
-                knownActor is null ? guestPolicy.ReadLimits(account.Money.Currency) : null));
+                knownActor is null ? guestPolicy.ReadLimits(account.Money.Currency) : null),
+            account.Session.BillingAllocationVersion);
         if (transaction is not null)
             await transaction.CommitAsync(cancellationToken);
         if (knownActor is null)

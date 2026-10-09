@@ -1,5 +1,6 @@
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Orders.Commands.UpdateOrderStatusCommand;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Settings;
 
@@ -14,6 +15,7 @@ public static class OrderDetailServiceExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
         services.AddScoped<IRetainedCustomerDataScrubber, RetainedCustomerDataScrubber>();
+        services.AddScoped<IOrderStatusTransitionPolicy, OrderStatusTransitionPolicy>();
         services.AddScoped<IOrderPermittedActionsService, OrderPermittedActionsService>();
         services.AddScoped<IOrderResponseProjector, OrderResponseProjector>();
         return services;

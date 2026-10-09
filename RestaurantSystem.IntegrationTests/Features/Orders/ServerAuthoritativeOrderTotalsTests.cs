@@ -287,8 +287,7 @@ public class ServerAuthoritativeOrderTotalsTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// The failure direction. <c>RedeemAsync</c> swallows its exceptions, so a caller asking for
-    /// points it does not have must end up paying FULL price — never discounted for points that
+    /// A valid discount request with insufficient balance must pay FULL price — never discounted for points that
     /// were never taken. The fields are set on a tracked entity, so a later
     /// <c>SaveChangesAsync</c> in the same transaction would otherwise flush them.
     /// </summary>
@@ -304,7 +303,7 @@ public class ServerAuthoritativeOrderTotalsTests : IntegrationTestBase
             customerName = "Customer",
             items = new[] { new { productId = _pizzaId, quantity = 1, unitPrice = PizzaPrice } },
             payments = new[] { new { paymentMethod = nameof(PaymentMethod.Cash), amount = PizzaPrice } },
-            pointsToRedeem = 5000,
+            pointsToRedeem = 500,
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -313,6 +312,26 @@ public class ServerAuthoritativeOrderTotalsTests : IntegrationTestBase
         order.FidelityPointsDiscount.Should().Be(0m);
         order.FidelityPointsRedeemed.Should().Be(0);
         order.Total.Should().Be(PizzaPrice);
+    }
+
+    [Fact]
+    public async Task Redemption_larger_than_the_order_is_refused_even_with_insufficient_balance()
+    {
+        await SeedPointsBalanceAsync(10);
+        AuthenticateAsUser();
+        var response = await Client.PostAsJsonAsync("/api/orders", new
+        {
+            type = nameof(OrderType.Takeaway),
+            customerName = "Customer",
+            items = new[] { new { productId = _pizzaId, quantity = 1 } },
+            pointsToRedeem = 5000,
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await using var verify = DatabaseFixture.CreateContext();
+        (await verify.Orders.CountAsync()).Should().Be(0);
+        (await verify.OrderBillingSnapshots.CountAsync()).Should().Be(0);
+        (await verify.FidelityPointsTransactions.CountAsync(value => value.TransactionType == TransactionType.Redeemed)).Should().Be(0);
+        (await verify.FidelityPointBalances.SingleAsync(value => value.UserId == Guid.Parse(TestAuthHandler.UserId))).CurrentPoints.Should().Be(10);
     }
 
     // ---- The tip -----------------------------------------------------------------------------

@@ -38,6 +38,11 @@ public sealed class OrderAmendmentsController : ControllerBase
         Guid orderId) =>
         Ok(await _mediator.SendQuery(new GetOrderAmendmentsQuery(orderId)));
 
+    [HttpGet("eligibility")]
+    public async Task<ActionResult<ApiResponse<OrderAmendmentEligibilityDto>>> Eligibility(
+        Guid orderId) =>
+        Ok(await _mediator.SendQuery(new GetOrderAmendmentEligibilityQuery(orderId)));
+
     [HttpGet("~/api/staff/amendment-operations/{operationId:guid}")]
     public async Task<ActionResult<ApiResponse<OrderAmendmentOperationLookupDto>>> Operation(
         Guid operationId) =>

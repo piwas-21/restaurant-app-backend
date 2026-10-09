@@ -36,7 +36,7 @@ public sealed class AccountPaymentReceiptReader(ApplicationDbContext context, Ti
             throw Unavailable();
         return new AccountPaymentReceiptDto(attemptId, receipt.AmountMinor, receipt.Currency, receipt.State,
             receipt.ProviderCapturedMinor, receipt.ProviderRefundedMinor,
-            receipt.ReconciliationRequired, receipt.CompletedAt);
+            receipt.ReconciliationRequired, receipt.CompletedAt, receipt.ReceiptExpiresAt.Value);
     }
 
     private static NotFoundException Unavailable() => new("The payment receipt is unavailable.");

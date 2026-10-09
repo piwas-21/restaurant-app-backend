@@ -10,6 +10,16 @@ using FloorPlanEntity = RestaurantSystem.Domain.Entities.FloorPlan;
 
 namespace RestaurantSystem.Api.Features.ServerWorkspace.Services;
 
+internal sealed record ServerFloorSnapshotInput(
+    IReadOnlyCollection<FloorPlanEntity> Plans,
+    IReadOnlyCollection<Table> Tables,
+    IReadOnlyCollection<FloorSessionRow> Sessions,
+    IReadOnlyCollection<FloorOrderRow> Orders,
+    IReadOnlyCollection<ReservationRow> Reservations,
+    DateTimeOffset TenantTime,
+    DateTime ServerTime,
+    bool HasUnidentifiedLegacyOrders = false);
+
 internal sealed class ServerFloorSnapshotProjector
 {
     private static readonly OrderStatus[] ActiveRoundStatuses =
@@ -21,45 +31,48 @@ internal sealed class ServerFloorSnapshotProjector
     private readonly ITenantClock _clock;
     private readonly ICurrentUserService _currentUser;
     private readonly decimal _paymentTolerance;
+    private readonly bool _tableVisitReadinessEnabled;
+    private readonly bool _serverCanCollect;
 
     public ServerFloorSnapshotProjector(
-        ITenantClock clock, ICurrentUserService currentUser, decimal paymentTolerance)
+        ITenantClock clock, ICurrentUserService currentUser, decimal paymentTolerance,
+        bool tableVisitReadinessEnabled = false, bool canStartCollection = false)
     {
         _clock = clock;
         _currentUser = currentUser;
         _paymentTolerance = paymentTolerance;
+        _tableVisitReadinessEnabled = tableVisitReadinessEnabled;
+        _serverCanCollect = currentUser.Role == UserRole.Server && canStartCollection;
     }
 
-    public ServerFloorProjection Project(
-        IReadOnlyCollection<FloorPlanEntity> plans,
-        IReadOnlyCollection<Table> tables,
-        IReadOnlyCollection<FloorSessionRow> sessions,
-        IReadOnlyCollection<FloorOrderRow> orders,
-        IReadOnlyCollection<ReservationRow> reservations,
-        DateTimeOffset tenantTime,
-        DateTime serverTime)
+    public ServerFloorProjection Project(ServerFloorSnapshotInput input)
     {
-        var reservationsByTable = ExpandReservations(reservations, tenantTime);
-        var nextStateChangeAt = FindNextStateChangeAt(reservations, tenantTime);
-        var sessionByTableId = sessions
+        var reservationsByTable = ExpandReservations(input.Reservations, input.TenantTime);
+        var nextStateChangeAt = FindNextStateChangeAt(input.Reservations, input.TenantTime);
+        var sessionByTableId = input.Sessions
             .Where(session => session.TableId.HasValue)
             .ToDictionary(session => session.TableId!.Value);
-        var legacySessionByNumber = sessions
+        var legacySessionByNumber = input.Sessions
             .Where(session => !session.TableId.HasValue && session.TableNumber.HasValue)
             .ToDictionary(session => session.TableNumber!.Value);
-        var zoneNames = plans.ToDictionary(plan => plan.Id, plan => plan.Name);
-        var tableDtos = tables.Select(table => MapTable(
+        var hasUnidentifiedLegacy = _tableVisitReadinessEnabled
+            && (input.Sessions.Any(session => !session.TableId.HasValue && !session.TableNumber.HasValue)
+                || input.HasUnidentifiedLegacyOrders);
+        var zoneNames = input.Plans.ToDictionary(plan => plan.Id, plan => plan.Name);
+        var tableDtos = input.Tables.Select(table => MapTable(
             table,
             ResolveSession(table, sessionByTableId, legacySessionByNumber),
-            orders,
+            input.Orders,
             reservationsByTable.GetValueOrDefault(table.Id),
             table.FloorPlanId is { } planId ? zoneNames.GetValueOrDefault(planId) : null,
-            serverTime)).ToList();
+            input.ServerTime, hasUnidentifiedLegacy)).ToList();
         return new ServerFloorProjection(
             tableDtos,
             ServerFloorSnapshotVersionBuilder.Create(
-                plans, tables, sessions, orders, reservationsByTable,
-                nextStateChangeAt, _paymentTolerance),
+                input.Plans, input.Tables, input.Sessions, input.Orders, reservationsByTable,
+                new ServerFloorSnapshotVersionContext(
+                    nextStateChangeAt, _paymentTolerance, hasUnidentifiedLegacy, _currentUser.Role,
+                    _serverCanCollect)),
             nextStateChangeAt);
     }
 
@@ -69,22 +82,28 @@ internal sealed class ServerFloorSnapshotProjector
         IReadOnlyCollection<FloorOrderRow> orders,
         ServerFloorReservationDto? reservation,
         string? zoneName,
-        DateTime serverTime)
+        DateTime serverTime, bool hasUnidentifiedLegacy)
     {
         var legacy = LegacyForTable(table, orders);
         var legacyOperational = legacy.Where(IsOccupyingLegacy).ToList();
-        var hasLegacyAmbiguity = legacy.Any(IsBlockingLegacy);
+        var hasLegacyAmbiguity = hasUnidentifiedLegacy || legacy.Any(IsBlockingLegacy);
         var summary = session is null ? null : SummarizeSession(session, legacy, serverTime);
         var readyCount = summary?.ReadyRoundCount ?? legacyOperational.Count(IsReady);
         var state = DetermineTableState(
             table.IsActive, readyCount, summary is not null,
             hasLegacyAmbiguity, reservation?.IsCurrent == true);
+        if ((state is "Available" or "Reserved") && _tableVisitReadinessEnabled
+            && table.ReadinessState == TableReadinessState.NeedsReset)
+        {
+            state = "NeedsReset";
+        }
         var legacyDto = legacyOperational.Count == 0 ? null : new ServerFloorLegacySummaryDto
         {
             OrderCount = legacyOperational.Count,
             ActiveOrderCount = legacyOperational.Count(IsActiveRound),
             ReadyOrderCount = legacyOperational.Count(IsReady),
-            Outstanding = legacyOperational.Sum(order => Math.Max(0m, order.RemainingAmount))
+            Outstanding = legacyOperational.Sum(order => TableServiceSessionCloseRules.EffectiveOutstanding(
+                order.Total, order.BillingCreditAmount, order.TotalPaid))
         };
 
         return new ServerFloorTableDto
@@ -103,6 +122,8 @@ internal sealed class ServerFloorSnapshotProjector
             Shape = table.Shape,
             Rotation = table.Rotation,
             State = state,
+            ReadinessState = table.ReadinessState.ToString(),
+            ReadinessVersion = table.ReadinessVersion,
             ActiveRoundCount = summary?.ActiveRoundCount ?? legacyDto?.ActiveOrderCount ?? 0,
             ReadyRoundCount = readyCount,
             Session = summary,
@@ -110,8 +131,15 @@ internal sealed class ServerFloorSnapshotProjector
             HasLegacyAmbiguity = hasLegacyAmbiguity,
             Reservation = reservation,
             PermittedActions = ServerFloorActionProjection.Project(
-                table, summary, hasLegacyAmbiguity, legacyDto is not null, readyCount,
-                reservation?.IsCurrent == true, _currentUser.Role)
+                table,
+                summary,
+                new ServerFloorActionContext(
+                    hasLegacyAmbiguity,
+                    legacyDto is not null,
+                    readyCount,
+                    reservation?.IsCurrent == true,
+                    _currentUser.Role,
+                    _tableVisitReadinessEnabled))
         };
     }
     private ServerFloorSessionSummaryDto SummarizeSession(
@@ -121,14 +149,16 @@ internal sealed class ServerFloorSnapshotProjector
     {
         var members = session.Bill?.Rounds
             .Select(round => new TableServiceSessionOrderState(
-                ParseStatus(round.Order.Status), round.Order.RemainingAmount,
+                ParseStatus(round.Order.Status), round.Outstanding,
                 round.Order.PaymentStatus == nameof(PaymentStatus.Refunded)))
             .ToList() ?? [];
         var legacyStates = legacy.Select(order =>
-            new TableServiceSessionOrderState(order.Status, order.RemainingAmount));
+            TableServiceSessionCloseRules.FromCharge(
+                order.Status, order.Total, order.BillingCreditAmount, order.TotalPaid));
         var assessment = TableServiceSessionCloseRules.Assess(
             members, legacyStates, _paymentTolerance);
         var bill = session.Bill;
+        var hasTenderRole = _currentUser.Role is UserRole.Admin or UserRole.Cashier || _serverCanCollect;
         return new ServerFloorSessionSummaryDto
         {
             ServiceSessionId = session.Id,
@@ -141,8 +171,8 @@ internal sealed class ServerFloorSnapshotProjector
             Remaining = assessment.Outstanding,
             ActiveRoundCount = bill?.Rounds.Count(round => IsActiveRound(ParseStatus(round.Order.Status))) ?? 0,
             ReadyRoundCount = bill?.Rounds.Count(round => IsReady(ParseStatus(round.Order.Status))) ?? 0,
-            CanCollect = bill?.EligibleOutstanding > _paymentTolerance,
-            CanRequestPaymentHandoff = _currentUser.Role == UserRole.Server
+            CanCollect = hasTenderRole && bill?.EligibleOutstanding > _paymentTolerance,
+            CanRequestPaymentHandoff = !hasTenderRole && _currentUser.Role == UserRole.Server
                 && bill?.EligibleOutstanding > _paymentTolerance && !session.HasPendingPaymentHandoff,
             HasPendingPaymentHandoff = session.HasPendingPaymentHandoff,
             CanClose = assessment.CanClose && !session.HasPendingPaymentHandoff,
@@ -191,7 +221,8 @@ internal sealed class ServerFloorSnapshotProjector
 
     private bool IsBlockingLegacy(FloorOrderRow order) =>
         TableServiceSessionCloseRules.IsBlockingLegacyOrder(
-            new TableServiceSessionOrderState(order.Status, order.RemainingAmount), _paymentTolerance);
+            TableServiceSessionCloseRules.FromCharge(
+                order.Status, order.Total, order.BillingCreditAmount, order.TotalPaid), _paymentTolerance);
 
     private static OrderStatus ParseStatus(string value) =>
         Enum.TryParse<OrderStatus>(value, ignoreCase: true, out var status)

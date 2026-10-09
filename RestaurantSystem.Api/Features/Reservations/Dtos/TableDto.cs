@@ -1,5 +1,7 @@
 namespace RestaurantSystem.Api.Features.Reservations.Dtos;
 
+using System.Text.Json.Serialization;
+
 public record TableDto
 {
     public Guid Id { get; set; }
@@ -7,6 +9,10 @@ public record TableDto
     public int MaxGuests { get; set; }
     public bool IsActive { get; set; }
     public bool IsOutdoor { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReadinessState { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ReadinessVersion { get; set; }
     public decimal PositionX { get; set; }
     public decimal PositionY { get; set; }
     public decimal Width { get; set; }

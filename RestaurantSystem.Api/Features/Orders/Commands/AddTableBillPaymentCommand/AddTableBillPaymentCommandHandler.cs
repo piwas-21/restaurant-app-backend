@@ -87,7 +87,7 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
                 && o.ServiceSessionId == command.ServiceSessionId)
             .Where(OrderSettlementEligibility.CanCollectQuery())
             .OrderBy(o => o.OrderDate).ThenBy(o => o.OrderNumber)
-            .Select(o => new BillRound(o.Id, o.RemainingAmount))
+            .Select(o => new BillRound(o.Id, o.Total - o.BillingCreditAmount - o.TotalPaid))
             .ToListAsync(cancellationToken);
 
         if (openOrders.Count == 0)

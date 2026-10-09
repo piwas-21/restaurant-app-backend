@@ -4,13 +4,16 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.TableServiceSessions.Services;
 
-/// <summary>Loads one service-session row with a PostgreSQL row lock for close/create serialization.</summary>
+/// <summary>Loads table/session rows with PostgreSQL locks for lifecycle serialization.</summary>
 public static class TableServiceSessionRowLock
 {
     public static Task<Table?> LoadTableAsync(
         ApplicationDbContext context, Guid tableId, CancellationToken cancellationToken) =>
         context.Tables
-            .FromSqlInterpolated($"SELECT * FROM \"Tables\" WHERE id = {tableId} FOR UPDATE")
+            // Table.Id is the referenced key for order inserts. PostgreSQL's FK check takes
+            // KEY SHARE; NO KEY UPDATE keeps readiness/lifecycle writes serialized while allowing
+            // a staff round holding the session lock to insert its table-linked order.
+            .FromSqlInterpolated($"SELECT * FROM \"Tables\" WHERE id = {tableId} FOR NO KEY UPDATE")
             .SingleOrDefaultAsync(cancellationToken);
 
     public static Task<TableServiceSession?> LoadAsync(
@@ -18,4 +21,28 @@ public static class TableServiceSessionRowLock
         context.TableServiceSessions
             .FromSqlInterpolated($"SELECT * FROM table_service_sessions WHERE id = {serviceSessionId} FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken);
+
+    /// <summary>
+    /// Locks lifecycle rows in the common Table-then-Session order used by guest admission.
+    /// The initial identity read is only a locator; it is revalidated after both locks are held.
+    /// </summary>
+    public static async Task<TableServiceSessionLifecycleRows> LoadForLifecycleAsync(
+        ApplicationDbContext context, Guid serviceSessionId, CancellationToken cancellationToken)
+    {
+        var locatedTableId = await context.TableServiceSessions.AsNoTracking()
+            .Where(session => session.Id == serviceSessionId)
+            .Select(session => session.TableId)
+            .SingleOrDefaultAsync(cancellationToken);
+        var table = locatedTableId.HasValue
+            ? await LoadTableAsync(context, locatedTableId.Value, cancellationToken)
+            : null;
+        var session = await LoadAsync(context, serviceSessionId, cancellationToken);
+        var identityChanged = session is not null && session.TableId != locatedTableId;
+        return new TableServiceSessionLifecycleRows(table, session, identityChanged);
+    }
 }
+
+public sealed record TableServiceSessionLifecycleRows(
+    Table? Table,
+    TableServiceSession? Session,
+    bool IdentityChanged);

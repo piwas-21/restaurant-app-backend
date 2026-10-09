@@ -96,17 +96,17 @@ public class CreateCheckoutSessionCommandHandler
             ?? throw new NotFoundException("Order not found");
         OnlinePaymentEligibility.EnsurePayable(order);
         await _intentGuard.EnsureProcessingAsync(order.Id, cancellationToken);
-        // One call for both numbers: the amount is still the PERSISTED order total and nothing
-        // else, and the fee is a share of that same amount. See ICheckoutChargeResolver.
-        var (amount, applicationFeeMinor) = _charge.Resolve(order.Total);
         var existing = await _context.OrderCheckoutSessions
             .Where(s => s.OrderId == order.Id)
             .OrderByDescending(s => s.CreatedAt)
             .ToListAsync(cancellationToken);
+        var acceptedCurrency = await OrderCheckoutCurrencyEvidence.ResolveAsync(
+            _context, order, existing, cancellationToken);
+        // Refuse accepted/provider currency mismatch before session reuse, tender reactivation or provider calls.
+        var (amount, applicationFeeMinor) = _charge.Resolve(order.PayableTotal, acceptedCurrency);
         var reused = await _reuse.TryReuseAsync(existing, amount, cancellationToken);
         if (reused is not null) return ApiResponse<CheckoutSessionDto>.SuccessWithData(reused);
-        // Retirement uses set-based writes and may have bumped this tracked aggregate's version.
-        // Reload before adding the replacement session so its aggregate touch cannot write stale state.
+        // Retirement may bump the aggregate version; reload before touching the replacement session.
         await _context.Entry(order).ReloadAsync(cancellationToken);
         OnlinePaymentEligibility.EnsurePayable(order);
         await _intentGuard.ReactivateLatestFailedAsync(order.Id, cancellationToken);

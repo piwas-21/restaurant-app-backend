@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
+using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -50,9 +51,14 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
     }
 
     public async Task<StaffCounterOrderBuild> BuildAsync(
-        StaffCounterOrderRequest request, bool releaseToKitchen, CancellationToken cancellationToken)
+        StaffCounterOrderRequest request, bool releaseToKitchen, CancellationToken cancellationToken,
+        string? requiredAcceptedCurrency = null)
     {
         var target = await ResolveTableTargetAsync(request, cancellationToken);
+        var acceptedCurrency = target?.Currency
+            ?? await OrderNativeAcceptedCurrency.ResolveForAcceptanceAsync(
+                _context, frozenVisitCurrency: null, cancellationToken);
+        EnsureRequiredCurrency(requiredAcceptedCurrency, acceptedCurrency);
         var customer = await ResolveCustomerAsync(request.EffectiveCustomerUserId, cancellationToken);
         if (request.PointsToRedeem is > 0 && customer is null)
         {
@@ -86,7 +92,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
 
         var itemsTotal = order.Items.Sum(item => item.ItemTotal);
         await _pricing.ApplyAsync(order, itemsTotal, legacy, customerId, cancellationToken);
-        await _fidelity.CalculatePointsToEarnAsync(order, itemsTotal, customerId, cancellationToken);
+        var earning = await _fidelity.CalculatePointsToEarnAsync(order, itemsTotal, customerId, cancellationToken);
         _payments.UpdatePaymentSummary(order);
 
         var initialStatus = order.Status;
@@ -106,7 +112,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
             CreatedBy = draft.AuditId
         });
 
-        return new StaffCounterOrderBuild(order, legacy, customerId);
+        return new StaffCounterOrderBuild(order, legacy, customerId, acceptedCurrency, earning);
     }
 
     private async Task<TableOrderTarget?> ResolveTableTargetAsync(
@@ -168,7 +174,20 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
                 ErrorCodes.TableServiceSessionAmbiguous);
         }
 
-        return new TableOrderTarget(table, session.Id);
+        var acceptedCurrency = await OrderNativeAcceptedCurrency.ResolveForAcceptanceAsync(
+            _context, session.Currency, cancellationToken);
+        return new TableOrderTarget(table, session.Id, acceptedCurrency);
+    }
+
+    private static void EnsureRequiredCurrency(string? requiredCurrency, string? acceptedCurrency)
+    {
+        var required = CurrencyCode.Normalize(requiredCurrency);
+        var accepted = CurrencyCode.Normalize(acceptedCurrency);
+        if (required is not null && !string.Equals(required, accepted, StringComparison.Ordinal))
+        {
+            throw new ConflictException(
+                "The source order currency differs from the live catalogue currency. Review the order before adding items.");
+        }
     }
 
     private static void AssignTableIdentity(Order order, TableOrderTarget? target)
@@ -236,7 +255,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
             Payments = [],
         };
 
-    private sealed record TableOrderTarget(TableIdentity Identity, Guid? ServiceSessionId);
+    private sealed record TableOrderTarget(TableIdentity Identity, Guid? ServiceSessionId, string? Currency);
 
     private static void ApplyReleaseState(Order order, bool releaseToKitchen, OrderDraft draft)
     {

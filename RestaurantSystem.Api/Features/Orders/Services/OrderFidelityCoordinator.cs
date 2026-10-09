@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Features.FidelityPoints.Models;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -14,7 +15,7 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// <inheritdoc />
 public class OrderFidelityCoordinator : IOrderFidelityCoordinator
 {
-    private readonly IFidelityPointsService _fidelityPointsService;
+    private readonly IOrderNativeFidelityOperations _fidelityPointsService;
     private readonly IOrderPricingService _pricingService;
     private readonly IOrderPaymentBuilder _paymentBuilder;
     private readonly ApplicationDbContext _context;
@@ -23,7 +24,7 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
     private readonly FidelitySettings _settings;
 
     public OrderFidelityCoordinator(
-        IFidelityPointsService fidelityPointsService,
+        IOrderNativeFidelityOperations fidelityPointsService,
         IOrderPricingService pricingService,
         IOrderPaymentBuilder paymentBuilder,
         ApplicationDbContext context,
@@ -40,19 +41,29 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
         _settings = settings.Value;
     }
 
-    public async Task CalculatePointsToEarnAsync(
+    public async Task<OrderBillingEarningEvaluation?> CalculatePointsToEarnAsync(
         Order order, decimal itemsTotal, Guid? userId, CancellationToken cancellationToken)
     {
-        if (!userId.HasValue || !_modules.IsEnabled(ModuleIds.Loyalty))
+        if (!userId.HasValue)
         {
-            return;
+            order.FidelityPointsEarned = 0;
+            return KnownNoAward(OrderBillingEarningDisposition.NoCustomerOwnerAtAcceptance);
+        }
+        if (!_modules.IsEnabled(ModuleIds.Loyalty))
+        {
+            order.FidelityPointsEarned = 0;
+            return KnownNoAward(OrderBillingEarningDisposition.LoyaltyModuleDisabledAtAcceptance);
         }
 
-        var pointsToEarn = await _fidelityPointsService.CalculatePointsForOrderAsync(itemsTotal, cancellationToken);
-        order.FidelityPointsEarned = pointsToEarn;
+        var evaluation = await _fidelityPointsService.EvaluateOrderAsync(itemsTotal, cancellationToken);
+        order.FidelityPointsEarned = evaluation.CandidatePoints ?? 0;
 
-        _logger.LogInformation("Order will earn {Points} fidelity points", pointsToEarn);
+        _logger.LogInformation("Order will earn {Points} fidelity points", order.FidelityPointsEarned);
+        return evaluation;
     }
+
+    private static OrderBillingEarningEvaluation KnownNoAward(OrderBillingEarningDisposition disposition) =>
+        new(null, null, null, null, disposition);
 
     public async Task PreviewRedemptionAsync(
         Order order, int? pointsToRedeem, Guid? userId, CancellationToken cancellationToken)
@@ -76,13 +87,13 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
         _paymentBuilder.UpdatePaymentSummary(order);
     }
 
-    public async Task RedeemAsync(
+    public async Task<OrderBillingRedemptionEvidence?> RedeemAsync(
         Order order, int? pointsToRedeem, Guid? userId, CancellationToken cancellationToken,
         bool failOnError = false)
     {
         if (!userId.HasValue || !pointsToRedeem.HasValue || pointsToRedeem.Value <= 0)
         {
-            return;
+            return null;
         }
 
         EnsureLoyaltyEnabled();
@@ -90,7 +101,7 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
         try
         {
             var expectedDiscount = ValidateDiscountFitsOrder(order, pointsToRedeem.Value);
-            var (_, discountAmount) = await _fidelityPointsService.RedeemPointsAsync(
+            var (transaction, discountAmount) = await _fidelityPointsService.RedeemPointsAsync(
                 userId.Value,
                 order.Id, // Order must exist in DB by now (caller saves first to avoid FK violation).
                 pointsToRedeem.Value,
@@ -116,23 +127,22 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
                 pointsToRedeem.Value, discountAmount, order.OrderNumber);
 
             await _context.SaveChangesAsync(cancellationToken);
+            return new OrderBillingRedemptionEvidence(
+                transaction.Id, transaction.UserId
+                    ?? throw new ConflictException("The new redemption has no authenticated owner."),
+                transaction.OrderId, transaction.TransactionType,
+                transaction.Points, discountAmount, transaction.OrderTotal, transaction.CreatedAt);
         }
-        catch (Exception ex)
+        catch (InsufficientPointsException ex) when (!failOnError)
         {
-            // Clear the transient aggregate even for strict callers. Staff creation wraps the
-            // ledger write, order update, and operation record in one transaction, so rethrowing
-            // rolls all three back. Guest checkout remains best-effort; if its separate order save
-            // fails after the ledger transaction commits, support may need to reconcile the debit.
             order.FidelityPointsRedeemed = 0;
             order.FidelityPointsDiscount = 0;
             _pricingService.RecalculateTotal(order);
             _paymentBuilder.UpdatePaymentSummary(order);
 
-            _logger.LogError(ex, "Failed to redeem fidelity points for order {OrderNumber}", order.OrderNumber);
-            if (failOnError)
-            {
-                throw;
-            }
+            _logger.LogWarning(ex, "Insufficient fidelity balance for order {OrderNumber}; no debit was written",
+                order.OrderNumber);
+            return null;
         }
     }
 
@@ -168,36 +178,21 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
     }
 
     public async Task AwardEarnedPointsAsync(
-        Order order, Guid? userId, CancellationToken cancellationToken)
+        Order order, CancellationToken cancellationToken)
     {
-        if (!userId.HasValue || order.FidelityPointsEarned <= 0)
-        {
-            return;
-        }
-
-        // The gate is the ORDER's PaymentStatus, not its tenders'. Every tender created with an
-        // order is Pending, and since S0b order.Total is computed server-side from the order's own
-        // items — so a caller can no longer declare `basketTotal: 0`, land RemainingAmount at 0,
-        // and have points awarded for an order nobody paid for. Both halves are load-bearing:
-        // do not weaken this gate, and do not let a client-supplied total back into pricing.
-        if (order.PaymentStatus != PaymentStatus.Completed &&
-            order.PaymentStatus != PaymentStatus.Overpaid)
-        {
-            return;
-        }
-
         try
         {
-            await _fidelityPointsService.AwardPointsAsync(
-                userId.Value,
-                order.Id,
-                order.FidelityPointsEarned,
-                order.SubTotal,
-                cancellationToken);
-
-            _logger.LogInformation(
-                "Awarded {Points} fidelity points to user {UserId} for order {OrderNumber}",
-                order.FidelityPointsEarned, userId, order.OrderNumber);
+            var result = await _fidelityPointsService.AwardAcceptedOrderAsync(order.Id, cancellationToken);
+            if (result.Disposition == FidelityPointsAwardDisposition.Awarded)
+                _logger.LogInformation("Awarded {Points} fidelity points for order {OrderNumber}",
+                    result.AppliedPoints, order.OrderNumber);
+        }
+        catch (Exception ex)
+            when (PostgresConcurrencyAborts.IsMatch(ex, out _) && _context.Database.CurrentTransaction is not null)
+        {
+            // Do not swallow a PostgreSQL abort inside the order-creation transaction. The caller
+            // must see the failed transaction rather than report success for rows that rolled back.
+            throw;
         }
         catch (Exception ex)
         {

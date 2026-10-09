@@ -89,9 +89,7 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
             return ApiResponse<OrderDto>.Failure("Order is already cancelled");
         }
 
-        await OrderAmendmentFinancialGuard.AssertNoPendingSourceResolutionAsync(
-            _context, order.Id, cancellationToken);
-        await AccountPaymentLedgerGuard.RequireOrderCorrectionAsync(_context, order.Id, cancellationToken);
+        await AccountPaymentLedgerGuard.RequireOrderCancellationAsync(_context, order.Id, cancellationToken);
 
         // Computed BEFORE the status-history row is built, because the row's Notes carry it: the
         // cancellation and the money still owed on it are one audit entry, not two.

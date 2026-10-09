@@ -98,7 +98,8 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
     {
         await using var context = fixture.CreateContext();
         var currentUser = CurrentUser(_actorId, UserRole.Admin, authenticated, isApiToken);
-        var reader = NewReader(context, new AccountPaymentActorResolver(currentUser), Features(enabled: true));
+        var reader = NewReader(context, new AccountPaymentActorResolver(currentUser,
+            Features(enabled: true), Modules()), Features(enabled: true));
 
         var read = () => reader.GetAsync(Guid.NewGuid(), CancellationToken.None);
         await read.Should().ThrowAsync<ForbiddenException>();
@@ -252,13 +253,13 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
         var currentUser = new Mock<ICurrentUserService>();
         currentUser.Setup(value => value.GetAuditIdentifier()).Returns(_actorId.ToString());
         var fidelity = new Mock<IOrderFidelityCoordinator>();
-        fidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(),
+        fidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(),
             It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = new AccountPaymentCaptureService(context, ActorResolver(_actorId),
             new AccountPaymentCaptureWriter(context, currentUser.Object, TimeProvider.System),
             fidelity.Object, TimeProvider.System, NullLogger<AccountPaymentCaptureService>.Instance);
         return await service.CaptureManualAsync(sessionId, operationId,
-            new CaptureAccountPaymentRequest { ExpectedVersion = expectedVersion }, CancellationToken.None);
+            new CaptureAccountPaymentRequest { ExpectedVersion = expectedVersion, ReceivedMinor = 335 }, CancellationToken.None);
     }
 
     private static CreateAccountPaymentQuoteRequest EqualQuote(
@@ -358,7 +359,14 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
     }
 
     private AccountPaymentActorResolver ActorResolver(Guid actorId) => new(CurrentUser(actorId,
-        UserRole.Cashier, authenticated: true, isApiToken: false));
+        UserRole.Cashier, authenticated: true, isApiToken: false), Features(enabled: true), Modules());
+
+    private static ITenantModules Modules()
+    {
+        var modules = new Mock<ITenantModules>();
+        modules.Setup(value => value.IsEnabled(It.IsAny<string>())).Returns(true);
+        return modules.Object;
+    }
 
     private static ICurrentUserService CurrentUser(
         Guid actorId, UserRole role, bool authenticated, bool isApiToken)

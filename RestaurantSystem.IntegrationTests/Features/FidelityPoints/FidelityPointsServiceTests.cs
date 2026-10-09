@@ -7,11 +7,14 @@ using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
+using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Features.FidelityPoints.Models;
 
 namespace RestaurantSystem.IntegrationTests.Features.FidelityPoints;
 
 [Collection("Database Lane 3")]
-public class FidelityPointsServiceTests : IAsyncLifetime
+public partial class FidelityPointsServiceTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;
     private ApplicationDbContext _context = null!;
@@ -19,6 +22,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     private Mock<IPointEarningRuleService> _ruleServiceMock = null!;
     private Mock<ICurrentUserService> _currentUserServiceMock = null!;
     private Guid _testUserId;
+    private string _testAuditIdentifier = string.Empty;
 
     public FidelityPointsServiceTests(DatabaseFixture fixture)
     {
@@ -33,10 +37,11 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         _ruleServiceMock = new Mock<IPointEarningRuleService>();
         _currentUserServiceMock = new Mock<ICurrentUserService>();
         _testUserId = Guid.NewGuid();
+        _testAuditIdentifier = Guid.NewGuid().ToString();
 
         _currentUserServiceMock.Setup(x => x.UserId).Returns(_testUserId);
         // Default-interface methods aren't invoked by Moq; stub explicitly.
-        _currentUserServiceMock.Setup(x => x.GetAuditIdentifier()).Returns(_testUserId.ToString());
+        _currentUserServiceMock.Setup(x => x.GetAuditIdentifier()).Returns(_testAuditIdentifier);
 
         _service = new FidelityPointsService(
             _context,
@@ -61,6 +66,58 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     {
         var orderId = Guid.NewGuid();
         await TestOrderSeeder.SeedOrderAsync(_context, orderId, userId);
+        return orderId;
+    }
+
+    private async Task<Guid> SeedAwardOrderAsync(
+        Guid userId,
+        int? candidatePoints,
+        decimal rootTotal,
+        int quantity = 1,
+        bool includeSnapshot = true,
+        bool evaluated = true,
+        bool matchedZeroPointRule = false)
+    {
+        var orderId = Guid.NewGuid();
+        await TestOrderSeeder.SeedOrderAsync(_context, orderId, userId);
+        var order = await _context.Orders.SingleAsync(value => value.Id == orderId);
+        order.Status = OrderStatus.Completed;
+        order.PaymentStatus = PaymentStatus.Completed;
+        order.SubTotal = rootTotal;
+        order.Total = rootTotal;
+        order.FidelityPointsEarned = candidatePoints ?? 0;
+        var item = new OrderItem
+        {
+            Id = Guid.NewGuid(),
+            OrderId = orderId,
+            ProductName = "Accepted award fixture",
+            Quantity = quantity,
+            UnitPrice = rootTotal / quantity,
+            ItemTotal = rootTotal,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "AwardSnapshotTest"
+        };
+        order.Items.Add(item);
+        _context.OrderItems.Add(item);
+        await _context.SaveChangesAsync();
+
+        if (!includeSnapshot)
+            return orderId;
+
+        var rule = candidatePoints is > 0 || matchedZeroPointRule
+            ? new OrderBillingEarningRuleEvidence(Guid.NewGuid(), "Frozen test rule", 0m,
+                null, candidatePoints ?? 0, 1)
+            : null;
+        var evaluation = evaluated
+            ? new OrderBillingEarningEvaluation(
+                candidatePoints, "fixed-priority-v1", new string('a', 64), rule)
+            : new OrderBillingEarningEvaluation(null, null, null, null);
+        var built = OrderBillingSnapshotFactory.Build(order, "CHF", evaluation, null,
+            OrderBillingSnapshotLimits.AbsoluteMaximumUnitRows);
+        _context.OrderBillingSnapshots.Add(built.Header);
+        _context.OrderBillingSnapshotUnits.AddRange(built.Units);
+        _context.OrderBillingSnapshotOwnerLinks.AddRange(built.OwnerLinks);
+        await _context.SaveChangesAsync();
         return orderId;
     }
 
@@ -116,19 +173,23 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     {
         // Arrange
         var userId = _testUserId;
-        var orderId = await SeedOrderAsync(userId);
         var points = 100;
         var orderTotal = 50m;
+        var orderId = await SeedAwardOrderAsync(userId, points, orderTotal);
 
         // Act
-        var transaction = await _service.AwardPointsAsync(userId, orderId, points, orderTotal);
+        var result = await _service.AwardAcceptedOrderAsync(orderId);
+        var transaction = await _context.FidelityPointsTransactions.SingleAsync(value =>
+            value.OrderId == orderId && value.TransactionType == TransactionType.Earned);
 
         // Assert
         Assert.NotNull(transaction);
+        Assert.Equal(FidelityPointsAwardDisposition.Awarded, result.Disposition);
         Assert.Equal(userId, transaction.UserId);
         Assert.Equal(orderId, transaction.OrderId);
         Assert.Equal(points, transaction.Points);
         Assert.Equal(TransactionType.Earned, transaction.TransactionType);
+        Assert.Equal(_testAuditIdentifier, transaction.CreatedBy);
 
         // Verify balance was created/updated
         var balance = await _context.FidelityPointBalances
@@ -138,6 +199,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         Assert.Equal(points, balance.CurrentPoints);
         Assert.Equal(points, balance.TotalEarnedPoints);
         Assert.Equal(0, balance.TotalRedeemedPoints);
+        Assert.Equal(_testAuditIdentifier, balance.CreatedBy);
     }
 
     [Fact]
@@ -145,14 +207,14 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     {
         // Arrange
         var userId = _testUserId;
-        var orderId1 = await SeedOrderAsync(userId);
-        var orderId2 = await SeedOrderAsync(userId);
         var points1 = 100;
         var points2 = 50;
+        var orderId1 = await SeedAwardOrderAsync(userId, points1, 50m);
+        var orderId2 = await SeedAwardOrderAsync(userId, points2, 25m);
 
         // Act
-        await _service.AwardPointsAsync(userId, orderId1, points1, 50m);
-        await _service.AwardPointsAsync(userId, orderId2, points2, 25m);
+        await _service.AwardAcceptedOrderAsync(orderId1);
+        await _service.AwardAcceptedOrderAsync(orderId2);
 
         // Assert
         var balance = await _context.FidelityPointBalances
@@ -173,7 +235,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         var pointsToRedeem = 100;
 
         // First award points
-        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), availablePoints, 100m);
+        await _service.AwardAcceptedOrderAsync(await SeedAwardOrderAsync(userId, availablePoints, 100m));
 
         // Act
         var result = await _service.RedeemPointsAsync(userId, orderId, pointsToRedeem);
@@ -183,6 +245,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         Assert.Equal(-pointsToRedeem, result.Transaction.Points);
         Assert.Equal(TransactionType.Redeemed, result.Transaction.TransactionType);
         Assert.Equal(1m, result.DiscountAmount); // 100 points = $1
+        Assert.Equal(_testAuditIdentifier, result.Transaction.CreatedBy);
 
         // Verify balance
         var balance = await _context.FidelityPointBalances
@@ -191,6 +254,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         Assert.NotNull(balance);
         Assert.Equal(availablePoints - pointsToRedeem, balance.CurrentPoints);
         Assert.Equal(pointsToRedeem, balance.TotalRedeemedPoints);
+        Assert.Equal(_testAuditIdentifier, balance.UpdatedBy);
     }
 
     [Fact]
@@ -203,12 +267,15 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         var pointsToRedeem = 100;
 
         // First award points
-        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), availablePoints, 25m);
+        await _service.AwardAcceptedOrderAsync(await SeedAwardOrderAsync(userId, availablePoints, 25m));
 
-        // Act & Assert — service surfaces insufficient-points as BadRequestException
-        await Assert.ThrowsAsync<RestaurantSystem.Api.Common.Exceptions.BadRequestException>(
+        // The dedicated pre-debit refusal is the only failure native guest acceptance may suppress.
+        await Assert.ThrowsAsync<RestaurantSystem.Api.Common.Exceptions.InsufficientPointsException>(
             () => _service.RedeemPointsAsync(userId, orderId, pointsToRedeem)
         );
+        Assert.Equal(availablePoints, (await _service.GetUserBalanceAsync(userId))!.CurrentPoints);
+        Assert.False(await _context.FidelityPointsTransactions.AnyAsync(value =>
+            value.OrderId == orderId && value.TransactionType == TransactionType.Redeemed));
     }
 
     [Fact]
@@ -218,7 +285,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         var userId = _testUserId;
         var points = 150;
 
-        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), points, 75m);
+        await _service.AwardAcceptedOrderAsync(await SeedAwardOrderAsync(userId, points, 75m));
 
         // Act
         var balance = await _service.GetUserBalanceAsync(userId);
@@ -235,9 +302,9 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         // Arrange
         var userId = _testUserId;
 
-        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), 100, 50m);
+        await _service.AwardAcceptedOrderAsync(await SeedAwardOrderAsync(userId, 100, 50m));
         await Task.Delay(100); // Ensure different timestamps
-        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), 50, 25m);
+        await _service.AwardAcceptedOrderAsync(await SeedAwardOrderAsync(userId, 50, 25m));
         await Task.Delay(100);
         await _service.RedeemPointsAsync(userId, await SeedOrderAsync(userId), 30);
 
@@ -277,7 +344,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         var initialPoints = 30;
         var negativeAdjustment = -50;
 
-        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), initialPoints, 15m);
+        await _service.AwardAcceptedOrderAsync(await SeedAwardOrderAsync(userId, initialPoints, 15m));
 
         // Act
         await _service.AdjustPointsAsync(userId, negativeAdjustment, "Correction");
@@ -328,11 +395,11 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         await TestUserSeeder.SeedUserAsync(_context, user2);
 
         // User 1: Earn 200, redeem 50
-        await _service.AwardPointsAsync(user1, await SeedOrderAsync(user1), 200, 100m);
+        await _service.AwardAcceptedOrderAsync(await SeedAwardOrderAsync(user1, 200, 100m));
         await _service.RedeemPointsAsync(user1, await SeedOrderAsync(user1), 50);
 
         // User 2: Earn 300
-        await _service.AwardPointsAsync(user2, await SeedOrderAsync(user2), 300, 150m);
+        await _service.AwardAcceptedOrderAsync(await SeedAwardOrderAsync(user2, 300, 150m));
 
         // Act
         var analytics = await _service.GetSystemAnalyticsAsync();

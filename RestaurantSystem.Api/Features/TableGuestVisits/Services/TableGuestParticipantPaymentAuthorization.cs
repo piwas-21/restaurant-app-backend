@@ -64,7 +64,8 @@ public sealed class TableGuestParticipantPaymentAuthorization(
     private static AccountPaymentActor ToActor(TableGuestParticipant participant) => new(
         participant.Id,
         AccountPaymentActorKind.GuestParticipant,
-        $"GuestParticipant:{participant.Id:N}");
+        $"GuestParticipant:{participant.Id:N}",
+        null);
 
     private static NotFoundException Unavailable() => new(UnavailableMessage);
 }

@@ -66,7 +66,11 @@ public sealed class AccountPaymentCancellationTests(DatabaseFixture fixture) : I
         var (orderId, visitId) = await SeedAsync(entrance, state);
         await using var context = DatabaseFixture.CreateContext();
         var action = () => MutateAsync(context, orderId, entrance);
-        await action.Should().ThrowAsync<ConflictException>().WithMessage("*reserved or allocated*");
+        var expectedMessage = state == AccountPaymentState.Captured
+            && (entrance is "cancel" or "status")
+                ? "*matching tender evidence*"
+                : "*reserved or allocated*";
+        await action.Should().ThrowAsync<ConflictException>().WithMessage(expectedMessage);
         await using var read = DatabaseFixture.CreateContext();
         var order = await read.Orders.SingleAsync(value => value.Id == orderId);
         order.Status.Should().Be(entrance == "delay" ? OrderStatus.PendingApproval : OrderStatus.Pending);
@@ -93,6 +97,76 @@ public sealed class AccountPaymentCancellationTests(DatabaseFixture fixture) : I
         order.IsDeleted.Should().Be(entrance == "delete");
         if (entrance != "delete") order.Status.Should().Be(OrderStatus.Cancelled);
         (await read.TableServiceSessions.SingleAsync(value => value.Id == visitId)).AccountRevision.Should().Be(2);
+    }
+
+    [Theory]
+    [InlineData("cancel")]
+    [InlineData("status")]
+    public async Task LegacyVisitWithoutCapturedAllocationsCanCancelWithNullCurrencyAndRefundedManualTender(
+        string entrance)
+    {
+        var orderId = Guid.NewGuid();
+        var visitId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        await using (var seed = DatabaseFixture.CreateContext())
+        {
+            var now = DateTime.UtcNow;
+            seed.TableServiceSessions.Add(new TableServiceSession
+            {
+                Id = visitId,
+                TableNumber = 985,
+                Currency = null,
+                AccountRevision = 1,
+                OpenedAt = now,
+                CreatedBy = "test"
+            });
+            seed.Orders.Add(new Order
+            {
+                Id = orderId,
+                OrderNumber = $"LEGACY-{orderId:N}"[..16],
+                ServiceSessionId = visitId,
+                Type = OrderType.DineIn,
+                Status = OrderStatus.Pending,
+                PaymentStatus = PaymentStatus.Refunded,
+                Total = 10m,
+                TotalPaid = 10m,
+                RemainingAmount = 0m,
+                OrderDate = now,
+                CreatedBy = "test",
+                Payments =
+                [
+                    new OrderPayment
+                    {
+                        Id = paymentId,
+                        PaymentMethod = PaymentMethod.Cash,
+                        Amount = 10m,
+                        Currency = null,
+                        Status = PaymentStatus.Refunded,
+                        IsRefunded = true,
+                        RefundedAmount = 10m,
+                        PaymentDate = now,
+                        RefundDate = now,
+                        RefundReason = "Earlier manual refund",
+                        CreatedAt = now,
+                        CreatedBy = "test"
+                    }
+                ]
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var context = DatabaseFixture.CreateContext())
+            await MutateAsync(context, orderId, entrance);
+
+        await using var read = DatabaseFixture.CreateContext();
+        var order = await read.Orders.Include(value => value.Payments)
+            .SingleAsync(value => value.Id == orderId);
+        order.Status.Should().Be(OrderStatus.Cancelled);
+        order.Payments.Should().ContainSingle(value => value.Id == paymentId
+            && value.Status == PaymentStatus.Refunded && value.IsRefunded
+            && value.RefundedAmount == 10m && value.RefundReason == "Earlier manual refund");
+        (await read.TableServiceSessions.SingleAsync(value => value.Id == visitId))
+            .AccountRevision.Should().Be(2);
     }
 
     private static async Task MutateAsync(ApplicationDbContext context, Guid orderId, string entrance)

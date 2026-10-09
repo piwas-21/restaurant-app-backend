@@ -12,6 +12,7 @@ using RestaurantSystem.IntegrationTests.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Moq;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
@@ -154,6 +155,8 @@ public sealed class OrderAmendmentIntegrationTests(DatabaseFixture fixture) : In
         await using (var quoted = DatabaseFixture.CreateContext())
         {
             (await quoted.Orders.CountAsync()).Should().Be(1, "quote is a read-only preview");
+            (await quoted.OrderBillingSnapshots.CountAsync()).Should().Be(0,
+                "a quote does not persist the earning evaluation as an accepted snapshot");
             (await quoted.Set<OrderAmendment>().SingleAsync()).State.Should().Be(OrderAmendmentState.Quoted);
             (await quoted.OrderOperationalNotes.CountAsync()).Should().Be(0);
         }
@@ -198,6 +201,9 @@ public sealed class OrderAmendmentIntegrationTests(DatabaseFixture fixture) : In
         var committedAmendment = await verify.Set<OrderAmendment>().SingleAsync();
         committedAmendment.CommitResultJson.Should().NotBeNullOrWhiteSpace();
         (await verify.Orders.CountAsync()).Should().Be(2, "the retry returns the original supplement");
+        var billing = await verify.OrderBillingSnapshots.AsNoTracking()
+            .SingleAsync(snapshot => snapshot.OrderId == first.Data!.SupplementOrderId);
+        billing.Currency.Should().Be("CHF");
         (await verify.OrderOperationalNotes.CountAsync(note => note.OrderId == _sourceOrderId)).Should().Be(1);
         (await verify.Orders.SingleAsync(order => order.Id == _sourceOrderId))
             .Status.Should().Be(OrderStatus.Confirmed, "amendments preserve source lifecycle state");
@@ -218,6 +224,268 @@ public sealed class OrderAmendmentIntegrationTests(DatabaseFixture fixture) : In
         replaySnapshotJson.Should().NotContain("private-amendment-customer@example.test");
         replaySnapshotJson.Should().NotContain("Amendment customer");
         replaySnapshotJson.Should().NotContain("guestStatusToken");
+    }
+
+    [Fact]
+    public async Task Addition_quote_holds_when_live_catalogue_currency_drifted_from_accepted_source()
+    {
+        AuthenticateAsAdmin();
+        await SeedAcceptedSourceSnapshotAsync("CHF");
+        string? originalCurrency;
+        await using (var configure = DatabaseFixture.CreateContext())
+        {
+            var tenant = await configure.RestaurantInfo.SingleAsync();
+            originalCurrency = tenant.Currency;
+            tenant.Currency = "EUR";
+            await configure.SaveChangesAsync();
+        }
+
+        try
+        {
+            var response = await QuoteAsync(new OrderAmendmentQuoteRequest
+            {
+                ExpectedOrderVersion = await ReadSourceVersionAsync(),
+                Additions = [new CreateOrderItemDto { ProductId = _productId, Quantity = 1 }]
+            }, HttpStatusCode.Conflict);
+
+            response.Success.Should().BeFalse();
+            await using var verify = DatabaseFixture.CreateContext();
+            (await verify.Orders.CountAsync()).Should().Be(1);
+            (await verify.Set<OrderAmendment>().CountAsync()).Should().Be(0,
+                "the currency hold precedes supplement pricing and quote persistence");
+        }
+        finally
+        {
+            await using var restore = DatabaseFixture.CreateContext();
+            var tenant = await restore.RestaurantInfo.SingleAsync();
+            tenant.Currency = originalCurrency;
+            await restore.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Addition_quote_holds_when_in_flight_legacy_checkout_currency_disagrees_with_live_catalogue()
+    {
+        AuthenticateAsAdmin();
+        await SeedLegacyCheckoutCurrencyEvidenceAsync("CHF");
+        var originalCurrency = await SetTenantCurrencyAsync("EUR");
+
+        try
+        {
+            var response = await QuoteAsync(new OrderAmendmentQuoteRequest
+            {
+                ExpectedOrderVersion = await ReadSourceVersionAsync(),
+                Additions = [new CreateOrderItemDto { ProductId = _productId, Quantity = 1 }]
+            }, HttpStatusCode.Conflict);
+
+            response.Success.Should().BeFalse();
+            await using var verify = DatabaseFixture.CreateContext();
+            (await verify.Orders.CountAsync()).Should().Be(1);
+            (await verify.OrderBillingSnapshots.CountAsync()).Should().Be(0);
+            (await verify.Set<OrderAmendment>().CountAsync()).Should().Be(0,
+                "a prior CHF checkout attempt is accepted-currency evidence before supplement pricing");
+            (await verify.OrderCheckoutSessions.CountAsync()).Should().Be(1);
+            var payment = await verify.OrderPayments.SingleAsync();
+            payment.Status.Should().Be(PaymentStatus.Processing);
+            payment.Currency.Should().BeNull();
+        }
+        finally
+        {
+            await RestoreTenantCurrencyAsync(originalCurrency);
+        }
+    }
+
+    [Fact]
+    public async Task Addition_quote_accepts_matching_currency_from_a_legacy_checkout_attempt()
+    {
+        AuthenticateAsAdmin();
+        await SeedLegacyCheckoutCurrencyEvidenceAsync("CHF");
+        var originalCurrency = await SetTenantCurrencyAsync("CHF");
+
+        try
+        {
+            var response = await QuoteAsync(new OrderAmendmentQuoteRequest
+            {
+                ExpectedOrderVersion = await ReadSourceVersionAsync(),
+                Additions = [new CreateOrderItemDto { ProductId = _productId, Quantity = 1 }]
+            });
+
+            response.Success.Should().BeTrue();
+            response.Data!.FinancialPreview.Currency.Should().Be("CHF");
+            await using var verify = DatabaseFixture.CreateContext();
+            (await verify.Orders.CountAsync()).Should().Be(1, "a quote does not persist its supplement");
+            (await verify.OrderBillingSnapshots.CountAsync()).Should().Be(0);
+            (await verify.Set<OrderAmendment>().SingleAsync()).State.Should().Be(OrderAmendmentState.Quoted);
+        }
+        finally
+        {
+            await RestoreTenantCurrencyAsync(originalCurrency);
+        }
+    }
+
+    [Fact]
+    public async Task Addition_commit_holds_when_legacy_checkout_currency_drifts_after_quote()
+    {
+        AuthenticateAsAdmin();
+        await SeedLegacyCheckoutCurrencyEvidenceAsync("CHF");
+        var originalCurrency = await SetTenantCurrencyAsync("CHF");
+        ApiResponse<OrderAmendmentQuoteDto> quote;
+        try
+        {
+            quote = await QuoteAsync(new OrderAmendmentQuoteRequest
+            {
+                ExpectedOrderVersion = await ReadSourceVersionAsync(),
+                Additions = [new CreateOrderItemDto { ProductId = _productId, Quantity = 1 }]
+            });
+            quote.Success.Should().BeTrue();
+
+            await SetTenantCurrencyAsync("EUR");
+            var response = await CommitAsync(new OrderAmendmentCommitRequest
+            {
+                AmendmentId = quote.Data!.AmendmentId,
+                ClientOperationId = Guid.NewGuid(),
+                ExpectedOrderVersion = quote.Data.ExpectedOrderVersion,
+                ExpectedAccountRevision = quote.Data.ExpectedAccountRevision,
+                ReviewAcknowledged = true
+            }, HttpStatusCode.Conflict);
+
+            response.Success.Should().BeFalse();
+            await using var verify = DatabaseFixture.CreateContext();
+            (await verify.Orders.CountAsync()).Should().Be(1);
+            (await verify.OrderBillingSnapshots.CountAsync()).Should().Be(0,
+                "currency drift must be rejected before a supplement snapshot is written");
+            (await verify.OrderCheckoutSessions.CountAsync()).Should().Be(1);
+            var amendment = await verify.Set<OrderAmendment>().SingleAsync();
+            amendment.State.Should().Be(OrderAmendmentState.Quoted);
+            amendment.CommitResultJson.Should().BeNull();
+            (await verify.OrderOperationalNotes.CountAsync()).Should().Be(0);
+        }
+        finally
+        {
+            await RestoreTenantCurrencyAsync(originalCurrency);
+        }
+    }
+
+    [Fact]
+    public async Task Addition_quote_holds_when_prior_legacy_checkout_attempts_conflict()
+    {
+        AuthenticateAsAdmin();
+        await SeedLegacyCheckoutCurrencyEvidenceAsync("EUR", "CHF");
+        var originalCurrency = await SetTenantCurrencyAsync("CHF");
+
+        try
+        {
+            var response = await QuoteAsync(new OrderAmendmentQuoteRequest
+            {
+                ExpectedOrderVersion = await ReadSourceVersionAsync(),
+                Additions = [new CreateOrderItemDto { ProductId = _productId, Quantity = 1 }]
+            }, HttpStatusCode.Conflict);
+
+            response.Success.Should().BeFalse();
+            await using var verify = DatabaseFixture.CreateContext();
+            (await verify.OrderCheckoutSessions.CountAsync()).Should().Be(2);
+            (await verify.Orders.CountAsync()).Should().Be(1);
+            (await verify.OrderBillingSnapshots.CountAsync()).Should().Be(0);
+            (await verify.Set<OrderAmendment>().CountAsync()).Should().Be(0,
+                "all persisted attempts must agree; a latest-session winner would hide the earlier currency");
+        }
+        finally
+        {
+            await RestoreTenantCurrencyAsync(originalCurrency);
+        }
+    }
+
+    [Fact]
+    public async Task Removal_financial_preview_keeps_native_snapshot_currency_after_tenant_currency_changes()
+    {
+        await SeedAcceptedSourceSnapshotAsync("CHF");
+        string? originalCurrency;
+        await using (var configure = DatabaseFixture.CreateContext())
+        {
+            var tenant = await configure.RestaurantInfo.SingleAsync();
+            originalCurrency = tenant.Currency;
+            tenant.Currency = "EUR";
+            await configure.SaveChangesAsync();
+        }
+
+        try
+        {
+            await using var context = DatabaseFixture.CreateContext();
+            var source = await context.Orders
+                .Include(value => value.Items)
+                .Include(value => value.Payments)
+                .SingleAsync(value => value.Id == _sourceOrderId);
+            var resolver = Mock.Of<IOrderDisplayCurrencyResolver>(value => value.Resolve(source) == "EUR");
+            var financial = new OrderAmendmentFinancialResolutionService(
+                resolver, Mock.Of<IOrderBillingAdjustmentWriter>(), context);
+            var changes = new[]
+            {
+                new OrderAmendmentChangeSnapshot(_originalItemId, OrderAmendmentChangeKind.Void,
+                    1, 1, true, new OrderItemDto { Id = _originalItemId, ProductName = "Earlier soup", Quantity = 1 }, null)
+            };
+
+            var preview = await financial.PreviewAsync(source, changes, null, CancellationToken.None);
+
+            preview.Currency.Should().Be("CHF", "the immutable native snapshot outranks the later tenant currency");
+            preview.PotentialCreditMinor.Should().Be(500, "the historical CHF line must retain its original amount");
+        }
+        finally
+        {
+            await using var restore = DatabaseFixture.CreateContext();
+            var tenant = await restore.RestaurantInfo.SingleAsync();
+            tenant.Currency = originalCurrency;
+            await restore.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Addition_commit_holds_currency_drift_after_quote_before_persisting_supplement()
+    {
+        AuthenticateAsAdmin();
+        var quote = await QuoteAsync(new OrderAmendmentQuoteRequest
+        {
+            ExpectedOrderVersion = await ReadSourceVersionAsync(),
+            Additions = [new CreateOrderItemDto { ProductId = _productId, Quantity = 1 }]
+        });
+        quote.Success.Should().BeTrue();
+
+        string? originalCurrency;
+        await using (var configure = DatabaseFixture.CreateContext())
+        {
+            var tenant = await configure.RestaurantInfo.SingleAsync();
+            originalCurrency = tenant.Currency;
+            tenant.Currency = "EUR";
+            await configure.SaveChangesAsync();
+        }
+
+        try
+        {
+            var response = await CommitAsync(new OrderAmendmentCommitRequest
+            {
+                AmendmentId = quote.Data!.AmendmentId,
+                ClientOperationId = Guid.NewGuid(),
+                ExpectedOrderVersion = quote.Data.ExpectedOrderVersion,
+                ExpectedAccountRevision = quote.Data.ExpectedAccountRevision,
+                ReviewAcknowledged = true
+            }, HttpStatusCode.Conflict);
+
+            response.Success.Should().BeFalse();
+            await using var verify = DatabaseFixture.CreateContext();
+            (await verify.Orders.CountAsync()).Should().Be(1);
+            (await verify.OrderBillingSnapshots.CountAsync()).Should().Be(0,
+                "the rejected commit must not persist a supplement snapshot");
+            var amendment = await verify.Set<OrderAmendment>().SingleAsync();
+            amendment.State.Should().Be(OrderAmendmentState.Quoted);
+            amendment.CommitResultJson.Should().BeNull();
+            (await verify.OrderOperationalNotes.CountAsync()).Should().Be(0);
+        }
+        finally
+        {
+            await using var restore = DatabaseFixture.CreateContext();
+            var tenant = await restore.RestaurantInfo.SingleAsync();
+            tenant.Currency = originalCurrency;
+            await restore.SaveChangesAsync();
+        }
     }
 
     [Fact]
@@ -643,6 +911,78 @@ public sealed class OrderAmendmentIntegrationTests(DatabaseFixture fixture) : In
         await using var context = DatabaseFixture.CreateContext();
         return await context.Orders.Where(order => order.Id == _sourceOrderId)
             .Select(order => order.Version).SingleAsync();
+    }
+
+    private async Task SeedAcceptedSourceSnapshotAsync(string currency)
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        var source = await context.Orders.Include(value => value.Items)
+            .SingleAsync(value => value.Id == _sourceOrderId);
+        var snapshot = OrderBillingSnapshotFactory.Build(source, currency,
+            earningEvaluation: null, redemption: null, maximumUnitRows: 1_000);
+        context.OrderBillingSnapshots.Add(snapshot.Header);
+        context.OrderBillingSnapshotUnits.AddRange(snapshot.Units);
+        context.OrderBillingSnapshotOwnerLinks.AddRange(snapshot.OwnerLinks);
+        await context.SaveChangesAsync();
+    }
+
+    private async Task SeedLegacyCheckoutCurrencyEvidenceAsync(params string[] currencies)
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        var source = await context.Orders.SingleAsync(value => value.Id == _sourceOrderId);
+        source.Type = OrderType.Takeaway;
+        source.ServiceSessionId = null;
+        context.OrderPayments.Add(new OrderPayment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = source.Id,
+            PaymentMethod = PaymentMethod.OnlinePayment,
+            Amount = 5m,
+            Status = PaymentStatus.Processing,
+            Currency = null,
+            PaymentDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = nameof(OrderAmendmentIntegrationTests)
+        });
+        for (var index = 0; index < currencies.Length; index++)
+        {
+            var attempt = index + 1;
+            var createdAt = DateTime.UtcNow.AddMinutes(attempt - currencies.Length);
+            context.OrderCheckoutSessions.Add(new OrderCheckoutSession
+            {
+                Id = Guid.NewGuid(),
+                OrderId = source.Id,
+                SessionId = $"cs_test_amendment_{Guid.NewGuid():N}",
+                Status = CheckoutSessionStatus.Created,
+                Currency = currencies[index].ToLowerInvariant(),
+                AmountMinor = 500,
+                IdempotencyKey = $"checkout:{source.Id}:{attempt}",
+                ExpiresAt = createdAt.AddMinutes(31),
+                ConnectedAccountId = "acct_test_amendment",
+                CreatedAt = createdAt,
+                CreatedBy = nameof(OrderAmendmentIntegrationTests)
+            });
+        }
+
+        await context.SaveChangesAsync();
+    }
+
+    private async Task<string?> SetTenantCurrencyAsync(string currency)
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        var tenant = await context.RestaurantInfo.SingleAsync();
+        var originalCurrency = tenant.Currency;
+        tenant.Currency = currency;
+        await context.SaveChangesAsync();
+        return originalCurrency;
+    }
+
+    private async Task RestoreTenantCurrencyAsync(string? currency)
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        var tenant = await context.RestaurantInfo.SingleAsync();
+        tenant.Currency = currency;
+        await context.SaveChangesAsync();
     }
 
     private async Task<TableServiceSessionDto> OpenSessionAsync()

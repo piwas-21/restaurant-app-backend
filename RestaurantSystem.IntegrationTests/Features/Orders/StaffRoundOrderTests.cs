@@ -50,6 +50,44 @@ public sealed class StaffRoundOrderTests : IntegrationTestBase
         (await context.OrderRoutingStates.CountAsync()).Should().Be(0);
         (await context.StaffOrderOperations.SingleAsync()).Kind
             .Should().Be(StaffOrderOperationKind.RoundCreate);
+        var snapshot = await context.OrderBillingSnapshots.AsNoTracking().SingleAsync();
+        snapshot.OrderId.Should().Be(firstBody.Data.Id);
+        snapshot.Currency.Should().Be(session.Currency);
+    }
+
+    [Fact]
+    public async Task Round_refuses_when_live_catalogue_currency_differs_from_frozen_visit()
+    {
+        AuthenticateAsRole(UserRole.Server);
+        var session = await OpenSessionAsync();
+        string? tenantCurrency;
+        await using (var configure = DatabaseFixture.CreateContext())
+        {
+            var tenant = await configure.RestaurantInfo.SingleAsync();
+            tenantCurrency = tenant.Currency;
+            tenant.Currency = "EUR";
+            await configure.SaveChangesAsync();
+        }
+
+        try
+        {
+            var response = await PostAsJsonAsync("/api/staff/orders/round", Body(
+                session.ServiceSessionId, Guid.NewGuid(), releaseToKitchen: false));
+
+            response.StatusCode.Should().Be(HttpStatusCode.Conflict,
+                "live catalogue prices cannot be interpreted in a different frozen visit currency");
+            await using var verify = DatabaseFixture.CreateContext();
+            (await verify.Orders.CountAsync()).Should().Be(0);
+            (await verify.StaffOrderOperations.CountAsync()).Should().Be(0);
+            (await verify.OrderBillingSnapshots.CountAsync()).Should().Be(0);
+        }
+        finally
+        {
+            await using var restore = DatabaseFixture.CreateContext();
+            var tenant = await restore.RestaurantInfo.SingleAsync();
+            tenant.Currency = tenantCurrency;
+            await restore.SaveChangesAsync();
+        }
     }
 
     [Theory]

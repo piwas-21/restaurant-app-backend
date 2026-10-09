@@ -1,0 +1,85 @@
+using System.Data;
+using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
+using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
+using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Domain.Common.Enums;
+
+namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
+
+public sealed partial class OrderAmendmentResolutionService
+{
+    public async Task<OrderAmendmentResolutionContextDto> ContextAsync(
+        Guid orderId, Guid amendmentId, CancellationToken cancellationToken)
+    {
+        RequireAdminActor();
+        resolutionPolicy.RequireFeature();
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead, cancellationToken);
+        var source = await LoadSourceAsync(orderId, cancellationToken);
+        var amendment = await context.OrderAmendments.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.Id == amendmentId && value.SourceOrderId == orderId,
+                cancellationToken)
+            ?? throw new NotFoundException("The committed amendment was not found.");
+        if (await context.OrderAmendmentResolutionOperations.AsNoTracking()
+            .AnyAsync(value => value.AmendmentId == amendmentId, cancellationToken))
+            throw new ConflictException("This amendment already has a financial resolution operation.");
+        var sourceAmendments = await EnsureNoPriorUnresolvedResolutionAsync(source, amendmentId, cancellationToken);
+
+        var acceptedCurrency = await OrderNativeAcceptedCurrency.ReadOrderCurrencyEvidenceAsync(
+            context, source, cancellationToken);
+        var money = new AccountMoney(acceptedCurrency
+            ?? source.ServiceSession?.Currency
+            ?? resolutionPolicy.ResolveCurrency(source));
+        var attempts = await ReadAttemptsAsync(source.ServiceSessionId, source.Id, money, cancellationToken);
+        var changes = OrderAmendmentJson.Deserialize<List<OrderAmendmentChangeSnapshot>>(amendment.ChangesJson);
+        var loyaltyEvidence = await OrderAmendmentLoyaltyEvidenceReader.ReadAsync(
+            context, source.Id, cancellationToken);
+        var loyalty = loyaltyEvidence.Transactions;
+        var recalculatedFinancial = await financialResolution.PreviewAsync(
+            source, changes, null, cancellationToken);
+        var retirementRequired = OrderAmendmentEarningRetirementRules.IsEligible(
+            source, amendment, changes, loyaltyEvidence, money, recalculatedFinancial, out _);
+        var loyaltyPlan = retirementRequired
+            ? OrderAmendmentLoyaltyPlan.Empty(money.Currency) with
+            {
+                SnapshotId = loyaltyEvidence.Snapshot!.Id,
+                EarningDisposition = OrderBillingEarningDisposition.Unevaluated
+            }
+            : OrderAmendmentLoyaltyPlanner.Build(source, amendment, changes, money, loyaltyEvidence);
+        var refunds = await AccountAmendmentRefundIntegrity.ReadAsync(context, [source], sourceAmendments,
+            attempts, money, cancellationToken);
+        var credit = OrderAmendmentResolutionPlanner.ValidateSourceForResolution(
+            source, amendment, refunds.AuthorizedRefundMinorByPayment, money, loyalty.Count > 0,
+            loyaltyPlan.SnapshotId.HasValue);
+        var attemptIds = attempts.Select(value => value.Id).ToArray();
+        var journals = attemptIds.Length == 0 ? []
+            : await context.AccountCheckoutJournals.AsNoTracking()
+                .Where(value => attemptIds.Contains(value.AttemptId)).ToListAsync(cancellationToken);
+        var removals = OrderAmendmentRefundScopePlanner.RemovalRanges(changes);
+        OrderAmendmentRefundScopePlanner.EnsureNoPriorRemovalRefund(removals, refunds.Reversals);
+        _ = OrderAmendmentResolutionPlanner.PlanAllocatedRefunds(source, attempts, journals,
+            refunds.Reversals, removals, money, refunds.CashRefundHistoryByAttempt);
+        await OrderBillingCreditConsistency.AssertAsync(context, [source.Id], cancellationToken);
+
+        var allocatedPaymentIds = attempts.SelectMany(value => value.Allocations)
+            .Where(value => value.OrderId == source.Id && value.OrderPaymentId.HasValue)
+            .Select(value => value.OrderPaymentId!.Value).ToHashSet();
+        var candidates = source.Payments.Where(payment => payment.Status.IsCaptured()
+                && payment.PaymentGateway is null
+                && payment.PaymentMethod is PaymentMethod.Cash or PaymentMethod.CreditCard
+                && !allocatedPaymentIds.Contains(payment.Id))
+            .Select(payment => new ManualRefundCandidateDto(payment.Id,
+                payment.PaymentMethod.ToString(), checked(money.ToMinor(payment.Amount)
+                    - refunds.AuthorizedRefundMinorByPayment.GetValueOrDefault(payment.Id))))
+            .Where(value => value.AvailableMinor > 0)
+            .OrderBy(value => value.PaymentId).ToArray();
+
+        var result = new OrderAmendmentResolutionContextDto(source.Id, amendment.Id,
+            source.Version, source.ServiceSession?.AccountRevision, money.Currency, credit, candidates,
+            retirementRequired);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+}

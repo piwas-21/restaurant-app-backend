@@ -37,10 +37,10 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     /// </param>
     /// <param name="disableApplicationHostedServices">
     /// Drops this application's own <see cref="IHostedService"/> registrations (the cleanup,
-    /// retention and reconciliation sweeps). Set ONLY for the long-lived shared host of
-    /// <see cref="DatabaseFixture.SharedFactory"/>: a per-test host lives under a second, so its
-    /// 5-minute and 1-minute timers never fire, but a host that lives for the whole run would
-    /// sweep DURING an unrelated test and delete rows that test had just seeded. No test loses
+    /// retention and reconciliation sweeps). Both shared and isolated hosts used by
+    /// <see cref="IntegrationTestBase"/> disable these services: they start before the lane
+    /// reset, and a worker may query immediately, without waiting for its polling interval.
+    /// A long-lived shared host can also sweep during unrelated tests. No test loses
     /// coverage — every background service is exercised by tests that construct it directly
     /// (e.g. <c>ReservationRetentionServiceTests</c>), never through the hosted registration.
     /// </param>

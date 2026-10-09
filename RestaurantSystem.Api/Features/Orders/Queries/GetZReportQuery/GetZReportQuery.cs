@@ -1,9 +1,12 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -39,6 +42,9 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
     public async Task<ApiResponse<ZReportDto>> Handle(GetZReportQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
+        await using var snapshot = _context.Database.CurrentTransaction is null
+            ? await _context.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken)
+            : null;
 
         // The instants the tenant's own calendar day begins and ends at. Not startOfDay.AddDays(1):
         // a local day is 23 or 25 hours on a DST changeover, and on those two days the till would
@@ -52,11 +58,20 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
             .Include(o => o.Items)
                 .ThenInclude(i => i.Product)
             .Where(o => !o.IsDeleted && o.OrderDate >= startOfDay && o.OrderDate < startOfNextDay)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
         // Split into non-cancelled (for sales) and cancelled
         var salesOrders = allOrders.Where(o => o.Status != OrderStatus.Cancelled).ToList();
         var cancelledOrders = allOrders.Where(o => o.Status == OrderStatus.Cancelled).ToList();
+        var creditedIds = salesOrders.Where(order => order.BillingCreditAmount > 0)
+            .Select(order => order.Id).ToArray();
+        await OrderBillingCreditConsistency.AssertAsync(_context, creditedIds, cancellationToken);
+        var salesOrderIds = salesOrders.Select(order => order.Id).ToArray();
+        var amendments = await _context.OrderAmendments.AsNoTracking()
+            .Where(amendment => salesOrderIds.Contains(amendment.SourceOrderId)
+                && amendment.State == OrderAmendmentState.Committed).ToListAsync(cancellationToken);
+        var salesLines = BillingAdjustedSalesLines.Project(salesOrders, amendments);
 
         // --- Totals ---
         var totalTransactions = salesOrders.Count;
@@ -68,7 +83,7 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
         // sales would overstate turnover and, under Swiss VAT, work against the separate-disclosure
         // condition that keeps a voluntary tip out of taxable consideration at all (ESTV
         // MWST-Branchen-Info 08 §8.3). TotalTips below is that separate line.
-        var netSales = salesOrders.Sum(o => o.Total - o.Tip);
+        var netSales = salesOrders.Sum(o => o.PayableTotal - o.Tip);
         var totalTax = salesOrders.Sum(o => o.Tax);
         var totalDeliveryFees = salesOrders.Sum(o => o.DeliveryFee);
 
@@ -116,39 +131,16 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
             {
                 OrderType = g.Key.ToString(),
                 OrderCount = g.Count(),
-                TotalAmount = g.Sum(o => o.Total)
+                TotalAmount = g.Sum(o => o.PayableTotal)
             })
             .OrderByDescending(o => o.TotalAmount)
             .ToList();
 
-        // --- Sales by product type (root items only to avoid double-counting with child/bundle items) ---
-        var salesByProductType = salesOrders
-            .SelectMany(o => o.Items)
-            .Where(i => i.ParentOrderItemId == null && i.Product != null)
-            .GroupBy(i => i.Product!.Type)
-            .Select(g => new ZReportProductTypeDto
-            {
-                ProductType = g.Key.ToString(),
-                ItemCount = g.Sum(i => i.Quantity),
-                TotalAmount = g.Sum(i => i.ItemTotal)
-            })
-            .OrderByDescending(p => p.TotalAmount)
-            .ToList();
-
-        // --- Top selling items (top 10 by quantity, root items only) ---
-        var topSellingItems = salesOrders
-            .SelectMany(o => o.Items)
-            .Where(i => i.ParentOrderItemId == null)
-            .GroupBy(i => i.ProductName)
-            .Select(g => new ZReportTopItemDto
-            {
-                ProductName = g.Key,
-                QuantitySold = g.Sum(i => i.Quantity),
-                TotalRevenue = g.Sum(i => i.ItemTotal)
-            })
-            .OrderByDescending(i => i.QuantitySold)
-            .Take(TopItemsCount)
-            .ToList();
+        var salesByProductType = BillingAdjustedSalesLines.ByProductType(salesLines);
+        var topSellingItems = BillingAdjustedSalesLines.TopItems(salesLines, TopItemsCount);
+        var generatedAt = DateTime.UtcNow;
+        var accountCashMovements = await ZReportAccountCashMovementReader.ReadAsync(
+            _context, startOfDay, startOfNextDay, generatedAt, cancellationToken);
 
         var report = new ZReportDto
         {
@@ -156,10 +148,11 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
             // renders this as a date, and the tenant-day start (22:00Z the evening before, in
             // Zurich summer) would print as the previous day in any browser at or west of UTC.
             ReportDate = query.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
-            GeneratedAt = DateTime.UtcNow,
+            GeneratedAt = generatedAt,
             TotalTransactions = totalTransactions,
             GrossSales = grossSales,
             NetSales = netSales,
+            TotalBillingCredits = salesOrders.Sum(o => o.BillingCreditAmount),
             TotalTax = totalTax,
             TotalTips = totalTips,
             TotalDeliveryFees = totalDeliveryFees,
@@ -175,6 +168,7 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
                 RefundCount = refundCount,
                 TotalRefundedAmount = totalRefundedAmount
             },
+            AccountCashMovements = accountCashMovements,
             CancelledOrdersCount = cancelledOrdersCount,
             CancelledOrdersTotal = cancelledOrdersTotal,
             PaymentsByMethod = paymentsByMethod,

@@ -20,5 +20,11 @@ public class OrderOperationalNote : Entity
     public DevicePrintTarget? KitchenTarget { get; set; }
     public string? KitchenChangesJson { get; set; }
 
+    /// <summary>Commit-ordered sequence for the native and printer kitchen-change feeds.</summary>
+    public long KitchenBoardSequence { get; set; }
+
+    /// <summary>Withdraws operational text from preparation without deleting the retained job identity.</summary>
+    public DateTime? WithdrawnAt { get; set; }
+
     public virtual Order Order { get; set; } = null!;
 }

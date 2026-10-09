@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -13,31 +15,30 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
 {
-    private static readonly TimeSpan QuoteLifetime = TimeSpan.FromMinutes(5);
     private readonly ApplicationDbContext _context;
     private readonly ITenantFeatures _features;
     private readonly ICurrentUserService _currentUser;
-    private readonly OrderAmendmentSupplementBuilder _supplements;
-    private readonly OrderAmendmentChangeBuilder _changes;
-    private readonly IOrderMappingService _mapping;
+    private readonly IOrderAmendmentQuotePreviewBuilder _previewBuilder;
+    private readonly IOrderDisplayCurrencyResolver _currencyResolver;
     private readonly IOrderAmendmentFinancialResolution _financial;
+    private readonly OrderAmendmentResolutionSettings _resolutionSettings;
 
     public OrderAmendmentQuoteService(
         ApplicationDbContext context,
         ITenantFeatures features,
         ICurrentUserService currentUser,
-        OrderAmendmentSupplementBuilder supplements,
-        OrderAmendmentChangeBuilder changes,
-        IOrderMappingService mapping,
-        IOrderAmendmentFinancialResolution financial)
+        IOrderAmendmentQuotePreviewBuilder previewBuilder,
+        IOrderDisplayCurrencyResolver currencyResolver,
+        IOrderAmendmentFinancialResolution financial,
+        IOptions<OrderAmendmentResolutionSettings> resolutionSettings)
     {
         _context = context;
         _features = features;
         _currentUser = currentUser;
-        _supplements = supplements;
-        _changes = changes;
-        _mapping = mapping;
+        _previewBuilder = previewBuilder;
+        _currencyResolver = currencyResolver;
         _financial = financial;
+        _resolutionSettings = resolutionSettings.Value;
     }
 
     public async Task<OrderAmendmentQuoteDto> QuoteAsync(
@@ -56,25 +57,26 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
             {
                 var source = await OrderAmendmentOrderLoader.LoadSourceAsync(_context, orderId, cancellationToken)
                     ?? throw new NotFoundException("The source order was not found.");
-                OrderAmendmentPolicy.ValidateOrderContext(source, normalized);
+                await OrderAmendmentFinancialGuard.AssertNoPendingSourceResolutionAsync(
+                    _context, source.Id, cancellationToken);
+                var refundAuthority = await OrderAmendmentRefundAuthorityReader.ReadAsync(
+                    _context, source, _currencyResolver, cancellationToken);
+                OrderAmendmentPolicy.ValidateOrderContext(source, normalized, refundAuthority);
                 OrderAmendmentPolicy.ValidateChangeAuthority(source, normalized, _currentUser);
-                var sourceDto = await _mapping.MapToOrderDtoAsync(source, cancellationToken);
+                var sourceDto = await _previewBuilder.MapSourceAsync(source, cancellationToken);
                 var sourceLines = source.Items.Where(item => !item.ParentOrderItemId.HasValue).ToList();
                 var sourceQuantities = sourceLines.ToDictionary(item => item.Id, item => item.Quantity);
                 await OrderAmendmentRangeValidator.ValidateAsync(
                     _context, source.Id, normalized, sourceQuantities, cancellationToken);
 
-                var supplement = await _supplements.BuildAsync(source, normalized, cancellationToken);
-                // A rolled-back preview cannot reserve a human-facing daily order number.
-                if (supplement is not null)
-                    supplement.OrderNumber = string.Empty;
-                var supplementDto = supplement is null ? null : OrderAmendmentSnapshots.MapBuiltOrder(_mapping, supplement);
-                var changes = await _changes.BuildAsync(
-                    source, sourceDto, normalized, supplementDto, cancellationToken);
+                var preview = await _previewBuilder.BuildAsync(source, sourceDto, normalized, cancellationToken);
+                var supplement = preview.Supplement;
+                var supplementDto = preview.SupplementDto;
+                var changes = preview.Changes;
                 var financial = await _financial.PreviewAsync(source, changes, supplement, cancellationToken);
 
                 var amendmentId = Guid.NewGuid();
-                var expiresAt = now.Add(QuoteLifetime);
+                var expiresAt = now.AddMinutes(_resolutionSettings.AmendmentQuoteLifetimeMinutes);
                 amendment = new OrderAmendment
                 {
                     Id = amendmentId,
@@ -124,7 +126,20 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
         }
 
         _context.ChangeTracker.Clear();
-        await using var persistence = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var persistence = await OrderAccountMutationScope.BeginAsync(
+            _context, orderId, cancellationToken);
+        var current = await _context.Orders.AsNoTracking()
+            .Where(order => order.Id == orderId && !order.IsDeleted)
+            .Select(order => new
+            {
+                order.Version,
+                order.ServiceSessionId,
+                AccountRevision = order.ServiceSession == null ? (long?)null : order.ServiceSession.AccountRevision
+            }).SingleOrDefaultAsync(cancellationToken);
+        if (current is null || current.Version != amendment.ExpectedOrderVersion
+            || current.ServiceSessionId != amendment.ServiceSessionId
+            || current.AccountRevision != amendment.ExpectedAccountRevision)
+            throw new ConflictException("The source order changed while preparing the quote. Refresh and quote again.");
         _context.Set<OrderAmendment>().Add(amendment);
         await _context.SaveChangesAsync(cancellationToken);
         await persistence.CommitAsync(cancellationToken);

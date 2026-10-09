@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Infrastructure.Settings;
 
 namespace RestaurantSystem.Api.Features.Payments.Services;
@@ -22,9 +24,17 @@ public class CheckoutChargeResolver : ICheckoutChargeResolver
         _commission = commission.Value;
     }
 
-    public CheckoutCharge Resolve(decimal orderTotal)
+    public CheckoutCharge Resolve(decimal orderTotal, string? acceptedCurrency = null)
     {
-        var amount = CheckoutAmount.From(orderTotal, _localization.Currency);
+        var accepted = CurrencyCode.Normalize(acceptedCurrency);
+        var configured = CurrencyCode.Normalize(_localization.Currency);
+        if (accepted is not null && !string.Equals(accepted, configured, StringComparison.Ordinal))
+        {
+            throw new ConflictException(
+                "The order's accepted currency differs from current checkout configuration. Contact the restaurant before retrying.");
+        }
+
+        var amount = CheckoutAmount.From(orderTotal, accepted ?? _localization.Currency);
 
         // Order matters: the fee is a percentage of the ALREADY-VALIDATED amount, never of the raw
         // total, so it inherits every guarantee CheckoutAmount.From just established rather than

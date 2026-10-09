@@ -1,0 +1,91 @@
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Persistence;
+
+namespace RestaurantSystem.IntegrationTests.Infrastructure;
+
+/// <summary>
+/// Isolated database used to seed genuine pre-loyalty native billing history before upgrading it.
+/// </summary>
+internal sealed class PublishedBillingParentDatabase : IAsyncDisposable
+{
+    private const string ParentMigration = "20261004172810_AddNativeOrderBillingSnapshots"; // pragma: allowlist secret
+    private readonly NpgsqlDataSource _dataSource;
+
+    private PublishedBillingParentDatabase(string connectionString, NpgsqlDataSource dataSource)
+    {
+        ConnectionString = connectionString;
+        _dataSource = dataSource;
+    }
+
+    public string ConnectionString { get; }
+
+    public static async Task<PublishedBillingParentDatabase> CreateAsync()
+    {
+        var connectionString = await TestDatabaseCluster.CreateLaneDatabaseAsync();
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+        dataSourceBuilder.EnableDynamicJson();
+        var database = new PublishedBillingParentDatabase(connectionString, dataSourceBuilder.Build());
+
+        try
+        {
+            await database.MigrateAsync(ParentMigration);
+            return database;
+        }
+        catch
+        {
+            await database.DisposeAsync();
+            throw;
+        }
+    }
+
+    public ApplicationDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(_dataSource)
+            .Options;
+        return new ApplicationDbContext(options);
+    }
+
+    public Task UpgradeToCurrentAsync() => MigrateAsync();
+
+    public async Task InsertEarnedTransactionAsync(
+        Guid transactionId,
+        Guid userId,
+        Guid orderId,
+        int points,
+        decimal orderTotal,
+        DateTime createdAt)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO fidelity_points_transactions
+                (id, user_id, order_id, transaction_type, points, order_total, created_at, created_by)
+            VALUES
+                (@id, @user_id, @order_id, @transaction_type, @points, @order_total, @created_at, @created_by)
+            """, connection);
+        command.Parameters.AddWithValue("id", transactionId);
+        command.Parameters.AddWithValue("user_id", userId);
+        command.Parameters.AddWithValue("order_id", orderId);
+        command.Parameters.AddWithValue("transaction_type", TransactionType.Earned.ToString());
+        command.Parameters.AddWithValue("points", points);
+        command.Parameters.AddWithValue("order_total", orderTotal);
+        command.Parameters.AddWithValue("created_at", createdAt);
+        command.Parameters.AddWithValue("created_by", "PreLoyaltyMigrationFixture");
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _dataSource.DisposeAsync();
+        await TestDatabaseCluster.DropLaneDatabaseAsync(ConnectionString);
+    }
+
+    private async Task MigrateAsync(string? target = null)
+    {
+        await using var context = CreateContext();
+        await context.Database.MigrateAsync(target);
+    }
+}

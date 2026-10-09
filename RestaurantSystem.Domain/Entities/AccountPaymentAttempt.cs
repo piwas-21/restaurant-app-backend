@@ -33,4 +33,5 @@ public sealed class AccountPaymentAttempt : Entity
     public TableServiceSession? ServiceSession { get; set; }
     public AccountEqualSharePlan? EqualSharePlan { get; set; }
     public ICollection<AccountPaymentAllocation> Allocations { get; set; } = [];
+    public AccountCashCollectionReceipt? CashCollectionReceipt { get; set; }
 }

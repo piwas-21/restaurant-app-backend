@@ -34,6 +34,17 @@ internal sealed class ActiveTableOrderProjection(
         return info is not null;
     }
 
+    public void ApplyTo(IEnumerable<TableDto> tables)
+    {
+        foreach (var table in tables)
+        {
+            if (!TryGet(table, out var info)) continue;
+            table.IsOccupied = true;
+            table.ActiveOrderCount = info.OrderCount;
+            table.Occupants = info.Occupants;
+        }
+    }
+
     private static bool TryReadCanonicalNumber(string label, out int number) =>
         int.TryParse(label, NumberStyles.None, CultureInfo.InvariantCulture, out number)
         && number > 0

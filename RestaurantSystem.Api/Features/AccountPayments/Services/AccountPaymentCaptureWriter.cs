@@ -20,7 +20,7 @@ public sealed class AccountPaymentCaptureWriter(
         AccountDebtMath.Subtract(account.Debt.Outstanding, scopes);
         var orders = await LoadScopedOrdersAsync(attempt, scopes, cancellationToken);
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var now = PostgresTimestampPrecision.TruncateToMicrosecond(timeProvider.GetUtcNow().UtcDateTime);
         var audit = currentUser.GetAuditIdentifier();
         foreach (var order in orders)
             PostOrderPayment(order, attempt, account.Money, now, audit);
@@ -36,7 +36,7 @@ public sealed class AccountPaymentCaptureWriter(
         var scopes = CreateAndValidateScopes(attempt, account.Money.Currency);
         AccountDebtMath.Subtract(account.Debt.Outstanding, scopes);
         var orders = await LoadScopedOrdersAsync(attempt, scopes, cancellationToken);
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var now = PostgresTimestampPrecision.TruncateToMicrosecond(timeProvider.GetUtcNow().UtcDateTime);
         foreach (var order in orders)
             PostOrderPayment(order, attempt, account.Money, now, attempt.CreatedBy, journal.ProviderChargeId);
         MarkCaptured(attempt, now, attempt.CreatedBy);
@@ -157,7 +157,7 @@ public sealed class AccountPaymentCaptureWriter(
     {
         var paidMinor = order.Payments.Where(value => value.Status.IsCaptured())
             .DistinctBy(value => value.Id).Sum(value => money.ToMinor(value.Amount));
-        var totalMinor = money.ToMinor(order.Total);
+        var totalMinor = money.ToMinor(order.PayableTotal);
         if (paidMinor > totalMinor)
             throw new ConflictException("Collection exceeds the frozen order charge.");
         order.TotalPaid = money.ToMajor(paidMinor);

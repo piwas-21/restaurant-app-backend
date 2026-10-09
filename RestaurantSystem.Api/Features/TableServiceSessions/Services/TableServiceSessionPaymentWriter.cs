@@ -44,15 +44,25 @@ public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPayme
             return currencyResult;
         }
 
-        var orders = await _context.Orders
+        var orderRows = await _context.Orders
             .Where(order => !order.IsDeleted
                 && order.ServiceSessionId == session.Id)
             .Where(OrderSettlementEligibility.CanCollectQuery())
             .OrderBy(order => order.OrderDate)
             .ThenBy(order => order.OrderNumber)
-            .Select(order => new BillRound(order.Id, order.RemainingAmount))
+            .Select(order => new
+            {
+                order.Id,
+                order.Total,
+                order.BillingCreditAmount,
+                order.TotalPaid
+            })
             .ToListAsync(cancellationToken);
-        var remaining = orders.Sum(order => Math.Max(0, order.RemainingAmount));
+        var orders = orderRows.Select(order => new BillRound(
+            order.Id,
+            TableServiceSessionCloseRules.EffectiveOutstanding(
+                order.Total, order.BillingCreditAmount, order.TotalPaid))).ToList();
+        var remaining = orders.Sum(order => order.Outstanding);
         if (remaining <= 0)
         {
             return new SessionPaymentWriteResult(false, 0, 0, "The service session has no outstanding balance.");
@@ -92,7 +102,7 @@ public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPayme
                 break;
             }
 
-            var share = Math.Min(order.RemainingAmount, left);
+            var share = Math.Min(order.Outstanding, left);
             var result = await _payments.ApplyToOrderAsync(order.Id, new OrderPaymentTender
             {
                 Amount = share,
@@ -167,5 +177,5 @@ public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPayme
         return new SessionPaymentWriteResult(true, 0, 0);
     }
 
-    private sealed record BillRound(Guid Id, decimal RemainingAmount);
+    private sealed record BillRound(Guid Id, decimal Outstanding);
 }

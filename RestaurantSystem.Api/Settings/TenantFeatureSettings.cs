@@ -24,8 +24,14 @@ public sealed class TenantFeatureSettings
     /// <summary>Opt-in guest visit admission and rounds; disabled until isolation is verified.</summary>
     public bool TableGuestVisitsV1 { get; set; }
 
+    /// <summary>Requires an explicit staff reset before opening the next table visit.</summary>
+    public bool TableVisitReadinessV1 { get; set; }
+
     /// <summary>Opt-in exact visit payment collection; defaults off pending reconciliation verification.</summary>
     public bool TableAccountPaymentsV1 { get; set; }
+
+    /// <summary>Tenant-wide opt-in for Server-role manual account collection; defaults off.</summary>
+    public bool ServerAccountCollectionV1 { get; set; }
 
     /// <summary>Opt-in participant-initiated online payment for an exact table visit; defaults off.</summary>
     public bool TableGuestAccountPaymentsV1 { get; set; }

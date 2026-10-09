@@ -188,6 +188,13 @@ public static class ErrorCodes
     public const string TableServiceSessionAlreadyOpen = "TableServiceSessionAlreadyOpen";
     public const string TableServiceSessionRequired = "TableServiceSessionRequired";
     public const string TableServiceSessionPaymentOperationMismatch = "TableServiceSessionPaymentOperationMismatch";
+    public const string TableReadinessFeatureDisabled = "TableReadinessFeatureDisabled";
+    public const string TableReadinessVersionStale = "TableReadinessVersionStale";
+    public const string TableReadinessOperationNotFound = "TableReadinessOperationNotFound";
+    public const string TableReadinessOperationMismatch = "TableReadinessOperationMismatch";
+    public const string TableReadinessNotAvailable = "TableReadinessNotAvailable";
+    public const string TableReadinessStaffRequired = "TableReadinessStaffRequired";
+    public const string TableReadinessVisitOpen = "TableReadinessVisitOpen";
     public const string TableServicePaymentHandoffOperationMismatch = "TableServicePaymentHandoffOperationMismatch";
     public const string TableServicePaymentHandoffAlreadyPending = "TableServicePaymentHandoffAlreadyPending";
     public const string TableServicePaymentHandoffNotRequestable = "TableServicePaymentHandoffNotRequestable";
@@ -207,6 +214,8 @@ public static class ErrorCodes
     public const string OrderVersionConflict = "OrderVersionConflict";
     public const string KitchenReleaseRequired = "KitchenReleaseRequired";
     public const string RequiredRoutingUnresolved = "RequiredRoutingUnresolved";
+    public const string KitchenCorrectionUnresolved = "KitchenCorrectionUnresolved";
+    public const string KitchenWorkUnresolved = "KitchenWorkUnresolved";
     public const string KitchenRoleRequired = "KitchenRoleRequired";
     public const string CashierRequired = "CashierRequired";
 

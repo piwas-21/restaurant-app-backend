@@ -1,10 +1,11 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.Devices.Dtos;
+using RestaurantSystem.Api.Features.KitchenBoard.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -30,14 +31,16 @@ public class RecordPrintAcksCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly IOrderRoutingService _routing;
+    private readonly ITenantFeatures? _features;
 
     public RecordPrintAcksCommandHandler(
         ApplicationDbContext context, ICurrentUserService currentUserService,
-        IOrderRoutingService routing)
+        IOrderRoutingService routing, ITenantFeatures? features = null)
     {
         _context = context;
         _currentUserService = currentUserService;
         _routing = routing;
+        _features = features;
     }
 
     public async Task<ApiResponse<bool>> Handle(
@@ -49,6 +52,9 @@ public class RecordPrintAcksCommandHandler
     {
         try
         {
+            await using var boardReceiptBatch = await KitchenBoardReceiptBatch.BeginAsync(
+                _context, _features, command.Acks, cancellationToken);
+
             var orderIds = command.Acks.Select(a => a.OrderId).ToHashSet();
             var jobIds = command.Acks
                 .Where(a => a.JobId.HasValue)
@@ -89,11 +95,14 @@ public class RecordPrintAcksCommandHandler
                     return ApiResponse<bool>.Failure(error!);
                 }
 
-                ApplyAcknowledgement(receipt, ack);
+                boardReceiptBatch.TrackPotentialCorrectionChange(receipt, ack);
+                PrintAckReceiptUtilities.ApplyAcknowledgement(receipt, ack);
+
                 await _routing.ApplyAcknowledgementAsync(command.DeviceId, ack, cancellationToken);
             }
 
             await _context.SaveChangesAsync(cancellationToken);
+            await boardReceiptBatch.CommitAsync(cancellationToken);
             return ApiResponse<bool>.SuccessWithData(true, "Print acknowledgements recorded.");
         }
         catch (DbUpdateConcurrencyException) when (retryOnRace)
@@ -102,7 +111,7 @@ public class RecordPrintAcksCommandHandler
             return await HandleCoreAsync(command, false, cancellationToken);
         }
         catch (DbUpdateException exception)
-            when (retryOnRace && IsReceiptUniqueViolation(exception))
+            when (retryOnRace && PrintAckReceiptUtilities.IsReceiptUniqueViolation(exception))
         {
             // Two device flushes may insert the same receipt simultaneously. The unique natural
             // key makes one winner authoritative; reload the batch once so the loser becomes the
@@ -179,22 +188,4 @@ public class RecordPrintAcksCommandHandler
         return receipt;
     }
 
-    private static void ApplyAcknowledgement(DeviceOrderReceipt receipt, PrintAckDto ack)
-    {
-        receipt.Status = ack.Status;
-        receipt.FailureReason = ack.FailureReason;
-        receipt.Copies = ack.Copies;
-        receipt.ReceivedAt = AsUtc(ack.ReceivedAt);
-        receipt.PrintedAt = ack.PrintedAt.HasValue ? AsUtc(ack.PrintedAt.Value) : null;
-    }
-
-    // Client instants are UTC; the columns are `timestamptz` and Npgsql rejects a non-UTC Kind
-    // (a zoneless JSON timestamp deserialises to Kind=Unspecified). Relabel rather than convert —
-    // matching the heartbeat handler and Groups/UserGroupService's client-DateTime handling.
-    private static DateTime AsUtc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
-
-    private static bool IsReceiptUniqueViolation(DbUpdateException exception) =>
-        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg
-        && (pg.ConstraintName?.Contains("DeviceOrderReceipts", StringComparison.OrdinalIgnoreCase) == true
-            || pg.ConstraintName?.Contains("device_order_receipts", StringComparison.OrdinalIgnoreCase) == true);
 }
