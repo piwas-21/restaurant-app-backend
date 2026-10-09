@@ -171,7 +171,7 @@ public sealed partial class RepairLegacyTableServiceSessionCommandHandler
             .SingleOrDefaultAsync(session => (session.TableId == table.Id
                 || (table.Number.HasValue && session.TableId == null
                     && session.TableNumber == table.Number))
-                && session.Status == TableServiceSessionStatus.Open,
+                && session.Status == TableServiceSessionStatus.Open && session.ReleasedAt == null,
                 cancellationToken);
 
     private static bool IsOpenSessionConflict(DbUpdateException exception) =>

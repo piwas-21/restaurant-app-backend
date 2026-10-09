@@ -45,6 +45,15 @@ public class TableServiceSession : Entity
     public DateTime OpenedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
 
+    /// <summary>
+    /// The physical table was released for another visit while this payable visit remains open.
+    /// Orders and payment history remain attached to this session.
+    /// </summary>
+    public DateTime? ReleasedAt { get; set; }
+
+    /// <summary>Staff audit identifier responsible for releasing the physical table.</summary>
+    public string? ReleasedBy { get; set; }
+
     public virtual Table? Table { get; set; }
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 }

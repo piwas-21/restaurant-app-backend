@@ -86,7 +86,7 @@ public sealed class CreateStaffRoundCommandHandler
                     ErrorCodes.TableServiceSessionNotFound);
             }
 
-            if (session.Status != TableServiceSessionStatus.Open)
+            if (session.Status != TableServiceSessionStatus.Open || session.ReleasedAt.HasValue)
             {
                 return ApiResponse<OrderDto>.FailureWithCode(
                     "The table service session is no longer open.",

@@ -23,7 +23,7 @@ internal static class AccountCashCaptureReceiptPolicy
         var quote = snapshot.CashSettlement
             ?? throw new ConflictException("This legacy cash quote has no frozen settlement terms.");
         AccountCashSettlementPolicy.RequireMatches(quote, attempt.Currency,
-            attempt.PaymentMethod, attempt.AmountMinor);
+            attempt.PaymentMethod, checked(attempt.AmountMinor + attempt.TipMinor));
         var received = request.ReceivedMinor
             ?? throw new BadRequestException("Enter the cash received before completing collection.");
         if (received < quote.DueAmountMinor)
@@ -84,7 +84,7 @@ internal static class AccountCashCaptureReceiptPolicy
         var quote = snapshot.CashSettlement
             ?? throw new ConflictException("The saved cash quote has no frozen settlement terms.");
         AccountCashSettlementPolicy.RequireMatches(quote, attempt.Currency,
-            attempt.PaymentMethod, attempt.AmountMinor);
+            attempt.PaymentMethod, checked(attempt.AmountMinor + attempt.TipMinor));
         var received = request.ReceivedMinor;
         var originalActor = actor with { Role = receipt.ActorRole };
         if (received is null
@@ -114,6 +114,7 @@ internal static class AccountCashCaptureReceiptPolicy
             && (snapshot.PaymentMethod != attempt.PaymentMethod
                 || snapshot.ExpectedAccountRevision != attempt.ExpectedAccountRevision
                 || snapshot.AmountMinor != attempt.AmountMinor
+                || snapshot.TipMinor != attempt.TipMinor
                 || snapshot.Currency != attempt.Currency))
             throw new ConflictException("The cash quote snapshot requires reconciliation.");
         if (receipt is null)
@@ -142,7 +143,7 @@ internal static class AccountCashCaptureReceiptPolicy
             || receipt.RequestHash.Length != 64)
             throw new ConflictException("The saved cash collection receipt requires reconciliation.");
         AccountCashSettlementPolicy.RequireMatches(quote, attempt.Currency,
-            attempt.PaymentMethod, attempt.AmountMinor);
+            attempt.PaymentMethod, checked(attempt.AmountMinor + attempt.TipMinor));
         if (receipt.PolicyVersion != quote.PolicyVersion || receipt.Currency != quote.Currency
             || receipt.PaymentMethod != quote.PaymentMethod || receipt.ExactAmountMinor != quote.ExactAmountMinor
             || receipt.AdjustmentMinor != quote.AdjustmentMinor || receipt.DueAmountMinor != quote.DueAmountMinor)
@@ -185,6 +186,7 @@ internal static class AccountCashCaptureReceiptPolicy
             || snapshot.ExpectedAccountRevision <= 0
             || snapshot.ExpectedAccountRevision != attempt.ExpectedAccountRevision
             || snapshot.PaymentMethod != attempt.PaymentMethod || snapshot.AmountMinor != attempt.AmountMinor
+            || snapshot.TipMinor != attempt.TipMinor
             || snapshot.Currency != attempt.Currency)
             throw new ConflictException("The reserved cash collection does not match its reviewed quote.");
     }

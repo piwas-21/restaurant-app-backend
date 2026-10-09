@@ -123,7 +123,8 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
 
     private Task<List<TableServiceSession>> LoadSessionsAsync(CancellationToken cancellationToken) =>
         _context.TableServiceSessions.AsNoTracking()
-            .Where(session => session.Status == TableServiceSessionStatus.Open)
+            .Where(session => session.Status == TableServiceSessionStatus.Open
+                && session.ReleasedAt == null)
             .OrderBy(session => session.TableNumber)
             .ToListAsync(cancellationToken);
 

@@ -21,4 +21,7 @@ public sealed record AccountPaymentOperationDto(
 {
     public CashSettlementQuote? CashSettlement { get; init; }
     public CashCollectionReceiptDto? CashReceipt { get; init; }
+    public long TipMinor { get; init; }
+    public Guid? CustomSharePlanId { get; init; }
+    public int? CustomShareOrdinal { get; init; }
 }

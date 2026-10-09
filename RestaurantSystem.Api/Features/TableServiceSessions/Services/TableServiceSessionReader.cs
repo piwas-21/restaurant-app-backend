@@ -16,7 +16,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.TableServiceSessions.Services;
 
 /// <summary>Reads session metadata and its immutable-member bill as one contract.</summary>
-public sealed class TableServiceSessionReader : ITableServiceSessionReader
+public sealed partial class TableServiceSessionReader : ITableServiceSessionReader
 {
     private readonly ApplicationDbContext _context;
     private readonly ITableBillAssembler _bills;
@@ -95,8 +95,14 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         return ToDto(session, bill, legacy, handoff, now, currency);
     }
 
-    public async Task<IReadOnlyList<TableServiceSessionDto>> ReadActiveAsync(
-        CancellationToken cancellationToken)
+    public Task<IReadOnlyList<TableServiceSessionDto>> ReadActiveAsync(CancellationToken cancellationToken) =>
+        ReadSessionsAsync(released: false, cancellationToken);
+
+    public Task<IReadOnlyList<TableServiceSessionDto>> ReadReleasedAsync(CancellationToken cancellationToken) =>
+        ReadSessionsAsync(released: true, cancellationToken);
+
+    private async Task<IReadOnlyList<TableServiceSessionDto>> ReadSessionsAsync(
+        bool released, CancellationToken cancellationToken)
     {
         await using var snapshot = _context.Database.CurrentTransaction is null
             ? await _context.Database.BeginTransactionAsync(
@@ -110,7 +116,8 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         var sessionRows = await _context.TableServiceSessions
             .AsNoTracking()
             .Include(value => value.Table)
-            .Where(value => value.Status == TableServiceSessionStatus.Open)
+            .Where(value => value.Status == TableServiceSessionStatus.Open
+                && (released ? value.ReleasedAt != null : value.ReleasedAt == null))
             .OrderBy(value => value.TableNumber)
             .ToListAsync(cancellationToken);
         var bills = await _bills.AssembleManyAsync(sessionRows, cancellationToken);
@@ -182,58 +189,6 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         return rows.Select(row => row.ToState()).ToList();
     }
 
-    private async Task<Dictionary<Guid, List<TableServiceSessionOrderState>>> ReadLegacyOrdersBySessionAsync(
-        IReadOnlyList<TableServiceSession> sessions, CancellationToken cancellationToken)
-    {
-        var tableIds = sessions
-            .Where(session => session.TableId.HasValue)
-            .Select(session => session.TableId!.Value)
-            .Distinct()
-            .ToArray();
-        var tableNumbers = sessions
-            .Where(session => session.TableNumber.HasValue)
-            .Select(session => session.TableNumber!.Value)
-            .Distinct()
-            .ToArray();
-        if (tableIds.Length == 0 && tableNumbers.Length == 0)
-        {
-            return [];
-        }
-
-        var rows = await _context.Orders
-            .AsNoTracking()
-            .Where(order => !order.IsDeleted
-                && order.Type == OrderType.DineIn
-                && order.ServiceSessionId == null)
-            .Where(order => (order.TableId.HasValue && tableIds.Contains(order.TableId.Value))
-                || (!order.TableId.HasValue && order.TableNumber.HasValue
-                    && tableNumbers.Contains(order.TableNumber.Value)))
-            .SelectCloseCharges()
-            .ToListAsync(cancellationToken);
-        var byTableId = rows
-            .Where(row => row.TableId.HasValue)
-            .GroupBy(row => row.TableId!.Value)
-            .ToDictionary(group => group.Key, group => group.ToList());
-        var byTableNumber = rows
-            .Where(row => !row.TableId.HasValue && row.TableNumber.HasValue)
-            .GroupBy(row => row.TableNumber!.Value)
-            .ToDictionary(group => group.Key, group => group.ToList());
-        return sessions.ToDictionary(session => session.Id, session =>
-        {
-            var stableRows = session.TableId.HasValue
-                && byTableId.TryGetValue(session.TableId.Value, out var idRows)
-                ? idRows
-                : [];
-            var legacyRows = session.TableNumber.HasValue
-                && byTableNumber.TryGetValue(session.TableNumber.Value, out var numberRows)
-                ? numberRows
-                : [];
-            return stableRows.Concat(legacyRows)
-                .Select(row => row.ToState())
-                .ToList();
-        });
-    }
-
     private TableServiceSessionDto ToDto(
         TableServiceSession session,
         TableBillDto bill,
@@ -248,6 +203,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         bill.Remaining = memberStates.Sum(TableServiceSessionCloseRules.Outstanding);
         var assessment = TableServiceSessionCloseRules.Assess(memberStates, legacy, _paymentTolerance);
         var isOpen = session.Status == TableServiceSessionStatus.Open;
+        var isTableReleased = session.ReleasedAt.HasValue;
         var hasPendingHandoff = handoff?.Status == nameof(TableServicePaymentHandoffStatus.Requested);
         var hasTenderRole = _currentUser is null
             || _currentUser.IsAdmin
@@ -267,6 +223,9 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             AccountRevision = session.AccountRevision,
             OpenedAt = session.OpenedAt,
             ClosedAt = session.ClosedAt,
+            ReleasedAt = session.ReleasedAt,
+            ReleasedBy = session.ReleasedBy,
+            IsTableReleased = isTableReleased,
             RoundCount = bill.OrderCount,
             AgeMinutes = Math.Max(0, (int)(now - session.OpenedAt).TotalMinutes),
             Outstanding = assessment.Outstanding,
@@ -276,6 +235,8 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
                 && bill.EligibleOutstanding > _paymentTolerance && !hasPendingHandoff,
             HasPendingPaymentHandoff = hasPendingHandoff,
             CanClose = isOpen && assessment.CanClose && !hasPendingHandoff,
+            CanReleaseTable = isOpen && !isTableReleased && !hasPendingHandoff
+                && assessment.LegacyActiveOrderCount == 0,
             HasUnassignedActiveOrders = assessment.LegacyActiveOrderCount > 0,
             LegacyActiveOrderCount = assessment.LegacyActiveOrderCount,
             Bill = bill,

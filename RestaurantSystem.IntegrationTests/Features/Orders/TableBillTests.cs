@@ -144,8 +144,8 @@ public class TableBillTests : IAsyncLifetime
         await SeedDineInOrderAsync(tableNumber: 14, total: 20m, orderedAt: Utc(12, 45));
         var operationId = Guid.NewGuid();
 
-        var first = await PayBillAsync(14, amount: 40m, operationId);
-        var retry = await PayBillAsync(14, amount: 40m, operationId);
+        var first = await PayBillAsync(14, amount: 40m, operationId, tipMinor: null);
+        var retry = await PayBillAsync(14, amount: 40m, operationId, tipMinor: 0);
 
         first.Success.Should().BeTrue();
         retry.Success.Should().BeTrue();
@@ -153,7 +153,8 @@ public class TableBillTests : IAsyncLifetime
         retry.Data!.Remaining.Should().Be(10m);
         await using var verify = _fixture.CreateContext();
         (await verify.OrderPayments.CountAsync()).Should().Be(2);
-        (await verify.TableBillPaymentOperations.CountAsync()).Should().Be(1);
+        var operation = await verify.TableBillPaymentOperations.SingleAsync();
+        operation.TipMinor.Should().Be(0);
     }
 
     [Fact]
@@ -248,7 +249,7 @@ public class TableBillTests : IAsyncLifetime
     }
 
     private async Task<RestaurantSystem.Api.Common.Models.ApiResponse<RestaurantSystem.Api.Features.Orders.Dtos.TableBillDto>>
-        PayBillAsync(int tableNumber, decimal amount, Guid? operationId = null)
+        PayBillAsync(int tableNumber, decimal amount, Guid? operationId = null, long? tipMinor = null)
     {
         var ctx = _fixture.CreateContext();
         var currentUser = new Mock<ICurrentUserService>();
@@ -275,6 +276,7 @@ public class TableBillTests : IAsyncLifetime
                 OperationId = operationId ?? Guid.NewGuid(),
                 Amount = amount,
                 PaymentMethod = PaymentMethod.Cash,
+                TipMinor = tipMinor,
             },
             CancellationToken.None);
     }

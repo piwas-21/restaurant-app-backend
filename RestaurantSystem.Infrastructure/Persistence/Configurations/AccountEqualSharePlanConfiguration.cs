@@ -13,6 +13,7 @@ public sealed class AccountEqualSharePlanConfiguration : IEntityTypeConfiguratio
         builder.Property(value => value.Currency).HasMaxLength(3).IsRequired();
         builder.Property(value => value.PayloadHash).HasMaxLength(64).IsRequired();
         builder.Property(value => value.ScopeJson).HasColumnType("jsonb").IsRequired();
+        builder.Property(value => value.CustomAmountsJson).HasColumnType("jsonb");
         builder.Property(value => value.ActorId).IsRequired(false);
         builder.Property(value => value.ActorKind).HasConversion<string>().HasMaxLength(20).IsRequired(false);
         builder.HasIndex(value => value.OperationId).IsUnique();

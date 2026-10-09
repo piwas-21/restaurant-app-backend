@@ -77,9 +77,12 @@ public class TableBillAssembler : ITableBillAssembler
 
         var orders = await QueryOrders(o => o.ServiceSessionId == serviceSessionId
             && o.Status != OrderStatus.Cancelled, cancellationToken);
+        var paymentTip = await TableBillPaymentTipReader.ReadAsync(_context, serviceSessionId, null, cancellationToken);
+        var paymentFlow = (await TableBillPaymentFlowReader.ReadManyAsync(
+            _context, [serviceSessionId], cancellationToken)).GetValueOrDefault(serviceSessionId);
         return BuildBill(
             orders, new BillContext(session.TableNumber, session.TableId, session.Table?.TableNumber,
-                session.Id, session.Version, session.AccountRevision, session.Currency));
+                session.Id, session.Version, session.AccountRevision, session.Currency), paymentTip, paymentFlow);
     }
 
     /// <summary>
@@ -102,11 +105,14 @@ public class TableBillAssembler : ITableBillAssembler
             .Where(order => order.ServiceSessionId.HasValue)
             .GroupBy(order => order.ServiceSessionId!.Value)
             .ToDictionary(group => group.Key, group => group.ToList());
+        var paymentTips = await TableBillPaymentTipReader.ReadManyAsync(_context, sessionIds, cancellationToken);
+        var paymentFlows = await TableBillPaymentFlowReader.ReadManyAsync(_context, sessionIds, cancellationToken);
 
         return sessions.Select(session => ordersBySession.TryGetValue(session.Id, out var members)
                 ? BuildBill(
                     members, new BillContext(session.TableNumber, session.TableId, session.Table?.TableNumber,
-                        session.Id, session.Version, session.AccountRevision, session.Currency))
+                        session.Id, session.Version, session.AccountRevision, session.Currency),
+                    paymentTips.GetValueOrDefault(session.Id), paymentFlows.GetValueOrDefault(session.Id))
                 : null)
             .ToList();
     }
@@ -120,7 +126,10 @@ public class TableBillAssembler : ITableBillAssembler
         var orders = await QueryOrders(o => o.TableNumber == tableNumber
             && o.ServiceSessionId == null, cancellationToken,
             OrderSettlementEligibility.OperationalQueuePredicate());
-        return BuildBill(orders, new BillContext(tableNumber, null, null, null, null, null, null));
+        var paymentTip = await TableBillPaymentTipReader.ReadAsync(_context, null, tableNumber, cancellationToken);
+        var paymentFlow = await TableBillPaymentFlowReader.ReadLegacyAsync(_context, tableNumber, cancellationToken);
+        return BuildBill(orders, new BillContext(tableNumber, null, null, null, null, null, null), paymentTip,
+            paymentFlow);
     }
 
     private async Task<List<Order>> QueryOrders(
@@ -154,7 +163,9 @@ public class TableBillAssembler : ITableBillAssembler
         long? AccountRevision,
         string? Currency);
 
-    private TableBillDto? BuildBill(List<Order> orders, BillContext identity)
+    private TableBillDto? BuildBill(
+        List<Order> orders, BillContext identity, decimal paymentTip = 0m,
+        TableBillPaymentFlow? paymentFlow = null)
     {
         if (orders.Count == 0)
         {
@@ -170,6 +181,10 @@ public class TableBillAssembler : ITableBillAssembler
             ServiceSessionVersion = identity.ServiceSessionVersion,
             AccountRevision = identity.AccountRevision,
             Currency = CurrencyCode.Normalize(identity.Currency),
+            PaymentTip = paymentTip,
+            PaymentFlowMode = paymentFlow?.Mode,
+            GuestCount = paymentFlow?.GuestCount,
+            GuestAmounts = paymentFlow?.Guests.ToList() ?? [],
             GeneratedAt = DateTime.UtcNow,
             OrderCount = orders.Count,
         };

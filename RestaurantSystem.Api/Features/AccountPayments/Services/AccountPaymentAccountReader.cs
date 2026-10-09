@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.AccountPayments.Services;
@@ -115,21 +116,13 @@ public sealed class AccountPaymentAccountReader(
         var plan = plans.SingleOrDefault();
         if (plan is null) return null;
         var scope = AccountPaymentSnapshots.ReadScope(plan.ScopeJson);
-        if (scope.Count > maximumSegments || plan.ShareCount < 2 || plan.ShareCount > maximumShares
-            || AccountDebtMath.Total(scope) != plan.TotalMinor || plan.TotalMinor < plan.ShareCount)
-            throw new ConflictException("The equal-share plan exceeds the configured allocation display limit.");
+        var customAmounts = plan.CustomAmountsJson is null
+            ? null
+            : AccountPaymentSnapshots.Deserialize<List<long>>(plan.CustomAmountsJson);
+        RequirePlanCanBeDisplayed(plan, scope, customAmounts, maximumSegments, maximumShares);
         var claims = await ReadShareClaimsAsync(sessionId, plan.Id, plan.ShareCount, cancellationToken);
-        var slots = Enumerable.Range(1, plan.ShareCount).Select(ordinal =>
-        {
-            var share = AccountEqualScopeMath.ForShare(scope, plan.ShareCount, ordinal);
-            claims.TryGetValue(ordinal, out var claimState);
-            var hasClaim = claims.ContainsKey(ordinal);
-            var isAvailable = !hasClaim && IsScopeAvailable(account.Debt.Available, share);
-            return new AccountEqualShareSlotSummaryDto(
-                ordinal, AccountDebtMath.Total(share), hasClaim ? claimState : null, isAvailable);
-        }).ToArray();
-        if (slots.Sum(value => value.AmountMinor) != plan.TotalMinor)
-            throw new ConflictException("The equal-share plan does not conserve its reviewed total.");
+        var slots = BuildShareSlots(account, plan, scope, customAmounts, claims);
+        RequireSlotTotals(plan, slots);
         return new AccountPaymentEqualShareSummaryDto(
             plan.Id,
             plan.AccountRevision,
@@ -138,7 +131,61 @@ public sealed class AccountPaymentAccountReader(
             plan.Currency,
             plan.ActorId == actor.ActorId && plan.ActorKind == actor.Kind,
             slots,
-            AccountPaymentSnapshots.ToDtos(scope));
+            AccountPaymentSnapshots.ToDtos(scope),
+            customAmounts is not null,
+            customAmounts);
+    }
+
+    private static void RequirePlanCanBeDisplayed(
+        AccountEqualSharePlan plan, IReadOnlyList<AccountDebtSegment> scope, IReadOnlyList<long>? customAmounts,
+        int maximumSegments, int maximumShares)
+    {
+        if (scope.Count > maximumSegments || plan.ShareCount < 2 || plan.ShareCount > maximumShares
+            || AccountDebtMath.Total(scope) != plan.TotalMinor || !HasValidShareAmounts(plan, customAmounts))
+            throw new ConflictException("The equal-share plan exceeds the configured allocation display limit.");
+    }
+
+    private static bool HasValidShareAmounts(AccountEqualSharePlan plan, IReadOnlyList<long>? customAmounts)
+    {
+        if (customAmounts is null) return plan.TotalMinor >= plan.ShareCount;
+        if (customAmounts.Count != plan.ShareCount || customAmounts.Any(value => value <= 0))
+            return false;
+        try
+        {
+            return customAmounts.Aggregate(0L, (sum, value) => checked(sum + value)) == plan.TotalMinor;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+    }
+
+    private static AccountEqualShareSlotSummaryDto[] BuildShareSlots(
+        AccountPaymentAccountSnapshot account, AccountEqualSharePlan plan,
+        IReadOnlyList<AccountDebtSegment> scope, IReadOnlyList<long>? customAmounts,
+        IReadOnlyDictionary<int, AccountPaymentState> claims) => Enumerable.Range(1, plan.ShareCount)
+        .Select(ordinal => BuildShareSlot(account.Debt.Available, plan, scope, customAmounts, claims, ordinal))
+        .ToArray();
+
+    private static AccountEqualShareSlotSummaryDto BuildShareSlot(
+        IReadOnlyList<AccountDebtSegment> available, AccountEqualSharePlan plan,
+        IReadOnlyList<AccountDebtSegment> scope, IReadOnlyList<long>? customAmounts,
+        IReadOnlyDictionary<int, AccountPaymentState> claims, int ordinal)
+    {
+        var share = customAmounts is null
+            ? AccountEqualScopeMath.ForShare(scope, plan.ShareCount, ordinal)
+            : AccountCustomShareScopeMath.ForShare(scope, customAmounts, ordinal);
+        var hasClaim = claims.TryGetValue(ordinal, out var claimState);
+        var isAvailable = !hasClaim && IsScopeAvailable(available, share);
+        return new AccountEqualShareSlotSummaryDto(
+            ordinal, AccountDebtMath.Total(share), hasClaim ? claimState : null, isAvailable);
+    }
+
+    private static void RequireSlotTotals(
+        AccountEqualSharePlan plan, IReadOnlyList<AccountEqualShareSlotSummaryDto> slots)
+    {
+        if (slots.Sum(value => value.AmountMinor) != plan.TotalMinor)
+            throw new ConflictException("The equal-share plan does not conserve its reviewed total.");
     }
 
     private async Task<Dictionary<int, AccountPaymentState>> ReadShareClaimsAsync(

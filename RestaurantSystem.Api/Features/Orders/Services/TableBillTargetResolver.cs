@@ -38,7 +38,8 @@ public sealed class TableBillTargetResolver : ITableBillTargetResolver
         var activeSessions = await _context.TableServiceSessions
             .AsNoTracking()
             .Where(session => session.TableNumber == tableNumber
-                && session.Status == TableServiceSessionStatus.Open)
+                && session.Status == TableServiceSessionStatus.Open
+                && session.ReleasedAt == null)
             .Select(session => session.Id)
             .ToListAsync(cancellationToken);
 

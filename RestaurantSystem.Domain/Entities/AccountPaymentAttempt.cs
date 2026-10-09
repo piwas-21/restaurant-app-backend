@@ -16,6 +16,8 @@ public sealed class AccountPaymentAttempt : Entity
     public int Version { get; set; } = 1;
     public long ExpectedAccountRevision { get; set; }
     public long AmountMinor { get; set; }
+    /// <summary>Captured gratuity in minor units, separate from the account allocation amount.</summary>
+    public long TipMinor { get; set; }
     public string Currency { get; set; } = string.Empty;
     public string PayloadHash { get; set; } = string.Empty;
     public string SnapshotJson { get; set; } = string.Empty;

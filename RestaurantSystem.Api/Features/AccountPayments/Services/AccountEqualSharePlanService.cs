@@ -84,7 +84,7 @@ public sealed class AccountEqualSharePlanService(
             var account = await new AccountDebtSnapshotReader(context).ReadAsync(sessionId, cancellationToken);
             var scope = account.Debt.Available;
             var total = AccountDebtMath.Total(scope);
-            ValidateScope(scope, total, request.ShareCount);
+            ValidateScope(scope, total, request);
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
             var plan = CreatePlan(sessionId, request, account, total, hash, now, actor);
@@ -109,18 +109,39 @@ public sealed class AccountEqualSharePlanService(
         if (!features.TableAccountPaymentsV1)
             throw new NotFoundException("Table account payments are not enabled.");
         if (sessionId == Guid.Empty || request.OperationId == Guid.Empty
-            || request.ExpectedAccountRevision <= 0)
+            || request.ExpectedAccountRevision <= 0 || request.CustomAmountsMinor is null)
             throw new BadRequestException("A valid table visit, operation and account revision are required.");
         if (request.ShareCount < 2 || request.ShareCount > options.Value.MaximumEqualShares)
             throw new BadRequestException("The equal-share count is outside the configured limit.");
         if (request.SupersedesPlanId == Guid.Empty)
             throw new BadRequestException("The superseded plan id is invalid.");
+        if (request.CustomAmountsMinor.Count > 0
+            && (request.CustomAmountsMinor.Count != request.ShareCount
+                || request.CustomAmountsMinor.Any(value => value <= 0 || value > 9_999_999_999)))
+            throw new BadRequestException("Every custom guest amount must be positive and match the guest count.");
     }
 
-    private void ValidateScope(IReadOnlyList<AccountDebtSegment> scope, long total, int shareCount)
+    private void ValidateScope(
+        IReadOnlyList<AccountDebtSegment> scope, long total, CreateAccountEqualSharePlanRequest request)
     {
-        if (scope.Count == 0 || total < shareCount)
+        if (scope.Count == 0)
+            throw new BadRequestException("The reviewed table balance has no payable value.");
+        if (request.CustomAmountsMinor.Count == 0 && total < request.ShareCount)
             throw new BadRequestException("Every reviewed share must contain at least one minor unit.");
+        if (request.CustomAmountsMinor.Count > 0)
+        {
+            long customTotal;
+            try
+            {
+                customTotal = request.CustomAmountsMinor.Aggregate(0L, (sum, amount) => checked(sum + amount));
+            }
+            catch (OverflowException)
+            {
+                throw new BadRequestException("The custom guest amounts exceed the supported balance.");
+            }
+            if (customTotal != total)
+                throw new BadRequestException("Custom guest amounts must add up to the full available table balance.");
+        }
         if (scope.Count > options.Value.MaximumScopeSegments)
             throw new BadRequestException("The equal-share scope exceeds the configured segment limit.");
     }
@@ -143,6 +164,9 @@ public sealed class AccountEqualSharePlanService(
             Currency = account.Money.Currency,
             PayloadHash = hash,
             ScopeJson = AccountPaymentSnapshots.Serialize(account.Debt.Available),
+            CustomAmountsJson = request.CustomAmountsMinor.Count > 0
+                ? AccountPaymentSnapshots.Serialize(request.CustomAmountsMinor)
+                : null,
             ActorId = actor.ActorId,
             ActorKind = actor.Kind,
             SupersedesPlanId = request.SupersedesPlanId,
