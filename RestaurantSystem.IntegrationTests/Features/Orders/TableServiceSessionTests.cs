@@ -1,10 +1,12 @@
 using System.Data.Common;
+using System.Globalization;
 using FluentAssertions;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Npgsql;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
@@ -931,6 +933,96 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Legacy_release_and_new_visit_open_serialize_on_the_table_then_session_locks()
+    {
+        const int tableNumber = 57;
+        var tableId = await SeedTableAsync(tableNumber.ToString());
+        var sessionId = await SeedLegacySessionAsync(tableNumber);
+
+        await using var blocker = _fixture.CreateContext();
+        await blocker.Database.OpenConnectionAsync();
+        await using var blockerTransaction = await blocker.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.ReadCommitted);
+        (await TableServiceSessionRowLock.LoadAsync(
+            blocker, sessionId, CancellationToken.None)).Should().NotBeNull();
+
+        await using var releaseContext = _fixture.CreateContext();
+        await releaseContext.Database.OpenConnectionAsync();
+        var releaseProcessId = ((NpgsqlConnection)releaseContext.Database.GetDbConnection()).ProcessID;
+        var releaseHandler = new ReleaseTableServiceSessionCommandHandler(
+            releaseContext,
+            SessionReader(releaseContext),
+            new RestaurantSystem.Api.Features.TableGuestVisits.Services.TableGuestVisitRevoker(releaseContext),
+            Mock.Of<ICurrentUserService>(user => user.GetAuditIdentifier() == "legacy-release-race"));
+        var releaseTask = releaseHandler.Handle(new ReleaseTableServiceSessionCommand
+        {
+            ServiceSessionId = sessionId,
+            ExpectedVersion = 1,
+        }, CancellationToken.None);
+
+        (await WaitForLockWaitAsync(releaseProcessId, "table_service_sessions"))
+            .Should().BeTrue("legacy release should take the configured table lock before waiting on its session");
+
+        await using var openContext = _fixture.CreateContext();
+        await openContext.Database.OpenConnectionAsync();
+        var openProcessId = ((NpgsqlConnection)openContext.Database.GetDbConnection()).ProcessID;
+        var openTask = OpenHandler(openContext).Handle(
+            new OpenTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
+        (await WaitForLockWaitAsync(openProcessId, "\"Tables\""))
+            .Should().BeTrue("opening must wait on the table guard held by the release");
+
+        await blockerTransaction.CommitAsync(CancellationToken.None);
+        var released = await releaseTask.WaitAsync(TimeSpan.FromSeconds(10));
+        var opened = await openTask.WaitAsync(TimeSpan.FromSeconds(10));
+
+        released.Success.Should().BeTrue();
+        released.Data!.IsTableReleased.Should().BeTrue();
+        opened.Success.Should().BeTrue();
+        opened.Data!.ServiceSessionId.Should().NotBe(sessionId);
+        await using var verify = _fixture.CreateContext();
+        var visits = await verify.TableServiceSessions.OrderBy(value => value.OpenedAt).ToListAsync();
+        visits.Should().HaveCount(2);
+        visits.Single(value => value.Id == sessionId).ReleasedAt.Should().NotBeNull();
+        visits.Single(value => value.Id == opened.Data.ServiceSessionId).ReleasedAt.Should().BeNull();
+        (await verify.Tables.SingleAsync(value => value.Id == tableId)).ReadinessState
+            .Should().Be(TableReadinessState.NeedsReset);
+    }
+
+    [Fact]
+    public async Task Opening_discards_a_session_candidate_released_before_its_row_lock()
+    {
+        var tableId = await SeedTableAsync("58");
+        var sessionId = await SeedStableSessionAsync(tableId);
+        var gate = new OpenCandidateReadGate();
+        await using var openContext = _fixture.CreateContext(gate);
+        var openTask = OpenHandler(openContext).Handle(
+            new OpenTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
+
+        await gate.CandidateRead.WaitAsync(TimeSpan.FromSeconds(5));
+        var releasedAt = Utc(12, 45);
+        await using (var concurrentRelease = _fixture.CreateContext())
+        {
+            var updated = await concurrentRelease.TableServiceSessions
+                .Where(value => value.Id == sessionId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(value => value.ReleasedAt, releasedAt)
+                    .SetProperty(value => value.ReleasedBy, "concurrent-release"));
+            updated.Should().Be(1);
+        }
+
+        gate.Continue();
+        var opened = await openTask.WaitAsync(TimeSpan.FromSeconds(10));
+
+        opened.Success.Should().BeTrue();
+        opened.Data!.ServiceSessionId.Should().NotBe(sessionId,
+            "the row lock must revalidate ReleasedAt after the earlier active-candidate query");
+        await using var verify = _fixture.CreateContext();
+        (await verify.TableServiceSessions.SingleAsync(value => value.Id == sessionId)).ReleasedAt
+            .Should().Be(releasedAt);
+        (await verify.TableServiceSessions.CountAsync(value => value.ReleasedAt == null)).Should().Be(1);
+    }
+
+    [Fact]
     public async Task Releasing_a_repaired_legacy_visit_keeps_its_orders_payable_and_separate_from_the_next_visit()
     {
         var tableId = await SeedTableAsync("52");
@@ -1321,11 +1413,43 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     {
         var id = Guid.NewGuid();
         await using var context = _fixture.CreateContext();
+        var tableLabel = tableNumber.ToString(CultureInfo.InvariantCulture);
+        if (!await context.Tables.AnyAsync(value => value.TableNumber == tableLabel))
+        {
+            context.Tables.Add(new Table
+            {
+                Id = Guid.NewGuid(),
+                TableNumber = tableLabel,
+                MaxGuests = 4,
+                IsActive = true,
+                CreatedAt = Utc(10, 0),
+                CreatedBy = nameof(TableServiceSessionTests),
+            });
+        }
         context.TableServiceSessions.Add(new TableServiceSession
         {
             Id = id,
             TableNumber = tableNumber,
             Currency = currency,
+            Status = TableServiceSessionStatus.Open,
+            Version = 1,
+            OpenedAt = Utc(11, 0),
+            CreatedAt = Utc(11, 0),
+            CreatedBy = nameof(TableServiceSessionTests),
+        });
+        await context.SaveChangesAsync();
+        return id;
+    }
+
+    private async Task<Guid> SeedLegacySessionAsync(int tableNumber)
+    {
+        var id = Guid.NewGuid();
+        await using var context = _fixture.CreateContext();
+        context.TableServiceSessions.Add(new TableServiceSession
+        {
+            Id = id,
+            TableNumber = tableNumber,
+            TableId = null,
             Status = TableServiceSessionStatus.Open,
             Version = 1,
             OpenedAt = Utc(11, 0),
@@ -1562,6 +1686,29 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
             new TableIdentityResolver(context));
     }
 
+    private async Task<bool> WaitForLockWaitAsync(int processId, string statementFragment)
+    {
+        await using var observer = _fixture.CreateContext();
+        await observer.Database.OpenConnectionAsync();
+        await using var command = observer.Database.GetDbConnection().CreateCommand();
+        command.CommandText = "SELECT query FROM pg_stat_activity WHERE pid = @pid AND wait_event_type = 'Lock'";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "pid";
+        parameter.Value = processId;
+        command.Parameters.Add(parameter);
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await command.ExecuteScalarAsync() is string query
+                && query.Contains(statementFragment, StringComparison.OrdinalIgnoreCase))
+                return true;
+            await Task.Delay(25);
+        }
+
+        return false;
+    }
+
     private static DateTime Utc(int hour, int minute) => new(2026, 9, 11, hour, minute, 0, DateTimeKind.Utc);
 
     private sealed class SessionMetadataQueryCounter : DbCommandInterceptor
@@ -1609,6 +1756,37 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
             }
 
             return await base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+    }
+
+    private sealed class OpenCandidateReadGate : DbCommandInterceptor
+    {
+        private readonly TaskCompletionSource<bool> _candidateRead =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _continue =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _blocked;
+
+        public Task CandidateRead => _candidateRead.Task;
+
+        public void Continue() => _continue.TrySetResult(true);
+
+        public override async ValueTask<DbDataReader> ReaderExecutedAsync(
+            DbCommand command,
+            CommandExecutedEventData eventData,
+            DbDataReader result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("table_service_sessions", StringComparison.OrdinalIgnoreCase)
+                && command.CommandText.Contains("released_at", StringComparison.OrdinalIgnoreCase)
+                && !command.CommandText.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase)
+                && Interlocked.Exchange(ref _blocked, 1) == 0)
+            {
+                _candidateRead.TrySetResult(true);
+                await _continue.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+
+            return await base.ReaderExecutedAsync(command, eventData, result, cancellationToken);
         }
     }
 }

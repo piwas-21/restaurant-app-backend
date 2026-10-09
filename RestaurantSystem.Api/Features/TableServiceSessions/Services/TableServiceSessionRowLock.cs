@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -16,6 +17,15 @@ public static class TableServiceSessionRowLock
             .FromSqlInterpolated($"SELECT * FROM \"Tables\" WHERE id = {tableId} FOR NO KEY UPDATE")
             .SingleOrDefaultAsync(cancellationToken);
 
+    public static Task<Table?> LoadTableByNumberAsync(
+        ApplicationDbContext context, int tableNumber, CancellationToken cancellationToken)
+    {
+        var label = tableNumber.ToString(CultureInfo.InvariantCulture);
+        return context.Tables
+            .FromSqlInterpolated($"SELECT * FROM \"Tables\" WHERE table_number = {label} FOR NO KEY UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
     public static Task<TableServiceSession?> LoadAsync(
         ApplicationDbContext context, Guid serviceSessionId, CancellationToken cancellationToken) =>
         context.TableServiceSessions
@@ -29,15 +39,22 @@ public static class TableServiceSessionRowLock
     public static async Task<TableServiceSessionLifecycleRows> LoadForLifecycleAsync(
         ApplicationDbContext context, Guid serviceSessionId, CancellationToken cancellationToken)
     {
-        var locatedTableId = await context.TableServiceSessions.AsNoTracking()
+        var located = await context.TableServiceSessions.AsNoTracking()
             .Where(session => session.Id == serviceSessionId)
-            .Select(session => session.TableId)
+            .Select(session => new { session.TableId, session.TableNumber })
             .SingleOrDefaultAsync(cancellationToken);
-        var table = locatedTableId.HasValue
-            ? await LoadTableAsync(context, locatedTableId.Value, cancellationToken)
-            : null;
+        var table = located?.TableId is Guid tableId
+            ? await LoadTableAsync(context, tableId, cancellationToken)
+            : located?.TableNumber is int tableNumber
+                ? await LoadTableByNumberAsync(context, tableNumber, cancellationToken)
+                : null;
         var session = await LoadAsync(context, serviceSessionId, cancellationToken);
-        var identityChanged = session is not null && session.TableId != locatedTableId;
+        var identityChanged = session is not null && (located is null
+            || session.TableId != located.TableId
+            || session.TableNumber != located.TableNumber
+            || !located.TableId.HasValue && (!located.TableNumber.HasValue
+                || table is null
+                || table.TableNumber != located.TableNumber.Value.ToString(CultureInfo.InvariantCulture)));
         return new TableServiceSessionLifecycleRows(table, session, identityChanged);
     }
 }

@@ -1,5 +1,4 @@
 using System.Data;
-using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -62,14 +61,15 @@ public sealed class ClearPendingTableOrdersCommandHandler(
         else
         {
             var tableNumber = command.TableNumber!.Value;
+            table = await TableServiceSessionRowLock.LoadTableByNumberAsync(
+                context, tableNumber, cancellationToken);
+            if (table is null)
+                return Refused("Resolve the legacy table identity before clearing its pending orders.");
             if (await context.TableServiceSessions.AnyAsync(value => value.TableNumber == tableNumber
                     && value.Status == TableServiceSessionStatus.Open, cancellationToken))
                 return Refused("Use the explicit visit instead of the legacy table-number action.");
             orderQuery = context.Orders.Where(value => value.TableNumber == tableNumber
                 && value.ServiceSessionId == null && value.Type == OrderType.DineIn);
-            table = await context.Tables.FirstOrDefaultAsync(value =>
-                    value.TableNumber == tableNumber.ToString(CultureInfo.InvariantCulture),
-                cancellationToken);
         }
 
         var orders = await orderQuery.Where(value => !value.IsDeleted && value.Status != OrderStatus.Cancelled)
