@@ -90,7 +90,7 @@ internal static class OrderBillingCreditConsistency
             throw InvalidJournal();
     }
 
-    private static bool HasSettledLoyaltyEvidence(OrderAmendmentFinancialPreviewDto outcome)
+    internal static bool HasSettledLoyaltyEvidence(OrderAmendmentFinancialPreviewDto outcome)
     {
         if (outcome.LoyaltyState == OrderAmendmentLoyaltyState.None)
             return IsNoLoyaltyEffect(outcome.Loyalty);

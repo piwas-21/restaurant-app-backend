@@ -6,6 +6,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
@@ -242,6 +243,16 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
         var journal = await context.AccountCheckoutJournals.SingleAsync(value => value.AttemptId == _attemptId);
         journal.AmountMinor = 1200;
         journal.ProviderCapturedMinor = 1200;
+        journal.CreatePayloadHash = AccountCheckoutReplayPayload.Hash(new AccountStripeCheckoutRequest
+        {
+            AttemptId = _attemptId,
+            Context = new AccountStripeContext(journal.ProviderAccountId, journal.ProviderLiveMode),
+            AmountMinor = journal.AmountMinor,
+            Currency = journal.Currency,
+            ExpiresAt = journal.ExpiresAt,
+            IdempotencyKey = journal.CreateIdempotencyKey,
+            ReturnBaseUrl = journal.ReturnBaseUrl
+        });
         await context.SaveChangesAsync();
         var source = await context.Orders.Include(value => value.ServiceSession)
             .SingleAsync(value => value.Id == _orderId);
@@ -283,7 +294,7 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
         }, options);
     }
 
-    private async Task RecordCanonicalCheckoutRefundAsync()
+    private async Task RecordCanonicalCheckoutRefundAsync(long expectedRefundedMinor = 600)
     {
         await using var context = DatabaseFixture.CreateContext();
         var journal = await context.AccountCheckoutJournals.SingleAsync(value => value.AttemptId == _attemptId);
@@ -292,7 +303,7 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
         var updated = await new AccountCheckoutEvidenceWriter(context,
                 Options.Create(new AccountCheckoutSettings()), TimeProvider.System)
             .RecordAsync(journal, evidence, CancellationToken.None);
-        updated.ProviderRefundedMinor.Should().Be(600);
+        updated.ProviderRefundedMinor.Should().Be(expectedRefundedMinor);
         updated.ReconciliationRequired.Should().BeFalse();
     }
 

@@ -13,12 +13,24 @@ internal static class AccountCashRefundHistoryReader
 {
     internal static async Task<IReadOnlyDictionary<Guid, AccountCashRefundHistory>> ReadAsync(
         ApplicationDbContext context, IReadOnlyCollection<Guid> attemptIds,
-        CancellationToken cancellationToken, Guid? excludedOperationId = null)
+        CancellationToken cancellationToken, Guid? excludedOperationId = null,
+        // Used only by cancellation integrity; null preserves whole-history validation.
+        IReadOnlySet<Guid>? cancellationTargetLegIds = null)
     {
         AccountCashRefundHistoryReadLimit.RequireWithinLimit(attemptIds.Count);
+        var cancellationTargets = cancellationTargetLegIds?.ToHashSet();
+        if (cancellationTargets is not null
+            && (cancellationTargets.Count == 0 || cancellationTargets.Contains(Guid.Empty)))
+            throw ReconciliationRequired();
+        if (cancellationTargets is not null)
+            AccountCashRefundHistoryReadLimit.RequireWithinLimit(cancellationTargets.Count);
         var ids = attemptIds.Distinct().ToArray();
         if (ids.Length == 0)
+        {
+            if (cancellationTargets is not null)
+                throw ReconciliationRequired();
             return new Dictionary<Guid, AccountCashRefundHistory>();
+        }
 
         var attempts = await AccountCashRefundHistoryReadLimit.ReadAsync(
             context.AccountPaymentAttempts.AsNoTracking()
@@ -28,7 +40,11 @@ internal static class AccountCashRefundHistoryReader
                 && value.CashCollectionReceipt is not null)
             .ToArray();
         if (cashAttempts.Length == 0)
+        {
+            if (cancellationTargets is not null)
+                throw ReconciliationRequired();
             return new Dictionary<Guid, AccountCashRefundHistory>();
+        }
 
         var cashAttemptIds = cashAttempts.Select(value => value.Id).ToArray();
         var allocations = await AccountCashRefundHistoryReadLimit.ReadAsync(
@@ -44,6 +60,15 @@ internal static class AccountCashRefundHistoryReader
         var excludedLegIds = GetExcludedLegIds(allLegs, excludedOperationId);
         var legs = allLegs.Where(value => !excludedLegIds.Contains(value.Id)).ToArray();
         var legIds = legs.Select(value => value.Id).ToArray();
+        var legIdSet = legIds.ToHashSet();
+        if (cancellationTargets is not null
+            && cancellationTargets.Any(value => !legIdSet.Contains(value)))
+            throw ReconciliationRequired();
+        var targetsByAttempt = cancellationTargets is null ? null : legs
+            .Where(value => cancellationTargets.Contains(value.Id))
+            .GroupBy(value => value.AccountPaymentAttemptId ?? throw ReconciliationRequired())
+            .ToDictionary(value => value.Key,
+                value => (IReadOnlySet<Guid>)value.Select(leg => leg.Id).ToHashSet());
         if (await context.OrderAmendmentRefundLegs.AsNoTracking()
                 .AnyAsync(value => legIds.Contains(value.Id) && value.Attempts.Any(), cancellationToken))
             throw ReconciliationRequired();
@@ -90,7 +115,7 @@ internal static class AccountCashRefundHistoryReader
                 legs.Where(value => value.AccountPaymentAttemptId == attempt.Id).ToArray(),
                 intents.Where(value => value.AttemptId == attempt.Id).ToArray(),
                 reversals.Where(value => attemptAllocationIds.Contains(value.AllocationId)).ToArray(),
-                evidence, operations), cancellationToken));
+                evidence, operations), targetsByAttempt?.GetValueOrDefault(attempt.Id), cancellationToken));
         }
         return result;
     }
@@ -103,7 +128,8 @@ internal static class AccountCashRefundHistoryReader
 
     private static AccountCashRefundHistory ReadOne(
         AccountPaymentAttempt attempt, AccountCashCollectionReceipt receipt,
-        AccountCashHistoryEvidence historyEvidence, CancellationToken cancellationToken)
+        AccountCashHistoryEvidence historyEvidence, IReadOnlySet<Guid>? cancellationTargetLegIds,
+        CancellationToken cancellationToken)
     {
         var (legs, intents, reversals, evidence, operations) = historyEvidence;
         cancellationToken.ThrowIfCancellationRequested();
@@ -114,7 +140,10 @@ internal static class AccountCashRefundHistoryReader
         var byLeg = legs.ToDictionary(value => value.Id);
         var operationById = operations.ToDictionary(value => value.Id);
         var allocationById = attempt.Allocations.ToDictionary(value => value.Id);
+        var (priorOperationIds, targetSourceOrderIds) = AccountCashRefundHistoryPrefix.TargetScope(
+            cancellationTargetLegIds, byLeg, operationById);
         var remaining = intents.ToList();
+        var validatedTargets = new HashSet<Guid>();
         var refundedExact = 0L;
         var refundedCash = 0L;
         var fingerprint = AccountCashRefundHistoryFingerprint.Seed(receipt);
@@ -125,6 +154,24 @@ internal static class AccountCashRefundHistoryReader
                 && value.PreviouslyRefundedCashMinor == refundedCash).ToArray();
             if (next.Length != 1)
                 throw ReconciliationRequired();
+            var nextLeg = byLeg[next[0].RefundLegId];
+            if (cancellationTargetLegIds is not null
+                && validatedTargets.Count == cancellationTargetLegIds.Count
+                && nextLeg.State == OrderAmendmentRefundLegState.Pending)
+            {
+                if (remaining.Count != 1)
+                    throw ReconciliationRequired();
+                var tailIntent = next[0];
+                if (!operationById.TryGetValue(tailIntent.OperationId, out var tailOperation))
+                    throw ReconciliationRequired();
+                AccountCashRefundHistoryPrefix.RequireUnrelatedPendingTail(
+                    tailIntent, nextLeg, tailOperation, receipt, attempt.ServiceSessionId,
+                    new AccountCashRefundHistory(refundedExact, refundedCash, fingerprint),
+                    evidence.Where(value => value.RefundLegId == nextLeg.Id).ToArray(),
+                    reversals.Where(value => value.RefundLegId == nextLeg.Id).ToArray(),
+                    reversals, allocationById, priorOperationIds, targetSourceOrderIds);
+                break;
+            }
             var intent = next[0];
             var leg = byLeg[intent.RefundLegId];
             if (!operationById.TryGetValue(intent.OperationId, out var operation))
@@ -136,13 +183,20 @@ internal static class AccountCashRefundHistoryReader
             ValidateRefund(intent, new AccountCashRefundProof(leg, operation, receipt, scopes,
                 legEvidence, legReversals, allocationById), returnEvidence,
                 new AccountCashRefundHistory(refundedExact, refundedCash, fingerprint));
+            priorOperationIds.Add(operation.Id);
 
             refundedExact = checked(refundedExact + intent.ExactRefundAmountMinor);
             refundedCash = checked(refundedCash + intent.CashRefundAmountMinor);
             fingerprint = AccountCashRefundHistoryFingerprint.Advance(
                 fingerprint, intent, returnEvidence!, scopes, legReversals);
+            if (cancellationTargetLegIds?.Contains(leg.Id) == true)
+                validatedTargets.Add(leg.Id);
             remaining.Remove(intent);
         }
+
+        if (cancellationTargetLegIds is not null
+            && validatedTargets.Count != cancellationTargetLegIds.Count)
+            throw ReconciliationRequired();
 
         var allLegIds = legs.Select(value => value.Id).ToHashSet();
         if (reversals.Any(value => !allLegIds.Contains(value.RefundLegId))

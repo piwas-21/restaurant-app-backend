@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
+using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
@@ -69,7 +70,7 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests(Datab
     {
         await base.SeedTestData();
         await using var context = DatabaseFixture.CreateContext();
-        var now = DateTime.UtcNow;
+        var now = PostgresTimestampPrecision.TruncateToMicrosecond(DateTime.UtcNow);
         var session = new TableServiceSession
         {
             Id = _sessionId,
@@ -131,6 +132,7 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests(Datab
             Mode = AccountPaymentMode.Amount,
             State = AccountPaymentState.Captured,
             PaymentMethod = PaymentMethod.OnlinePayment,
+            Version = 2,
             AmountMinor = 2000,
             Currency = "CHF",
             PayloadHash = new string('c', 64),
@@ -156,6 +158,18 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests(Datab
                 CreatedBy = nameof(OrderAmendmentStripeResolutionIntegrationTests)
             }]
         };
+        var returnBaseUrl = Client.BaseAddress?.ToString()
+            ?? throw new InvalidOperationException("The integration test host has no base URL.");
+        var checkoutRequest = new AccountStripeCheckoutRequest
+        {
+            AttemptId = _attemptId,
+            Context = new AccountStripeContext(FakeAmendmentRefundState.AccountId, false),
+            AmountMinor = 2000,
+            Currency = "CHF",
+            ExpiresAt = now.AddHours(1),
+            IdempotencyKey = AccountCheckoutReplayPayload.CreateKey(_attemptId),
+            ReturnBaseUrl = returnBaseUrl
+        };
         var journal = new AccountCheckoutJournal
         {
             Id = Guid.NewGuid(),
@@ -165,10 +179,9 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests(Datab
             Currency = "CHF",
             ProviderAccountId = FakeAmendmentRefundState.AccountId,
             ProviderLiveMode = false,
-            CreateIdempotencyKey = $"checkout:{_attemptId:N}",
-            CreatePayloadHash = new string('a', 64),
-            ReturnBaseUrl = Client.BaseAddress?.ToString()
-                ?? throw new InvalidOperationException("The integration test host has no base URL."),
+            CreateIdempotencyKey = checkoutRequest.IdempotencyKey,
+            CreatePayloadHash = AccountCheckoutReplayPayload.Hash(checkoutRequest),
+            ReturnBaseUrl = returnBaseUrl,
             StartedAt = now,
             ExpiresAt = now.AddHours(1),
             MaximumCreateRetryAt = now.AddHours(1),

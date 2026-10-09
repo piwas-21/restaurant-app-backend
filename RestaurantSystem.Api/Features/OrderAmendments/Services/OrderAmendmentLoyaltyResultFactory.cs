@@ -18,6 +18,54 @@ internal static class OrderAmendmentLoyaltyResultFactory
 {
     private sealed record AwardTotals(bool Pending, int Applied, int Suppressed);
 
+    internal static void ValidateSettledJournalEvidence(
+        OrderAmendmentResolutionOperation operation,
+        OrderAmendmentLoyaltyPlan? plan,
+        IReadOnlyList<OrderAmendmentLoyaltyCompensation> compensations,
+        IReadOnlyList<OrderAmendmentLoyaltyCompensationUnit> units,
+        IReadOnlyList<OrderAmendmentLoyaltyReservation> reservations,
+        IReadOnlyList<OrderAmendmentLoyaltyCompensationPosting> postings,
+        OrderAmendmentLoyaltyResultDto? result)
+    {
+        if (operation.State != OrderAmendmentResolutionOperationState.Resolved)
+            throw Invalid("Loyalty journal evidence is only valid for a resolved operation.");
+        if (plan is null)
+        {
+            if (compensations.Count != 0 || units.Count != 0 || reservations.Count != 0
+                || postings.Count != 0 || result is not null)
+                throw Invalid("A loyalty journal exists without an accepted snapshot.");
+            return;
+        }
+        if (plan.SnapshotId is null)
+        {
+            if (!IsCanonicalEmptyPlan(plan, operation.Currency)
+                || compensations.Count != 0 || units.Count != 0 || reservations.Count != 0
+                || postings.Count != 0 || result is not null)
+                throw Invalid("A loyalty journal exists without an accepted snapshot.");
+            return;
+        }
+
+        ValidateCompensations(operation, plan, compensations);
+        ValidateCompensationUnits(operation, plan, compensations, units);
+        var reservation = ValidateReservation(operation, plan, compensations, reservations);
+        if (reservation is not null && reservation.State != OrderAmendmentLoyaltyReservationState.Consumed)
+            throw Invalid("The settled loyalty clawback reservation was not consumed.");
+        ValidatePostings(operation, compensations, postings);
+        if (result is null
+            || plan.EarnedClawbackPoints != SumRequired(compensations,
+                OrderAmendmentLoyaltyCompensationKind.EarnedClawback)
+            || plan.RedemptionRestorationPoints != SumRequired(compensations,
+                OrderAmendmentLoyaltyCompensationKind.RedemptionRestoration)
+            || result.EarnedClawbackPoints != plan.EarnedClawbackPoints
+            || result.RedemptionRestorationPoints != plan.RedemptionRestorationPoints
+            || result.PostedClawbackPoints != SumPosted(compensations, postings,
+                OrderAmendmentLoyaltyCompensationKind.EarnedClawback)
+            || result.PostedRestorationPoints != SumPosted(compensations, postings,
+                OrderAmendmentLoyaltyCompensationKind.RedemptionRestoration)
+            || postings.Any(value => value.MovementTransactionId == Guid.Empty || value.PostedAt == default))
+            throw Invalid("The posted loyalty journal differs from its resolved operation result.");
+    }
+
     internal static OrderAmendmentLoyaltyResultDto? Create(
         OrderAmendmentResolutionOperation operation, OrderAmendmentLoyaltyResultEvidence evidence)
     {
@@ -138,7 +186,29 @@ internal static class OrderAmendmentLoyaltyResultFactory
                 || row.OriginalTransactionPoints != expected.OriginalTransactionPoints
                 || row.RequiredPoints != expected.RequiredPoints || row.PlanFingerprint != expected.PlanFingerprint)
                 throw Invalid("A saved loyalty compensation header is not bound to the reviewed operation.");
+            if (expected.PlanFingerprint != OrderAmendmentLoyaltyPlanFingerprint.CreateCompensation(
+                    operation.SourceOrderId, operation.AmendmentId, expected))
+                throw Invalid("A saved loyalty compensation plan fingerprint is invalid.");
         }
+    }
+
+    private static void ValidateCompensationUnits(OrderAmendmentResolutionOperation operation,
+        OrderAmendmentLoyaltyPlan plan, IReadOnlyList<OrderAmendmentLoyaltyCompensation> compensations,
+        IReadOnlyList<OrderAmendmentLoyaltyCompensationUnit> units)
+    {
+        var acceptedUnitIds = plan.RemovedUnits.Select(value => value.SnapshotUnitId).ToHashSet();
+        foreach (var expected in plan.Compensations)
+        {
+            var header = compensations.Single(value => value.OriginalTransactionId == expected.OriginalTransactionId
+                && value.Kind == expected.Kind);
+            var stored = units.Where(value => value.CompensationId == header.Id).ToArray();
+            if (!OrderAmendmentLoyaltyCompensationPoster.StoredUnitsMatch(stored,
+                    operation.SourceOrderId, expected.Kind, expected.Units, acceptedUnitIds)
+                || stored.Sum(value => (long)value.Points) != expected.RequiredPoints)
+                throw Invalid("The saved loyalty compensation units differ from the reviewed plan.");
+        }
+        if (units.Any(value => compensations.All(header => header.Id != value.CompensationId)))
+            throw Invalid("A saved loyalty compensation unit has no matching header.");
     }
 
     private static OrderAmendmentLoyaltyReservation? ValidateReservation(
@@ -186,6 +256,19 @@ internal static class OrderAmendmentLoyaltyResultFactory
         return checked((int)postings.Where(value => ids.Contains(value.CompensationId))
             .Sum(value => Math.Abs((long)value.PointsDelta)));
     }
+
+    private static int SumRequired(IReadOnlyList<OrderAmendmentLoyaltyCompensation> headers,
+        OrderAmendmentLoyaltyCompensationKind kind) => checked((int)headers
+            .Where(value => value.Kind == kind).Sum(value => (long)value.RequiredPoints));
+
+    private static bool IsCanonicalEmptyPlan(OrderAmendmentLoyaltyPlan plan, string currency) =>
+        string.Equals(plan.Currency, currency, StringComparison.Ordinal)
+        && plan.CandidatePoints == 0 && plan.AppliedAwardPoints == 0 && !plan.AwardPending
+        && plan.EarnedClawbackPoints == 0 && plan.RedemptionRestorationPoints == 0
+        && plan.RemovedUnits is { Count: 0 } && plan.Compensations is { Count: 0 }
+        && plan.PendingAwardSuppressions is { Count: 0 }
+        && plan.EarningOwnerLinkId is null && plan.RedemptionOwnerLinkId is null
+        && plan.SuppressedPoints == 0 && plan.EarningDisposition is null && plan.EarningRetired is null;
 
     private static ConflictException Invalid(string message) => new(message);
 }
