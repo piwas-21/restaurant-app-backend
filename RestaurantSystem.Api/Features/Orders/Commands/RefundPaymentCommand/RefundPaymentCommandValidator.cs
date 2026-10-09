@@ -23,12 +23,12 @@ public class RefundPaymentCommandValidator : AbstractValidator<RefundPaymentComm
             .GreaterThanOrEqualTo(0)
             .WithMessage("Refund amount cannot be negative");
 
-        RuleFor(x => x.RefundTipMinor)
+        RuleFor(x => x.EffectiveRefundTipMinor)
             .InclusiveBetween(0, RestaurantSystem.Domain.Entities.OrderPayment.MaximumTipMinor)
             .WithMessage("Refunded tip must be a non-negative minor-unit amount within the payment limit");
 
         RuleFor(x => x)
-            .Must(command => command.RefundAmount > 0 || command.RefundTipMinor > 0)
+            .Must(command => command.RefundAmount > 0 || command.EffectiveRefundTipMinor > 0)
             .WithMessage("Enter a positive food refund or tip refund amount");
 
         RuleFor(x => x.RefundReason)

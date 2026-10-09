@@ -24,9 +24,40 @@ internal static class ZReportTenderTotalsReader
         IOrderDisplayCurrencyResolver currencyResolver,
         CancellationToken cancellationToken)
     {
-        var payments = await context.OrderPayments.AsNoTracking()
-            .Include(payment => payment.Order)
-                .ThenInclude(order => order.ExternalReference)
+        var payments = await ReadPaymentsAsync(context, startUtc, endUtc, cancellationToken);
+
+        var tableTips = await ZReportTableAccountTipReader.ReadAsync(
+            context, startUtc, endUtc, cancellationToken);
+        var captured = payments.Where(payment => IsCapturedInWindow(payment, startUtc, endUtc)).ToArray();
+        var refunded = payments.Where(payment => IsRefundedInWindow(payment, startUtc, endUtc)).ToArray();
+
+        var methodTotals = new Dictionary<(PaymentMethod Method, string Currency), TenderMethodTotal>();
+        var collectedTips = new Dictionary<string, long>(StringComparer.Ordinal);
+        var refundedTips = new Dictionary<string, long>(StringComparer.Ordinal);
+        var netCash = new Dictionary<string, long>(StringComparer.Ordinal);
+
+        AccumulateCapturedPayments(captured, currencyResolver, methodTotals, collectedTips, netCash);
+        AccumulateRefundedPayments(refunded, currencyResolver, refundedTips, netCash);
+        AccumulateTableTips(tableTips, methodTotals, collectedTips, netCash);
+        await AddCashRefundAdjustmentsAsync(
+            context, startUtc, endUtc, refunded, currencyResolver, netCash, cancellationToken);
+
+        var byMethod = BuildMethodTotals(methodTotals);
+
+        return new ZReportTenderTotals(
+            byMethod,
+            ToCurrencyTotals(collectedTips),
+            ToCurrencyTotals(refundedTips),
+            ToCurrencyTotals(netCash));
+    }
+
+    private static async Task<OrderPayment[]> ReadPaymentsAsync(
+        ApplicationDbContext context,
+        DateTime startUtc,
+        DateTime endUtc,
+        CancellationToken cancellationToken) =>
+        await context.OrderPayments.AsNoTracking()
+            .Include(payment => payment.Order.ExternalReference)
             .Where(payment => !payment.Order.IsDeleted
                 && (payment.Status == PaymentStatus.Completed
                     || payment.Status == PaymentStatus.PartiallyRefunded
@@ -35,79 +66,108 @@ internal static class ZReportTenderTotalsReader
                     || (payment.RefundDate >= startUtc && payment.RefundDate < endUtc)))
             .ToArrayAsync(cancellationToken);
 
-        var tableTips = await ZReportTableAccountTipReader.ReadAsync(
-            context, startUtc, endUtc, cancellationToken);
-        var captured = payments.Where(payment => payment.PaymentDate >= startUtc
-            && payment.PaymentDate < endUtc && payment.Status.IsCaptured()).ToArray();
-        var refunded = payments.Where(payment => payment.RefundDate >= startUtc
-            && payment.RefundDate < endUtc).ToArray();
+    private static bool IsCapturedInWindow(OrderPayment payment, DateTime startUtc, DateTime endUtc) =>
+        payment.PaymentDate >= startUtc && payment.PaymentDate < endUtc && payment.Status.IsCaptured();
 
-        var methodTotals = new Dictionary<(PaymentMethod Method, string Currency), TenderMethodTotal>();
-        var collectedTips = new Dictionary<string, long>(StringComparer.Ordinal);
-        var refundedTips = new Dictionary<string, long>(StringComparer.Ordinal);
-        var netCash = new Dictionary<string, long>(StringComparer.Ordinal);
+    private static bool IsRefundedInWindow(OrderPayment payment, DateTime startUtc, DateTime endUtc) =>
+        payment.RefundDate >= startUtc && payment.RefundDate < endUtc;
 
+    private static void AccumulateCapturedPayments(
+        IEnumerable<OrderPayment> captured,
+        IOrderDisplayCurrencyResolver currencyResolver,
+        Dictionary<(PaymentMethod Method, string Currency), TenderMethodTotal> methodTotals,
+        Dictionary<string, long> collectedTips,
+        Dictionary<string, long> netCash)
+    {
         foreach (var payment in captured)
         {
-            var currency = ResolveCurrency(payment, currencyResolver);
-            var currencyKey = CurrencyKey(currency);
+            var currencyKey = CurrencyKey(ResolveCurrency(payment, currencyResolver));
             if (payment.Order.Status != OrderStatus.Cancelled)
-            {
-                var key = (payment.PaymentMethod, currencyKey);
-                if (!methodTotals.TryGetValue(key, out var total))
-                {
-                    total = new TenderMethodTotal();
-                    methodTotals.Add(key, total);
-                }
-
-                total.TransactionCount++;
-                total.OrderAmount += payment.Amount;
-                total.TipMinor = checked(total.TipMinor + payment.TipMinor);
-            }
+                AddCapturedMethodTotal(methodTotals, payment, currencyKey);
 
             // The sales-by-method breakdown keeps its established cancelled-order exclusion,
             // while movement and gratuity totals below follow the money actually taken.
             AddMinor(collectedTips, currencyKey, payment.TipMinor);
-
             if (payment.PaymentMethod == PaymentMethod.Cash)
-            {
                 AddMinor(netCash, currencyKey, ToMinor(payment.Amount) + payment.TipMinor);
-            }
+        }
+    }
+
+    private static void AddCapturedMethodTotal(
+        Dictionary<(PaymentMethod Method, string Currency), TenderMethodTotal> methodTotals,
+        OrderPayment payment,
+        string currencyKey)
+    {
+        var key = (payment.PaymentMethod, currencyKey);
+        if (!methodTotals.TryGetValue(key, out var total))
+        {
+            total = new TenderMethodTotal();
+            methodTotals.Add(key, total);
         }
 
+        total.TransactionCount++;
+        total.OrderAmount += payment.Amount;
+        total.TipMinor = checked(total.TipMinor + payment.TipMinor);
+    }
+
+    private static void AccumulateRefundedPayments(
+        IEnumerable<OrderPayment> refunded,
+        IOrderDisplayCurrencyResolver currencyResolver,
+        Dictionary<string, long> refundedTips,
+        Dictionary<string, long> netCash)
+    {
         foreach (var payment in refunded)
         {
-            var currency = ResolveCurrency(payment, currencyResolver);
-            var currencyKey = CurrencyKey(currency);
+            var currencyKey = CurrencyKey(ResolveCurrency(payment, currencyResolver));
             AddMinor(refundedTips, currencyKey, payment.RefundedTipMinor);
             if (payment.PaymentMethod == PaymentMethod.Cash)
-            {
                 AddMinor(netCash, currencyKey,
                     -(ToMinor(payment.RefundedAmount ?? 0m) + payment.RefundedTipMinor));
-            }
         }
+    }
 
+    private static void AccumulateTableTips(
+        IEnumerable<ZReportTableAccountTipDto> tableTips,
+        Dictionary<(PaymentMethod Method, string Currency), TenderMethodTotal> methodTotals,
+        Dictionary<string, long> collectedTips,
+        Dictionary<string, long> netCash)
+    {
         foreach (var tableTip in tableTips)
         {
-            var currency = CurrencyCode.Normalize(tableTip.Currency);
-            var currencyKey = CurrencyKey(currency);
-            var key = (tableTip.PaymentMethod, currencyKey);
-            if (!methodTotals.TryGetValue(key, out var total))
-            {
-                // Table/account tip rows supplement the allocated OrderPayment amount. They are
-                // not additional tenders and therefore must not increase TransactionCount.
-                total = new TenderMethodTotal();
-                methodTotals.Add(key, total);
-            }
-
-            total.TipMinor = checked(total.TipMinor + tableTip.TipMinor);
+            var currencyKey = CurrencyKey(CurrencyCode.Normalize(tableTip.Currency));
+            AddTableTipMethodTotal(methodTotals, tableTip, currencyKey);
             AddMinor(collectedTips, currencyKey, tableTip.TipMinor);
             if (tableTip.PaymentMethod == PaymentMethod.Cash)
-            {
                 AddMinor(netCash, currencyKey, tableTip.TipMinor);
-            }
+        }
+    }
+
+    private static void AddTableTipMethodTotal(
+        Dictionary<(PaymentMethod Method, string Currency), TenderMethodTotal> methodTotals,
+        ZReportTableAccountTipDto tableTip,
+        string currencyKey)
+    {
+        var key = (tableTip.PaymentMethod, currencyKey);
+        if (!methodTotals.TryGetValue(key, out var total))
+        {
+            // Table/account tip rows supplement the allocated OrderPayment amount. They are
+            // not additional tenders and therefore must not increase TransactionCount.
+            total = new TenderMethodTotal();
+            methodTotals.Add(key, total);
         }
 
+        total.TipMinor = checked(total.TipMinor + tableTip.TipMinor);
+    }
+
+    private static async Task AddCashRefundAdjustmentsAsync(
+        ApplicationDbContext context,
+        DateTime startUtc,
+        DateTime endUtc,
+        IEnumerable<OrderPayment> refunded,
+        IOrderDisplayCurrencyResolver currencyResolver,
+        Dictionary<string, long> netCash,
+        CancellationToken cancellationToken)
+    {
         var cashRefunds = refunded
             .Where(payment => payment.PaymentMethod == PaymentMethod.Cash)
             .Select(payment => new ZReportCashTenderAdjustmentReader.RefundedCashPayment(
@@ -118,11 +178,12 @@ internal static class ZReportTenderTotalsReader
         var cashAdjustments = await ZReportCashTenderAdjustmentReader.ReadAsync(
             context, startUtc, endUtc, cashRefunds, cancellationToken);
         foreach (var adjustment in cashAdjustments)
-        {
             AddMinor(netCash, adjustment.Key, adjustment.Value);
-        }
+    }
 
-        var byMethod = methodTotals
+    private static ZReportPaymentMethodDto[] BuildMethodTotals(
+        Dictionary<(PaymentMethod Method, string Currency), TenderMethodTotal> methodTotals) =>
+        methodTotals
             .Select(entry => new ZReportPaymentMethodDto
             {
                 PaymentMethod = entry.Key.Method.ToString(),
@@ -136,13 +197,6 @@ internal static class ZReportTenderTotalsReader
             .ThenBy(row => row.Currency, StringComparer.Ordinal)
             .ThenBy(row => row.PaymentMethod, StringComparer.Ordinal)
             .ToArray();
-
-        return new ZReportTenderTotals(
-            byMethod,
-            ToCurrencyTotals(collectedTips),
-            ToCurrencyTotals(refundedTips),
-            ToCurrencyTotals(netCash));
-    }
 
     private static string? ResolveCurrency(
         OrderPayment payment,
