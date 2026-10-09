@@ -15,6 +15,7 @@ using RestaurantSystem.Api.Features.Basket.Services;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderFromBasketCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.Settings.Interfaces;
 using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -45,9 +46,12 @@ public sealed class TableGuestRoundReplayTests : IAsyncLifetime
         var basket = new Mock<IBasketService>();
         var translator = new Mock<IBasketToOrderTranslator>();
         var currentUser = new Mock<ICurrentUserService>();
+        var orderTypes = new Mock<IOrderTypeConfigurationService>();
+        orderTypes.Setup(value => value.GetEnabledOrderTypesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
         var mediator = new CustomMediator(Mock.Of<IServiceProvider>());
         var handler = new CreateOrderFromBasketCommandHandler(
-            basket.Object, translator.Object, currentUser.Object, mediator, operations.Object);
+            basket.Object, translator.Object, currentUser.Object, mediator, orderTypes.Object, operations.Object);
         var command = new CreateOrderFromBasketCommand
         {
             SessionId = "basket-capability",
@@ -61,6 +65,8 @@ public sealed class TableGuestRoundReplayTests : IAsyncLifetime
         response.Message.Should().Be("Guest round already created");
         basket.Verify(value => value.GetBasketAsync(It.IsAny<string>(), It.IsAny<Guid?>()), Times.Never);
         translator.Verify(value => value.Translate(It.IsAny<IEnumerable<RestaurantSystem.Api.Features.Basket.Dtos.BasketItemDto>>()), Times.Never);
+        orderTypes.Verify(value => value.GetEnabledOrderTypesAsync(It.IsAny<CancellationToken>()), Times.Never,
+            "a committed operation remains replayable even after DineIn becomes unavailable");
     }
 
     [Fact]
@@ -85,9 +91,12 @@ public sealed class TableGuestRoundReplayTests : IAsyncLifetime
             });
         var translator = new Mock<IBasketToOrderTranslator>();
         var currentUser = new Mock<ICurrentUserService>();
+        var orderTypes = new Mock<IOrderTypeConfigurationService>();
+        orderTypes.Setup(value => value.GetEnabledOrderTypesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([OrderType.DineIn]);
         var handler = new CreateOrderFromBasketCommandHandler(
             basket.Object, translator.Object, currentUser.Object,
-            new CustomMediator(Mock.Of<IServiceProvider>()), operations.Object);
+            new CustomMediator(Mock.Of<IServiceProvider>()), orderTypes.Object, operations.Object);
 
         var error = await Record.ExceptionAsync(() => handler.Handle(new CreateOrderFromBasketCommand
         {
@@ -99,6 +108,38 @@ public sealed class TableGuestRoundReplayTests : IAsyncLifetime
         error.Should().BeOfType<BadRequestException>()
             .Which.ErrorCode.Should().Be(ErrorCodes.TableServiceSessionStale);
         basket.Verify(value => value.GetBasketAsync("basket-capability", It.IsAny<Guid?>()), Times.Once);
+        translator.Verify(value => value.Translate(It.IsAny<IEnumerable<BasketItemDto>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Unavailable_guest_DineIn_is_rejected_before_basket_read_or_translation()
+    {
+        var context = NewRoundContext();
+        var operations = new Mock<ITableGuestRoundOperationStore>();
+        operations.Setup(value => value.FindReplayBeforeBasketAsync(context, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ApiResponse<OrderDto>?)null);
+        var basket = new Mock<IBasketService>();
+        var translator = new Mock<IBasketToOrderTranslator>();
+        var currentUser = new Mock<ICurrentUserService>();
+        var orderTypes = new Mock<IOrderTypeConfigurationService>();
+        orderTypes.Setup(value => value.GetEnabledOrderTypesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var handler = new CreateOrderFromBasketCommandHandler(
+            basket.Object, translator.Object, currentUser.Object,
+            new CustomMediator(Mock.Of<IServiceProvider>()), orderTypes.Object, operations.Object);
+
+        var error = await Record.ExceptionAsync(() => handler.Handle(new CreateOrderFromBasketCommand
+        {
+            SessionId = "basket-capability",
+            Type = OrderType.DineIn,
+            GuestRoundContext = context,
+        }, CancellationToken.None));
+
+        error.Should().BeOfType<BadRequestException>()
+            .Which.ErrorCode.Should().Be(ErrorCodes.OrderTypeNotAvailable);
+        error!.Message.Should().Be(
+            "Dine-in ordering is currently unavailable. Your table visit and basket are still saved. Try again later or ask staff.");
+        basket.Verify(value => value.GetBasketAsync(It.IsAny<string>(), It.IsAny<Guid?>()), Times.Never);
         translator.Verify(value => value.Translate(It.IsAny<IEnumerable<BasketItemDto>>()), Times.Never);
     }
 
