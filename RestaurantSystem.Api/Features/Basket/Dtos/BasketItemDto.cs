@@ -12,6 +12,7 @@ public record BasketItemDto
     public string? ProductImageUrl { get; set; }
     public Guid? ProductVariationId { get; set; }
     public Guid? ProductCustomizationOptionId { get; set; }
+    public Guid? SectionId { get; set; }
     public string? VariationName { get; set; }
 
     // Menu details

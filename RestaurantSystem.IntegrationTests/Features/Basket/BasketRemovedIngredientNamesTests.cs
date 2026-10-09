@@ -402,6 +402,8 @@ public class BasketRemovedIngredientNamesTests : IntegrationTestBase
         var parent = basket!.Data!.Items.Single(i => i.ProductId == _menuProduct.Id);
         var pizzaChild = parent.ChildItems!.Single(c => c.ProductId == _testPizza.Id);
 
+        pizzaChild.SectionId.Should().Be(_mainSection.Id);
+
         pizzaChild.RemovedIngredientNames.Should().NotBeNull();
         pizzaChild.RemovedIngredientNames.Should().Contain("Cheese");
         // The paid add-on the guest DID buy is not a removal either.

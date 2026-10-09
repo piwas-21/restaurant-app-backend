@@ -9,6 +9,8 @@ public class OrderItem : Entity
     public Guid? ProductId { get; set; }
     public Guid? ProductVariationId { get; set; }
     public Guid? MenuId { get; set; }
+    /// <summary>Frozen bundle-choice grouping, preserved if the catalog section is later deleted.</summary>
+    public Guid? SectionId { get; set; }
     public Guid? ParentOrderItemId { get; set; }
 
     /// <summary>

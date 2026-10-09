@@ -32,6 +32,7 @@ public record OrderItemDto
     public Guid? ProductId { get; set; }
     public Guid? ProductVariationId { get; set; }
     public Guid? MenuID { get; set; }
+    public Guid? SectionId { get; set; }
     public string ProductName { get; set; } = null!;
     public string? VariationName { get; set; }
     public int Quantity { get; set; }

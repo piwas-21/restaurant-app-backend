@@ -23,7 +23,8 @@ namespace RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
 public record PrinterFeedQuery(
     DateTime? ModifiedSince,
     string? Language = null,
-    string? DeviceId = null) : IQuery<List<OrderDto>>
+    string? DeviceId = null,
+    string? OrderCursor = null) : IQuery<List<OrderDto>>
 {
     public const int MaxOrdersPerPoll = 50;
 }
@@ -59,7 +60,8 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
 
         var routing = await PrepareRoutingAsync(deviceId, cancellationToken);
         var ordersQuery = BuildOrdersQuery(routing);
-        ordersQuery = ApplyModifiedSince(ordersQuery, query.ModifiedSince);
+        ordersQuery = ApplyModifiedSince(ordersQuery, query.ModifiedSince, deviceId);
+        ordersQuery = ApplyOrderCursor(ordersQuery, query.OrderCursor);
         ordersQuery = ApplyLanguageIncludes(ordersQuery, query.Language);
         var orders = await ReadOrdersAsync(ordersQuery, cancellationToken);
 
@@ -161,17 +163,6 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
 
         return routing.RoutingActivated
             ? ordersQuery.Where(o => !o.RoutingStates.Any())
-            : ordersQuery;
-    }
-
-    private static IQueryable<Order> ApplyModifiedSince(
-        IQueryable<Order> ordersQuery, DateTime? modifiedSince)
-    {
-        // A cursor with no offset binds Unspecified; normalize it before comparing to timestamptz.
-        var modifiedSinceUtc = QueryInstant.AsUtc(modifiedSince);
-        return modifiedSinceUtc.HasValue
-            ? ordersQuery.Where(o => o.CreatedAt > modifiedSinceUtc.Value
-                || (o.UpdatedAt.HasValue && o.UpdatedAt.Value > modifiedSinceUtc.Value))
             : ordersQuery;
     }
 
