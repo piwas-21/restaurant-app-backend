@@ -132,6 +132,7 @@ public partial class BasketItemFactory
                 ParentBasketItem = basketItem,
                 Quantity = item.Quantity * option.Quantity, // Scale by main item quantity
                 ProductVariationId = sectionItem.ProductVariationId,
+                SectionId = sectionItem.MenuSectionId,
                 UnitPrice = MenuBundleSelectionRules.PriceFor(sectionItem),
                 ItemTotal = 0, // Included in parent total to avoid double counting in recalculation
                 CustomizationPrice = childCustomization.CustomizationPrice, // Store customization price for this child

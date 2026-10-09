@@ -468,6 +468,35 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Recovered_route_is_observable_after_the_order_timestamp_has_passed_the_poll_window()
+    {
+        var order = await CreateReleasedOrderAsync();
+        var since = DateTime.UtcNow.AddMinutes(-1);
+        var old = since.AddHours(-1);
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE orders SET created_at={old}, updated_at=NULL WHERE id={order.Id}");
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"OrderRoutingStates\" SET created_at={old}, updated_at=NULL WHERE order_id={order.Id}");
+        }
+
+        OrderNumbers(await FetchPrinterFeedAsync(modifiedSince: since)).Should().NotContain(order.OrderNumber);
+        var deviceId = await RegisterReadyGeneralDeviceAsync();
+        var recovered = await FetchPrinterFeedAsync(deviceId, since);
+        OrderNumbers(recovered).Should().ContainSingle(order.OrderNumber);
+        RoutesFor(recovered, order.OrderNumber).Should().OnlyContain(route =>
+            route!["status"]!.GetValue<string>() == nameof(DevicePrintStatus.Queued));
+
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            await context.OrderRoutingStates.Where(route => route.OrderId == order.Id)
+                .ExecuteUpdateAsync(update => update.SetProperty(route => route.Status, DevicePrintStatus.Printed));
+        }
+        OrderNumbers(await FetchPrinterFeedAsync(deviceId, since)).Should().NotContain(order.OrderNumber);
+    }
+
+    [Fact]
     public async Task Legacy_order_created_before_routing_activation_is_not_broadcast_after_activation()
     {
         var order = await CreateReleasedOrderAsync();
@@ -546,10 +575,13 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
         return body.Data!;
     }
 
-    private async Task<JsonNode> FetchPrinterFeedAsync(string? deviceId = null)
+    private async Task<JsonNode> FetchPrinterFeedAsync(string? deviceId = null, DateTime? modifiedSince = null)
     {
         AuthenticateAsDevice();
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/orders/printer-feed");
+        var url = "/api/orders/printer-feed";
+        if (modifiedSince.HasValue)
+            url += "?modifiedSince=" + Uri.EscapeDataString(modifiedSince.Value.ToString("O"));
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
         if (deviceId is not null)
         {
             request.Headers.Add("X-Device-Id", deviceId);

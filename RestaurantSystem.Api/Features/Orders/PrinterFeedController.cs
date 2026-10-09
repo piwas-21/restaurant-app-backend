@@ -51,6 +51,7 @@ public class PrinterFeedController : ControllerBase
         [FromQuery] DateTime? modifiedSince,
         [FromQuery] string? language,
         [FromQuery] string? updateCursor,
+        [FromQuery] string? orderCursor,
         [ModelBinder(Name = "X-Device-Id", BinderType = typeof(OptionalDeviceHeaderModelBinder))]
         OptionalDeviceHeader deviceHeader,
         CancellationToken cancellationToken)
@@ -61,7 +62,7 @@ public class PrinterFeedController : ControllerBase
                 ? deviceHeader.Value ?? string.Empty
                 : null;
             var orderDtos = await _mediator.SendQuery(
-                new PrinterFeedQuery(modifiedSince, language, deviceId),
+                new PrinterFeedQuery(modifiedSince, language, deviceId, orderCursor),
                 cancellationToken);
             var updatePage = await _mediator.SendQuery(
                 new PrinterFeedUpdatesQuery(modifiedSince, updateCursor), cancellationToken);
@@ -75,6 +76,10 @@ public class PrinterFeedController : ControllerBase
                     totalCount = orderDtos.Count,
                     page = 1,
                     pageSize = PrinterFeedQuery.MaxOrdersPerPoll,
+                    // A full page conservatively requests one more page, including an empty
+                    // terminal page at an exact multiple. Older clients ignore these fields.
+                    hasMoreOrders = orderDtos.Count == PrinterFeedQuery.MaxOrdersPerPoll,
+                    nextOrderCursor = orderDtos.Count > 0 ? PrinterFeedOrderCursor.Encode(orderDtos[^1]) : null,
                     updates = updatePage.Items,
                     nextUpdateCursor = updatePage.NextUpdateCursor,
                     hasMoreUpdates = updatePage.HasMoreUpdates
@@ -92,6 +97,8 @@ public class PrinterFeedController : ControllerBase
                 {
                     items = Array.Empty<object>(),
                     totalCount = 0,
+                    hasMoreOrders = false,
+                    nextOrderCursor = (string?)null,
                     updates = Array.Empty<object>(),
                     nextUpdateCursor = (string?)null,
                     hasMoreUpdates = false

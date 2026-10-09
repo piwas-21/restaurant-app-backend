@@ -141,6 +141,7 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
     {
         var childItem = new CreateOrderItemDto
         {
+            SectionId = child.SectionId,
             ProductId = child.ProductId,
             ProductVariationId = child.ProductVariationId,
             // Already LINE-ABSOLUTE when it was written: BuildMenuItemAsync stores
