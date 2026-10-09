@@ -772,6 +772,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("payload_hash");
 
+                    b.Property<int>("RoundingIncrementMinor")
+                        .HasDefaultValue(1)
+                        .HasColumnType("integer")
+                        .HasColumnName("rounding_increment_minor");
+
                     b.Property<string>("ScopeJson")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -812,7 +817,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.ToTable("account_equal_share_plans", null, t =>
                         {
-                            t.HasCheckConstraint("ck_account_equal_share_plan_shape", "total_minor > 0 AND share_count > 0 AND account_revision > 0");
+                            t.HasCheckConstraint("ck_account_equal_share_plan_shape", "total_minor > 0 AND share_count > 0 AND account_revision > 0 AND rounding_increment_minor > 0");
                         });
                 });
 
@@ -10060,6 +10065,243 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("table_guest_round_operations");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableOccupancyRecoveryDisposition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("HadRoutingHistory")
+                        .HasColumnType("boolean")
+                        .HasColumnName("had_routing_history");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("order_number");
+
+                    b.Property<decimal>("OriginalBillingCreditAmount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("original_billing_credit_amount");
+
+                    b.Property<string>("OriginalPaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("original_payment_status");
+
+                    b.Property<decimal>("OriginalRemainingAmount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("original_remaining_amount");
+
+                    b.Property<string>("OriginalStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("original_status");
+
+                    b.Property<decimal>("OriginalTotal")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("original_total");
+
+                    b.Property<decimal>("OriginalTotalPaid")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("original_total_paid");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid?>("ServiceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_session_id");
+
+                    b.Property<Guid>("TableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("table_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<bool>("WasKitchenReleased")
+                        .HasColumnType("boolean")
+                        .HasColumnName("was_kitchen_released");
+
+                    b.Property<bool>("WasLegacyUnassigned")
+                        .HasColumnType("boolean")
+                        .HasColumnName("was_legacy_unassigned");
+
+                    b.HasKey("Id")
+                        .HasName("pk_table_occupancy_recovery_dispositions");
+
+                    b.HasIndex("ServiceSessionId");
+
+                    b.HasIndex("OperationId", "OrderId")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "WasLegacyUnassigned");
+
+                    b.HasIndex("TableId", "OrderId")
+                        .IsUnique();
+
+                    b.ToTable("table_occupancy_recovery_dispositions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_table_occupancy_recovery_disposition_shape", "((was_legacy_unassigned AND service_session_id IS NULL) OR (NOT was_legacy_unassigned AND service_session_id IS NOT NULL)) AND (kind <> 'ArchivedLegacyOccupancy' OR was_legacy_unassigned) AND (kind <> 'RetainedInPriorVisit' OR NOT was_legacy_unassigned)");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableOccupancyRecoveryOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("actor_role");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<long?>("ExpectedAccountRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_account_revision");
+
+                    b.Property<int>("ExpectedReadinessVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_readiness_version");
+
+                    b.Property<int?>("ExpectedSessionVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_session_version");
+
+                    b.Property<long?>("OutcomeAccountRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("outcome_account_revision");
+
+                    b.Property<string>("OutcomeReadinessState")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("outcome_readiness_state");
+
+                    b.Property<int>("OutcomeReadinessVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("outcome_readiness_version");
+
+                    b.Property<int?>("OutcomeSessionVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("outcome_session_version");
+
+                    b.Property<string>("PreviewFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("preview_fingerprint");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_hash");
+
+                    b.Property<Guid?>("ServiceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_session_id");
+
+                    b.Property<Guid>("TableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("table_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<DateTime?>("VisitReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("visit_released_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_table_occupancy_recovery_operations");
+
+                    b.HasIndex("ServiceSessionId");
+
+                    b.HasIndex("TableId", "Id")
+                        .IsUnique();
+
+                    b.ToTable("table_occupancy_recovery_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_table_occupancy_recovery_operation_shape", "expected_readiness_version > 0 AND outcome_readiness_version > 0 AND actor_role IN ('Admin', 'Cashier', 'Server') AND outcome_readiness_state = 'NeedsReset' AND length(request_hash) = 64 AND length(preview_fingerprint) = 64 AND length(reason) BETWEEN 1 AND 500 AND ((service_session_id IS NULL AND expected_session_version IS NULL AND expected_account_revision IS NULL AND outcome_session_version IS NULL AND outcome_account_revision IS NULL) OR (service_session_id IS NOT NULL AND expected_session_version > 0 AND expected_account_revision > 0 AND outcome_session_version > 0 AND outcome_account_revision > 0))");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableReadyOperation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12737,6 +12979,46 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Participant");
 
                     b.Navigation("ServiceSession");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableOccupancyRecoveryDisposition", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableOccupancyRecoveryOperation", null)
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Table", null)
+                        .WithMany()
+                        .HasForeignKey("TableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableOccupancyRecoveryOperation", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Table", null)
+                        .WithMany()
+                        .HasForeignKey("TableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableReadyOperation", b =>

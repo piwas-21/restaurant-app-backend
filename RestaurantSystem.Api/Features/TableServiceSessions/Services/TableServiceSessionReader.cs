@@ -182,7 +182,7 @@ public sealed partial class TableServiceSessionReader : ITableServiceSessionRead
                 && order.Type == OrderType.DineIn
                 && order.ServiceSessionId == null);
         query = TableServiceSessionCloseRules.ForUnassignedSession(
-            query, tableId, tableNumber);
+            query, _context.Set<TableOccupancyRecoveryDisposition>(), tableId, tableNumber);
         var rows = await query
             .SelectCloseCharges()
             .ToListAsync(cancellationToken);

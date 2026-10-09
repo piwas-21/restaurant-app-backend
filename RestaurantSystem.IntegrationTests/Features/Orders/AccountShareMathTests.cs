@@ -21,6 +21,34 @@ public sealed class AccountShareMathTests
     }
 
     [Fact]
+    public void Existing_one_minor_unit_plan_keeps_its_original_share_positions()
+    {
+        var plan = AccountShareMath.Equal(235, 3, roundingIncrementMinor: 1);
+
+        Enumerable.Range(1, 3).Select(plan.At).Should().Equal(79, 78, 78);
+    }
+
+    [Theory]
+    [InlineData(460, new long[] { 150, 150, 160 })]
+    [InlineData(465, new long[] { 155, 155, 155 })]
+    public void Currency_increment_floors_early_shares_and_assigns_the_exact_remainder_to_the_last(
+        long total, long[] expected)
+    {
+        var split = AccountShareMath.Equal(total, 3, 5);
+
+        Enumerable.Range(1, 3).Select(split.At).Should().Equal(expected);
+        expected.Sum().Should().Be(total);
+    }
+
+    [Fact]
+    public void Currency_increment_can_produce_zero_slots_that_plan_validation_must_reject()
+    {
+        var split = AccountShareMath.Equal(5, 3, 5);
+
+        Enumerable.Range(1, 3).Select(split.At).Should().Equal(0, 0, 5);
+    }
+
+    [Fact]
     public void Large_quantity_is_a_compact_range_without_eager_expansion()
     {
         var units = AccountShareMath.Equal(5, int.MaxValue);

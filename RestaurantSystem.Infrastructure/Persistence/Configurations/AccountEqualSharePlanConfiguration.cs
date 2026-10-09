@@ -9,7 +9,9 @@ public sealed class AccountEqualSharePlanConfiguration : IEntityTypeConfiguratio
     public void Configure(EntityTypeBuilder<AccountEqualSharePlan> builder)
     {
         builder.ToTable("account_equal_share_plans", table => table.HasCheckConstraint(
-            "ck_account_equal_share_plan_shape", "total_minor > 0 AND share_count > 0 AND account_revision > 0"));
+            "ck_account_equal_share_plan_shape",
+            "total_minor > 0 AND share_count > 0 AND account_revision > 0 AND rounding_increment_minor > 0"));
+        builder.Property(value => value.RoundingIncrementMinor).HasDefaultValue(1).IsRequired();
         builder.Property(value => value.Currency).HasMaxLength(3).IsRequired();
         builder.Property(value => value.PayloadHash).HasMaxLength(64).IsRequired();
         builder.Property(value => value.ScopeJson).HasColumnType("jsonb").IsRequired();

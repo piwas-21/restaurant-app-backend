@@ -195,6 +195,9 @@ public static class ErrorCodes
     public const string TableReadinessNotAvailable = "TableReadinessNotAvailable";
     public const string TableReadinessStaffRequired = "TableReadinessStaffRequired";
     public const string TableReadinessVisitOpen = "TableReadinessVisitOpen";
+    public const string TableOccupancyRecoveryPreviewStale = "TableOccupancyRecoveryPreviewStale";
+    public const string TableOccupancyRecoveryOperationMismatch = "TableOccupancyRecoveryOperationMismatch";
+    public const string TableOccupancyRecoveryOperationNotFound = "TableOccupancyRecoveryOperationNotFound";
     public const string TableServicePaymentHandoffOperationMismatch = "TableServicePaymentHandoffOperationMismatch";
     public const string TableServicePaymentHandoffAlreadyPending = "TableServicePaymentHandoffAlreadyPending";
     public const string TableServicePaymentHandoffNotRequestable = "TableServicePaymentHandoffNotRequestable";

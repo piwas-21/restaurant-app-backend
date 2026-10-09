@@ -16,7 +16,7 @@ public sealed class JoinTableGuestVisitCommandValidator : AbstractValidator<Join
         RuleFor(command => command.QrCodeData).NotEmpty().MaximumLength(128);
         RuleFor(command => command.AdmissionCode)
             .Must(value => TableGuestCredentialCrypto.TryNormalizeAdmissionCode(value, out _))
-            .WithMessage("Enter the 10-character visit code.");
+            .WithMessage("Enter a valid visit code.");
     }
 }
 

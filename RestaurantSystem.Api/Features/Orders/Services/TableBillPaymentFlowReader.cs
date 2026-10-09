@@ -220,7 +220,7 @@ internal static class TableBillPaymentFlowReader
     {
         var amountMinor = customAmounts is null
             ? AccountDebtMath.Total(AccountEqualScopeMath.ForShare(
-                scope, plan.ShareCount, ordinal))
+                scope, plan.ShareCount, ordinal, plan.RoundingIncrementMinor))
             : customAmounts[ordinal - 1];
         var status = ResolveGuestStatus(claims, ordinal);
         return new TableBillGuestAmountDto(ordinal, amountMinor / (decimal)MinorUnitsPerCurrencyUnit, status);

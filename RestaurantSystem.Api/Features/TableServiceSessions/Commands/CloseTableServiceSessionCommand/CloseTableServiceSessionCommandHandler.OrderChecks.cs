@@ -13,7 +13,8 @@ public sealed partial class CloseTableServiceSessionCommandHandler
         TableServiceSession session, CancellationToken cancellationToken)
     {
         var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
-            _context.Orders, session.TableId, session.TableNumber);
+            _context.Orders, _context.Set<TableOccupancyRecoveryDisposition>(),
+            session.TableId, session.TableNumber);
         var legacyOrders = await legacyQuery
             .Where(order => !order.IsDeleted
                 && order.Type == OrderType.DineIn

@@ -6,7 +6,9 @@ namespace RestaurantSystem.Api.Features.TableGuestVisits.Services;
 
 public static class TableGuestCredentialCrypto
 {
+    /// <summary>Length of admission codes issued before the shorter-code rollout.</summary>
     public const int AdmissionCodeLength = 10;
+    public const int CurrentAdmissionCodeLength = 6;
     public const int AdmissionHashIterations = 210_000;
     private const int SaltLength = 16;
     private const int DigestLength = 32;
@@ -15,7 +17,7 @@ public static class TableGuestCredentialCrypto
 
     public static (string Code, string Hash) CreateAdmissionCode()
     {
-        var random = RandomNumberGenerator.GetBytes(AdmissionCodeLength);
+        var random = RandomNumberGenerator.GetBytes(CurrentAdmissionCodeLength);
         var code = new string(random.Select(value => CrockfordAlphabet[value & 31]).ToArray());
         return (code, HashAdmissionCode(code));
     }
@@ -89,7 +91,8 @@ public static class TableGuestCredentialCrypto
     public static bool TryNormalizeAdmissionCode(string? code, out string normalized)
     {
         normalized = string.Empty;
-        if (string.IsNullOrWhiteSpace(code) || code.Length != AdmissionCodeLength)
+        if (string.IsNullOrWhiteSpace(code)
+            || code.Length is not (CurrentAdmissionCodeLength or AdmissionCodeLength))
         {
             return false;
         }

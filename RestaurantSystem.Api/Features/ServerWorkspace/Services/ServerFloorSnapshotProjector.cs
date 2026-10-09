@@ -55,9 +55,10 @@ internal sealed class ServerFloorSnapshotProjector
         var legacySessionByNumber = input.Sessions
             .Where(session => !session.TableId.HasValue && session.TableNumber.HasValue)
             .ToDictionary(session => session.TableNumber!.Value);
+        var hasUnidentifiedLegacyVisit = _tableVisitReadinessEnabled
+            && input.Sessions.Any(session => !session.TableId.HasValue && !session.TableNumber.HasValue);
         var hasUnidentifiedLegacy = _tableVisitReadinessEnabled
-            && (input.Sessions.Any(session => !session.TableId.HasValue && !session.TableNumber.HasValue)
-                || input.HasUnidentifiedLegacyOrders);
+            && (hasUnidentifiedLegacyVisit || input.HasUnidentifiedLegacyOrders);
         var zoneNames = input.Plans.ToDictionary(plan => plan.Id, plan => plan.Name);
         var tableDtos = input.Tables.Select(table => MapTable(
             table,
@@ -65,7 +66,7 @@ internal sealed class ServerFloorSnapshotProjector
             input.Orders,
             reservationsByTable.GetValueOrDefault(table.Id),
             table.FloorPlanId is { } planId ? zoneNames.GetValueOrDefault(planId) : null,
-            input.ServerTime, hasUnidentifiedLegacy)).ToList();
+            input.ServerTime, hasUnidentifiedLegacyVisit)).ToList();
         return new ServerFloorProjection(
             tableDtos,
             ServerFloorSnapshotVersionBuilder.Create(

@@ -25,8 +25,8 @@ public sealed partial class TableServiceSessionReader
             return [];
         }
 
-        var rows = await _context.Orders
-            .AsNoTracking()
+        var rows = await TableServiceSessionCloseRules.ExcludeArchivedLegacyOccupancy(
+                _context.Orders.AsNoTracking(), _context.TableOccupancyRecoveryDispositions)
             .Where(order => !order.IsDeleted
                 && order.Type == OrderType.DineIn
                 && order.ServiceSessionId == null)

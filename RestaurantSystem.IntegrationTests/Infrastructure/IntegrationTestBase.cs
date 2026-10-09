@@ -235,9 +235,13 @@ public abstract class IntegrationTestBase : IAsyncLifetime
     protected async Task<T?> GetFromJsonAsync<T>(string requestUri)
     {
         var response = await Client.GetAsync(requestUri);
-        response.EnsureSuccessStatusCode();
-
         var json = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException(
+                $"GET {requestUri} returned {(int)response.StatusCode} ({response.StatusCode}): {json}",
+                null,
+                response.StatusCode);
+
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
     }
 

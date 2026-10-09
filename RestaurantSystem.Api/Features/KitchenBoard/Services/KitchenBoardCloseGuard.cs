@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.KitchenBoard.Services;
@@ -15,7 +16,7 @@ internal static class KitchenBoardCloseGuard
         CancellationToken cancellationToken)
     {
         var unassignedOrderIds = TableServiceSessionCloseRules.ForUnassignedSession(
-                context.Orders, tableId, tableNumber)
+                context.Orders, context.Set<TableOccupancyRecoveryDisposition>(), tableId, tableNumber)
             .Where(order => !order.IsDeleted && order.Type == OrderType.DineIn
                 && order.ServiceSessionId == null)
             .Select(order => order.Id);
