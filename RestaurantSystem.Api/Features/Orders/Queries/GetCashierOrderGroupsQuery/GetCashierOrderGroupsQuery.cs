@@ -30,15 +30,8 @@ public sealed class GetCashierOrderGroupsQueryHandler(
     public async Task<ApiResponse<PagedResult<CashierOrderGroupDto>>> Handle(
         GetCashierOrderGroupsQuery request, CancellationToken cancellationToken)
     {
-        if (!currentUser.IsStaff)
-            throw new ForbiddenException("The cashier queue is available only to staff.");
         var filters = request.Filters;
-        if (filters.Page < 1 || filters.PageSize is < 1 or > MaximumPageSize)
-            throw new BadRequestException("Choose a positive page and a page size between 1 and 100.");
-        if (filters.SyncCursor is not null || filters.ModifiedSince.HasValue)
-            throw new BadRequestException("The grouped cashier queue requires a complete page refresh.");
-        if (!string.Equals(filters.OrderBy, "OrderDate", StringComparison.OrdinalIgnoreCase))
-            throw new BadRequestException("The grouped cashier queue is ordered by the latest order date.");
+        ValidateFilters(filters);
 
         await using var snapshot = await context.Database.BeginTransactionAsync(
             IsolationLevel.RepeatableRead, cancellationToken);
@@ -101,15 +94,30 @@ public sealed class GetCashierOrderGroupsQueryHandler(
             var members = group.SessionId.HasValue
                 ? bySession[group.SessionId.Value].ToList()
                 : new List<Order> { byId[group.Id] };
-            return new CashierOrderGroupDto(
-                $"{(group.SessionId.HasValue ? "visit" : "order")}:{group.Id:D}", group.SessionId,
-                members[0].TableNumber,
+            return ProjectGroup(group.Id, group.SessionId, members,
                 group.SessionId.HasValue ? releasedVisits[group.SessionId.Value] : null,
-                !group.SessionId.HasValue && archivedOrderIds.Contains(group.Id),
-                members.Select(order => projection.Project(order, includePermittedActions: true)).ToList());
+                !group.SessionId.HasValue && archivedOrderIds.Contains(group.Id));
         }).ToList();
         await snapshot.CommitAsync(cancellationToken);
         return ApiResponse<PagedResult<CashierOrderGroupDto>>.SuccessWithData(
             new PagedResult<CashierOrderGroupDto>(items, total, pageNumber, filters.PageSize, totalPages));
     }
+
+    private void ValidateFilters(OrderFilters filters)
+    {
+        if (!currentUser.IsStaff)
+            throw new ForbiddenException("The cashier queue is available only to staff.");
+        if (filters.Page < 1 || filters.PageSize is < 1 or > MaximumPageSize)
+            throw new BadRequestException("Choose a positive page and a page size between 1 and 100.");
+        if (filters.SyncCursor is not null || filters.ModifiedSince.HasValue)
+            throw new BadRequestException("The grouped cashier queue requires a complete page refresh.");
+        if (!string.Equals(filters.OrderBy, "OrderDate", StringComparison.OrdinalIgnoreCase))
+            throw new BadRequestException("The grouped cashier queue is ordered by the latest order date.");
+    }
+
+    private CashierOrderGroupDto ProjectGroup(
+        Guid id, Guid? sessionId, List<Order> members, DateTime? releasedAt, bool archivedOccupancy)
+        => new($"{(sessionId.HasValue ? "visit" : "order")}:{id:D}", sessionId,
+            members[0].TableNumber, releasedAt, archivedOccupancy,
+            members.Select(order => projection.Project(order, includePermittedActions: true)).ToList());
 }

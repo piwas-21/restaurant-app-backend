@@ -60,45 +60,56 @@ public sealed class GetTableOccupancyRecoveryPreviewQueryHandler(
         Table table, Guid? requestedSessionId, CancellationToken cancellationToken)
     {
         var tableNumber = TableReadinessLegacyRules.CanonicalNumber(table.TableNumber);
-        TableServiceSession? session;
-        if (requestedSessionId is Guid sessionId)
-        {
-            session = await context.TableServiceSessions.AsNoTracking()
-                .SingleOrDefaultAsync(value => value.Id == sessionId, cancellationToken);
-            if (session is null)
-                return SessionResolution.Failed(Failure(
-                    "Table service session was not found.", ErrorCodes.TableServiceSessionNotFound));
-            if (!TableServiceSessionRowLock.IsPhysicalTableResolved(session, table))
-                return SessionResolution.Failed(Failure(
-                    "The selected visit does not belong to this physical table.",
-                    ErrorCodes.TableServiceSessionAmbiguous));
-            if (session.Status != TableServiceSessionStatus.Open)
-                return SessionResolution.Failed(Failure(
-                    "A closed table visit cannot be recovered.", ErrorCodes.TableServiceSessionNotClosable));
-        }
-        else
-        {
-            var activeSessions = await FindOpenSessionsAsync(table.Id, tableNumber, cancellationToken);
-            if (activeSessions.Count > 1)
-                return SessionResolution.Failed(Failure(
-                    "Multiple open visits point to this table; resolve the visit identity first.",
-                    ErrorCodes.TableServiceSessionAmbiguous));
-            session = activeSessions.SingleOrDefault();
-        }
+        var selectedSession = requestedSessionId is Guid sessionId
+            ? await ResolveRequestedSessionAsync(table, sessionId, cancellationToken)
+            : await ResolveUniqueOpenSessionAsync(table.Id, tableNumber, cancellationToken);
+        if (selectedSession.Error is not null) return selectedSession;
 
-        var hasOtherOpen = await context.TableServiceSessions.AsNoTracking().AnyAsync(value =>
-            value.Id != (session == null ? Guid.Empty : session.Id)
-            && value.Status == TableServiceSessionStatus.Open && value.ReleasedAt == null
-            && (value.TableId == table.Id
-                || (!value.TableId.HasValue && tableNumber.HasValue && value.TableNumber == tableNumber)),
-            cancellationToken);
-        if (hasOtherOpen)
+        if (await HasOtherOpenSessionAsync(table.Id, tableNumber, selectedSession.Session, cancellationToken))
             return SessionResolution.Failed(Failure(
                 "Another open visit is using this physical table; refresh the recovery preview.",
                 ErrorCodes.TableServiceSessionAmbiguous));
 
+        return selectedSession;
+    }
+
+    private async Task<SessionResolution> ResolveRequestedSessionAsync(
+        Table table, Guid sessionId, CancellationToken cancellationToken)
+    {
+        var session = await context.TableServiceSessions.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.Id == sessionId, cancellationToken);
+        if (session is null)
+            return SessionResolution.Failed(Failure(
+                "Table service session was not found.", ErrorCodes.TableServiceSessionNotFound));
+        if (!TableServiceSessionRowLock.IsPhysicalTableResolved(session, table))
+            return SessionResolution.Failed(Failure(
+                "The selected visit does not belong to this physical table.",
+                ErrorCodes.TableServiceSessionAmbiguous));
+        if (session.Status != TableServiceSessionStatus.Open)
+            return SessionResolution.Failed(Failure(
+                "A closed table visit cannot be recovered.", ErrorCodes.TableServiceSessionNotClosable));
         return SessionResolution.Resolved(session);
     }
+
+    private async Task<SessionResolution> ResolveUniqueOpenSessionAsync(
+        Guid tableId, int? tableNumber, CancellationToken cancellationToken)
+    {
+        var activeSessions = await FindOpenSessionsAsync(tableId, tableNumber, cancellationToken);
+        if (activeSessions.Count > 1)
+            return SessionResolution.Failed(Failure(
+                "Multiple open visits point to this table; resolve the visit identity first.",
+                ErrorCodes.TableServiceSessionAmbiguous));
+        return SessionResolution.Resolved(activeSessions.SingleOrDefault());
+    }
+
+    private Task<bool> HasOtherOpenSessionAsync(
+        Guid tableId, int? tableNumber, TableServiceSession? session, CancellationToken cancellationToken) =>
+        context.TableServiceSessions.AsNoTracking().AnyAsync(value =>
+            value.Id != (session == null ? Guid.Empty : session.Id)
+            && value.Status == TableServiceSessionStatus.Open && value.ReleasedAt == null
+            && (value.TableId == tableId
+                || (!value.TableId.HasValue && tableNumber.HasValue && value.TableNumber == tableNumber)),
+            cancellationToken);
 
     private Task<List<TableServiceSession>> FindOpenSessionsAsync(
         Guid tableId, int? tableNumber, CancellationToken cancellationToken) =>

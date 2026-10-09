@@ -39,11 +39,14 @@ internal sealed class TableOccupancyRecoverySnapshot
         && !order.IsKitchenReleased
         && !order.KitchenReleasedAt.HasValue;
 
-    public TableOccupancyRecoveryDispositionKind DispositionFor(Order order) => CanCancelUnsent(order)
-        ? TableOccupancyRecoveryDispositionKind.CancelledUnsent
-        : LegacyOrderIds.Contains(order.Id)
-            ? TableOccupancyRecoveryDispositionKind.ArchivedLegacyOccupancy
-            : TableOccupancyRecoveryDispositionKind.RetainedInPriorVisit;
+    public TableOccupancyRecoveryDispositionKind DispositionFor(Order order)
+    {
+        if (CanCancelUnsent(order))
+            return TableOccupancyRecoveryDispositionKind.CancelledUnsent;
+        if (LegacyOrderIds.Contains(order.Id))
+            return TableOccupancyRecoveryDispositionKind.ArchivedLegacyOccupancy;
+        return TableOccupancyRecoveryDispositionKind.RetainedInPriorVisit;
+    }
 
     public TableOccupancyRecoveryPreviewDto ToPreview() => new(
         Table.Id,
