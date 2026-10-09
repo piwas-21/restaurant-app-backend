@@ -21,7 +21,7 @@ public sealed class ClearPendingTableOrdersCommandHandler(
     TimeProvider timeProvider)
     : ICommandHandler<ClearPendingTableOrdersCommand, ApiResponse<ClearedTableOrdersDto>>
 {
-    private const string ClearReason = "Pending table order cleared by staff before kitchen routing.";
+    private const string ClearReason = "Unrouted table order cleared by staff before kitchen routing.";
 
     public async Task<ApiResponse<ClearedTableOrdersDto>> Handle(
         ClearPendingTableOrdersCommand command, CancellationToken cancellationToken)
@@ -38,7 +38,7 @@ public sealed class ClearPendingTableOrdersCommandHandler(
         var target = targetResult.Target!;
         var orders = await LoadOrdersAsync(target, cancellationToken);
         if (orders.Any(IsProtectedOrder))
-            return Refused("Only unprinted pending orders without payments or routing history can be cleared.");
+            return Refused("Only unpaid pending or held-confirmed orders without kitchen release or routing history can be cleared.");
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var audit = currentUser.GetAuditIdentifier();
@@ -50,7 +50,7 @@ public sealed class ClearPendingTableOrdersCommandHandler(
         await transaction.CommitAsync(cancellationToken);
         return ApiResponse<ClearedTableOrdersDto>.SuccessWithData(new ClearedTableOrdersDto(
             target.Session?.Id, command.TableNumber ?? target.Session?.TableNumber, orders.Count, now, releasedAt),
-            "Pending table orders cleared without dispatching them.");
+            "Unrouted table orders cleared without dispatching them.");
     }
 
     private async Task<TargetResolution> ResolveTargetAsync(
@@ -114,13 +114,18 @@ public sealed class ClearPendingTableOrdersCommandHandler(
             .ToListAsync(cancellationToken);
 
     private static bool IsProtectedOrder(Order order) =>
-        order.Status != OrderStatus.Pending || order.Payments.Count > 0 || order.TotalPaid > 0
+        !CanCancelBeforeKitchenRelease(order.Status) || order.PaymentStatus != PaymentStatus.Pending
+        || order.Payments.Count > 0 || order.TotalPaid > 0
         || order.RoutingStates.Count > 0 || order.IsKitchenReleased || order.KitchenReleasedAt.HasValue;
+
+    private static bool CanCancelBeforeKitchenRelease(OrderStatus status) =>
+        status is OrderStatus.Pending or OrderStatus.Confirmed;
 
     private void CancelOrders(IEnumerable<Order> orders, DateTime now, string audit)
     {
         foreach (var order in orders)
         {
+            var previousStatus = order.Status;
             order.Status = OrderStatus.Cancelled;
             order.CancellationReason = ClearReason;
             order.UpdatedAt = now;
@@ -129,7 +134,7 @@ public sealed class ClearPendingTableOrdersCommandHandler(
             {
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
-                FromStatus = OrderStatus.Pending,
+                FromStatus = previousStatus,
                 ToStatus = OrderStatus.Cancelled,
                 Notes = ClearReason,
                 ChangedAt = now,

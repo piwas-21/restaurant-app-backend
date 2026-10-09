@@ -12,10 +12,10 @@ internal static class ZReportTableAccountTipReader
         ApplicationDbContext context, DateTime startUtc, DateTime endUtc, CancellationToken cancellationToken)
     {
         var tableTips = await context.TableBillPaymentOperations.AsNoTracking()
-            .Where(value => value.TipMinor > 0 && value.Currency != null
+            .Where(value => value.TipMinor > 0
                 && value.CreatedAt >= startUtc && value.CreatedAt < endUtc)
             .GroupBy(value => new { value.Currency, value.PaymentMethod })
-            .Select(group => new TipTotal(group.Key.Currency!, group.Key.PaymentMethod,
+            .Select(group => new TipTotal(group.Key.Currency, group.Key.PaymentMethod,
                 group.Sum(value => value.TipMinor)))
             .ToListAsync(cancellationToken);
 
@@ -31,18 +31,22 @@ internal static class ZReportTableAccountTipReader
         var totals = new Dictionary<(string Currency, PaymentMethod Method), long>();
         foreach (var row in tableTips.Concat(accountTips))
         {
-            var currency = CurrencyCode.Normalize(row.Currency);
-            if (currency is null) continue;
+            var currency = CurrencyKey(row.Currency);
             var key = (currency, row.PaymentMethod);
             totals[key] = checked(totals.GetValueOrDefault(key) + row.TipMinor);
         }
 
         return totals.Select(pair => new ZReportTableAccountTipDto(
-                pair.Key.Currency, pair.Key.Method, pair.Value))
+                NullableCurrency(pair.Key.Currency), pair.Key.Method, pair.Value))
             .OrderBy(value => value.Currency, StringComparer.Ordinal)
             .ThenBy(value => value.PaymentMethod)
             .ToArray();
     }
 
-    private sealed record TipTotal(string Currency, PaymentMethod PaymentMethod, long TipMinor);
+    private static string CurrencyKey(string? value) =>
+        CurrencyCode.IsValid(value) ? CurrencyCode.Normalize(value) ?? string.Empty : string.Empty;
+
+    private static string? NullableCurrency(string currency) => currency.Length == 0 ? null : currency;
+
+    private sealed record TipTotal(string? Currency, PaymentMethod PaymentMethod, long TipMinor);
 }
