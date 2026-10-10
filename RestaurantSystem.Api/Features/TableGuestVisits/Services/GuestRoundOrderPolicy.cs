@@ -21,6 +21,7 @@ internal static class GuestRoundOrderPolicy
         }
 
         return tableVisitReadinessEnabled && command.Type == OrderType.DineIn
+            && command.TableNumber.HasValue
             ? ApiResponse<OrderDto>.FailureWithCode(
                 "Dine-in orders must join the current table visit before they can be submitted.",
                 ErrorCodes.TableServiceSessionRequired)
