@@ -58,10 +58,8 @@ public class BasketMappingService : IBasketMappingService
             }
         }
 
-        // Mapped sequentially (not Task.WhenAll): the per-item side-item lookup
-        // below queries the shared ApplicationDbContext, and EF Core forbids
-        // concurrent operations on one context instance — running these in
-        // parallel throws once two items carry side items.
+        var selectedSideItemsByBasketItemId = await BasketSelectedSideMapper.MapAllAsync(
+            _context, _logger, basket.Items);
         var allItems = new List<BasketItemDto>();
         foreach (var item in basket.Items
             .OrderBy(row => row.CreatedAt)
@@ -79,8 +77,6 @@ public class BasketMappingService : IBasketMappingService
             var addedNames = item.AddedIngredients?
                 .Select(id => productIngredients.FirstOrDefault(pi => pi.Id == id)?.Name ?? id.ToString())
                 .ToList();
-
-            var selectedSideItems = await BasketSelectedSideMapper.MapAsync(_context, _logger, item);
 
             // Deserialize ingredient quantities
             var ingredientQuantities = DeserializeIngredientQuantities(item.IngredientQuantitiesJson, item.Id);
@@ -123,8 +119,8 @@ public class BasketMappingService : IBasketMappingService
                 SelectedIngredientNames = selectedNames,
                 AddedIngredientNames = addedNames,
                 RemovedIngredientNames = removedNames,
-                SelectedSideItems = selectedSideItems,
-                ChildItems = await MapChildItemsAsync(item.ChildBasketItems)
+                SelectedSideItems = selectedSideItemsByBasketItemId.GetValueOrDefault(item.Id),
+                ChildItems = MapChildItems(item.ChildBasketItems, selectedSideItemsByBasketItemId)
             });
         }
 
@@ -198,15 +194,19 @@ public class BasketMappingService : IBasketMappingService
     /// basket flyout, cart and checkout. Omitting its selected names silently hid a bundle option's
     /// added ingredients and sauces even though checkout persisted them (#150).
     /// </summary>
-    private async Task<List<BasketItemDto>> MapChildItemsAsync(IEnumerable<BasketItem> children)
+    private List<BasketItemDto> MapChildItems(
+        IEnumerable<BasketItem> children,
+        IReadOnlyDictionary<Guid, List<BasketSideItemDto>> selectedSideItemsByBasketItemId)
     {
         var mapped = new List<BasketItemDto>();
         foreach (var child in children)
-            mapped.Add(await MapChildItemAsync(child));
+            mapped.Add(MapChildItem(child, selectedSideItemsByBasketItemId));
         return mapped;
     }
 
-    private async Task<BasketItemDto> MapChildItemAsync(BasketItem child)
+    private BasketItemDto MapChildItem(
+        BasketItem child,
+        IReadOnlyDictionary<Guid, List<BasketSideItemDto>> selectedSideItemsByBasketItemId)
     {
         var childIngredients = child.Product?.DetailedIngredients ?? new List<ProductIngredient>();
         var childQuantities = DeserializeIngredientQuantities(child.IngredientQuantitiesJson, child.Id);
@@ -214,7 +214,6 @@ public class BasketMappingService : IBasketMappingService
             .Select(id => childIngredients.FirstOrDefault(pi => pi.Id == id)?.Name ?? id.ToString())
             .ToList();
 
-        var selectedSideItems = await BasketSelectedSideMapper.MapAsync(_context, _logger, child);
         return new BasketItemDto
         {
             Id = child.Id,
@@ -248,8 +247,8 @@ public class BasketMappingService : IBasketMappingService
             SelectedIngredientNames = childSelectedNames,
             RemovedIngredientNames = BuildRemovedIngredientNames(
                 childIngredients, childQuantities, child.SelectedIngredients),
-            SelectedSideItems = selectedSideItems,
-            ChildItems = await MapChildItemsAsync(child.ChildBasketItems),
+            SelectedSideItems = selectedSideItemsByBasketItemId.GetValueOrDefault(child.Id),
+            ChildItems = MapChildItems(child.ChildBasketItems, selectedSideItemsByBasketItemId),
         };
     }
 

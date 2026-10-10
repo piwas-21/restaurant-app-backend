@@ -1,6 +1,8 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 using System.Net;
@@ -135,5 +137,21 @@ public partial class CustomerStepManifestContractTests : IntegrationTestBase
         var saved = await readContext.Products.SingleAsync(row => row.Id == _productId);
         saved.CustomerStepManifestRevision.Should().Be(1);
         saved.Name.Should().Be("Seeded screen order product");
+    }
+
+    [Fact]
+    public async Task RevisionConflictAfterProductIsSoftDeleted_ReturnsNotFound()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var product = await context.Products.SingleAsync(row => row.Id == _productId);
+        product.IsDeleted = true;
+        product.DeletedAt = DateTime.UtcNow;
+        product.DeletedBy = "test";
+        await context.SaveChangesAsync();
+
+        Func<Task> translate = () => CustomerStepManifestStore.RevisionWriteConflictAsync(
+            context, _productId, new DbUpdateConcurrencyException(), CancellationToken.None);
+        await translate.Should().ThrowAsync<NotFoundException>();
     }
 }

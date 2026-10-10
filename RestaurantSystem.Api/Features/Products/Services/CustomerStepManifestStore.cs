@@ -85,13 +85,16 @@ internal static class CustomerStepManifestStore
         RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext context,
         Guid productId, Exception exception, CancellationToken cancellationToken)
     {
-        var currentRevision = await context.Products.IgnoreQueryFilters().AsNoTracking()
+        var currentRevision = await context.Products.AsNoTracking()
             .Where(product => product.Id == productId)
-            .Select(product => product.CustomerStepManifestRevision)
-            .SingleAsync(cancellationToken);
+            .Select(product => (int?)product.CustomerStepManifestRevision)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (!currentRevision.HasValue)
+            throw new NotFoundException("Product not found.");
+
         return new ConflictException(
-            $"Customer-step manifest revision conflict; current revision is {currentRevision}.",
-            exception, "customer_step_manifest_revision_conflict", currentRevision);
+            $"Customer-step manifest revision conflict; current revision is {currentRevision.Value}.",
+            exception, "customer_step_manifest_revision_conflict", currentRevision.Value);
     }
 
     public static bool IsRevisionWriteConflict(Exception exception) =>
