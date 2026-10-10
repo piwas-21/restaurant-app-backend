@@ -13,62 +13,98 @@ internal static class BundleComponentSelection
         IReadOnlyList<CustomerStepManifestStepDto>? manifestSteps, OrderType? orderType,
         int maxQuantityPerItem)
     {
-        var hasAuthoredSideScreen = manifestSteps?.Any(step =>
-            step.Kind == CustomerStepKind.BundleComponentSide
-            && step.SectionItemId == sectionItemId
-            && step.ProductId == component.Id) == true;
-        var hasExplicitAssociationReference = selections?.Any(selection =>
-            selection.SuggestedSideItemId.HasValue) == true;
-        if (component.SuggestedSideItems.Count == 0
-            && !hasAuthoredSideScreen
-            && !hasExplicitAssociationReference)
+        if (CanIgnoreLegacySides(component, sectionItemId, selections, manifestSteps))
             return [];
 
         if (selections is null or { Count: 0 })
         {
-            if (component.SuggestedSideItems.Any(side => side.IsRequired))
-                throw new BadRequestException("This component requires one or more suggested side items.");
+            EnsureRequiredSidesWereSelected(component, new HashSet<Guid>());
             return [];
         }
-        if (selections.Any(selection => selection.Quantity <= 0 || selection.Quantity > maxQuantityPerItem)
-            || selections.Select(selection => selection.SuggestedSideItemId ?? selection.Id)
-                .Distinct().Count() != selections.Count)
+
+        ValidateSideSelectionShape(selections, maxQuantityPerItem);
+        var result = selections.Select(selection => ResolveSelectedSide(
+            component, sectionItemId, selection, manifestSteps, orderType)).ToList();
+        EnsureRequiredSidesWereSelected(component,
+            result.Select(row => row.Selection.SuggestedSideItemId.GetValueOrDefault()).ToHashSet());
+        return result;
+    }
+
+    private static bool CanIgnoreLegacySides(
+        Product component, Guid sectionItemId, List<SelectedSideItemDto>? selections,
+        IReadOnlyList<CustomerStepManifestStepDto>? manifestSteps)
+    {
+        var hasScreen = manifestSteps?.Any(step =>
+            step.Kind == CustomerStepKind.BundleComponentSide
+            && step.SectionItemId == sectionItemId
+            && step.ProductId == component.Id) == true;
+        var hasExplicitAssociation = selections?.Any(selection =>
+            selection.SuggestedSideItemId.HasValue) == true;
+        return component.SuggestedSideItems.Count == 0 && !hasScreen && !hasExplicitAssociation;
+    }
+
+    private static void ValidateSideSelectionShape(
+        List<SelectedSideItemDto> selections, int maxQuantityPerItem)
+    {
+        var invalidQuantity = selections.Any(selection =>
+            selection.Quantity <= 0 || selection.Quantity > maxQuantityPerItem);
+        var duplicateAssociations = selections.Select(selection =>
+                selection.SuggestedSideItemId ?? selection.Id)
+            .Distinct().Count() != selections.Count;
+        if (invalidQuantity || duplicateAssociations)
             throw new BadRequestException(
                 $"Component side selections must be unique with quantities from 1 to {maxQuantityPerItem}.");
+    }
 
-        var result = new List<(SelectedSideItemDto Selection, decimal UnitPrice)>();
-        foreach (var selection in selections)
+    private static (SelectedSideItemDto Selection, decimal UnitPrice) ResolveSelectedSide(
+        Product component, Guid sectionItemId, SelectedSideItemDto selection,
+        IReadOnlyList<CustomerStepManifestStepDto>? manifestSteps, OrderType? orderType)
+    {
+        var candidates = component.SuggestedSideItems
+            .Where(side => side.SideItemProductId == selection.Id && side.SideItemProduct is not null)
+            .ToList();
+        var membership = ResolveMembership(candidates, selection.SuggestedSideItemId);
+        var sideProduct = membership?.SideItemProduct;
+        if (membership is null || sideProduct is null || !sideProduct.IsActive || !sideProduct.IsAvailable)
+            throw new BadRequestException("A selected side is stale or ambiguous for this component.");
+
+        BasketComponentGuard.EnsureNotOrderedAlone(sideProduct);
+        BasketChannelGuard.EnsureOrderable(sideProduct, orderType);
+        var variation = ResolveSideVariation(sideProduct, selection.ProductVariationId);
+        var step = FindSideStep(manifestSteps, sectionItemId, component.Id, membership.Id);
+        var resolvedSelection = selection with
         {
-            var candidates = component.SuggestedSideItems
-                .Where(side => side.SideItemProductId == selection.Id && side.SideItemProduct is not null)
-                .ToList();
-            var membership = selection.SuggestedSideItemId is Guid associationId
-                ? candidates.SingleOrDefault(side => side.Id == associationId)
-                : candidates.Count == 1 ? candidates[0] : null;
-            if (membership?.SideItemProduct is not { } sideProduct || !sideProduct.IsActive || !sideProduct.IsAvailable)
-                throw new BadRequestException("A selected side is stale or ambiguous for this component.");
+            SuggestedSideItemId = membership.Id,
+            PresentationOrder = membership.DisplayOrder,
+            CompositionRole = step?.CompositionRole ?? CompositionRole.Side,
+        };
+        return (resolvedSelection, sideProduct.BasePrice + (variation?.PriceModifier ?? 0m));
+    }
 
-            BasketComponentGuard.EnsureNotOrderedAlone(sideProduct);
-            BasketChannelGuard.EnsureOrderable(sideProduct, orderType);
-            var variation = ResolveSideVariation(sideProduct, selection.ProductVariationId);
-            var step = manifestSteps?.FirstOrDefault(candidate =>
-                candidate.Kind == CustomerStepKind.BundleComponentSide
-                && candidate.SectionItemId == sectionItemId
-                && candidate.ProductId == component.Id
-                && candidate.ScopeId == membership.Id);
-            result.Add((selection with
-            {
-                SuggestedSideItemId = membership.Id,
-                PresentationOrder = membership.DisplayOrder,
-                CompositionRole = step?.CompositionRole ?? CompositionRole.Side,
-            }, sideProduct.BasePrice + (variation?.PriceModifier ?? 0m)));
-        }
+    private static ProductSideItem? ResolveMembership(
+        List<ProductSideItem> candidates, Guid? associationId)
+    {
+        if (associationId.HasValue)
+            return candidates.SingleOrDefault(side => side.Id == associationId.Value);
+        if (candidates.Count == 1)
+            return candidates[0];
+        return null;
+    }
 
-        var selectedAssociationIds = result
-            .Select(row => row.Selection.SuggestedSideItemId!.Value).ToHashSet();
-        if (component.SuggestedSideItems.Any(side => side.IsRequired && !selectedAssociationIds.Contains(side.Id)))
+    private static CustomerStepManifestStepDto? FindSideStep(
+        IReadOnlyList<CustomerStepManifestStepDto>? manifestSteps,
+        Guid sectionItemId, Guid productId, Guid associationId) =>
+        manifestSteps?.FirstOrDefault(candidate =>
+            candidate.Kind == CustomerStepKind.BundleComponentSide
+            && candidate.SectionItemId == sectionItemId
+            && candidate.ProductId == productId
+            && candidate.ScopeId == associationId);
+
+    private static void EnsureRequiredSidesWereSelected(Product component, HashSet<Guid> selectedAssociationIds)
+    {
+        if (component.SuggestedSideItems.Any(side =>
+                side.IsRequired && !selectedAssociationIds.Contains(side.Id)))
             throw new BadRequestException("This component requires one or more suggested side items.");
-        return result;
     }
 
     public static ProductVariation? ResolveVariation(

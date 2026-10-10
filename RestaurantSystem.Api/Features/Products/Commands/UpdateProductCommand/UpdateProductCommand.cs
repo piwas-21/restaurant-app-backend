@@ -156,8 +156,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 .ThenInclude(group => group.IngredientOptions)
             .Include(p => p.CustomizationGroups)
                 .ThenInclude(group => group.ProductOptions)
-            .Include(p => p.MenuDefinition)
-                .ThenInclude(definition => definition!.Sections)
+            .Include(p => p.MenuDefinition!.Sections)
                     .ThenInclude(section => section.Items)
             .FirstOrDefaultAsync(p => p.Id == command.Id && !p.IsDeleted, cancellationToken);
 

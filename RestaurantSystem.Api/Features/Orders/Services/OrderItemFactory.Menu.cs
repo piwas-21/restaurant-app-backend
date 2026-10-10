@@ -16,6 +16,23 @@ public partial class OrderItemFactory
         Order order, CreateOrderItemDto itemDto, bool pricesAreTrusted, bool metadataAreTrusted,
         CancellationToken cancellationToken)
     {
+        var menu = await LoadMenuAsync(itemDto.MenuId, cancellationToken);
+        if (menu is null)
+            return $"Menu {itemDto.MenuId} not found";
+
+        var menuProduct = menu.MenuItems.FirstOrDefault()?.Product;
+        if (IsMenuRecipeUnavailable(menu, menuProduct))
+            return "This menu's ingredient details are unavailable. Refresh the menu and try again.";
+
+        var ingredientQuantities = ResolveMenuIngredientQuantities(itemDto, menuProduct);
+        order.Items.Add(CreateMenuOrderItem(
+            menu, menuProduct, itemDto, ingredientQuantities, pricesAreTrusted, metadataAreTrusted));
+
+        return null;
+    }
+
+    private async Task<Menu?> LoadMenuAsync(Guid? menuId, CancellationToken cancellationToken)
+    {
         // The recipe behind the menu's first item is what the order line's ingredient snapshot is
         // projected against — the same resolution the read path uses for a menu-backed line
         // (OrderIngredientCustomizations). Split, because MenuItems and the products' ingredient
@@ -23,43 +40,45 @@ public partial class OrderItemFactory
         var menu = _tenantFeatures.EnforceSauceMinimum
             ? null
             : _context.Menus.Local.FirstOrDefault(
-                candidate => candidate.Id == itemDto.MenuId && !candidate.IsDeleted);
-        menu ??= await _context.Menus
+                candidate => candidate.Id == menuId && !candidate.IsDeleted);
+        return menu ?? await _context.Menus
             .Include(candidate => candidate.MenuItems)
                 .ThenInclude(item => item.Product.DetailedIngredients)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(candidate => candidate.Id == itemDto.MenuId && !candidate.IsDeleted,
+            .FirstOrDefaultAsync(candidate => candidate.Id == menuId && !candidate.IsDeleted,
                 cancellationToken);
+    }
 
-        if (menu == null)
-        {
-            return $"Menu {itemDto.MenuId} not found";
-        }
+    private bool IsMenuRecipeUnavailable(Menu menu, Product? menuProduct) =>
+        _tenantFeatures.EnforceSauceMinimum && menu.MenuItems.Count > 0 && menuProduct is null;
 
-        // The menu's first product is also the recipe used for its ingredient snapshot below. When
-        // sauce-minimum enforcement is enabled, resolve the explicit selection against that recipe
-        // just as the ProductId path does. Menu lines keep Menus.BasePrice; product customization
-        // pricing cannot replace the menu's price. Skipping selection resolution while the flag is
-        // off preserves the legacy MenuId payload exactly.
-        var menuProduct = menu.MenuItems.FirstOrDefault()?.Product;
-        if (_tenantFeatures.EnforceSauceMinimum && menu.MenuItems.Count > 0 && menuProduct is null)
-        {
-            return "This menu's ingredient details are unavailable. Refresh the menu and try again.";
-        }
-
-        var ingredientQuantities = itemDto.IngredientQuantities;
+    private Dictionary<Guid, int>? ResolveMenuIngredientQuantities(
+        CreateOrderItemDto itemDto, Product? menuProduct)
+    {
         if (_tenantFeatures.EnforceSauceMinimum && menuProduct is not null)
         {
-            ingredientQuantities = OrderLineIngredientChoice.Resolve(
+            return OrderLineIngredientChoice.Resolve(
                 _lineCustomizationBuilder,
                 itemDto,
                 menuProduct,
                 isRootLine: false).Quantities;
         }
 
+        return itemDto.IngredientQuantities;
+    }
+
+    private OrderItem CreateMenuOrderItem(
+        Menu menu,
+        Product? menuProduct,
+        CreateOrderItemDto itemDto,
+        Dictionary<Guid, int>? ingredientQuantities,
+        bool pricesAreTrusted,
+        bool metadataAreTrusted)
+    {
+        // Menu lines keep Menus.BasePrice; product customization pricing cannot replace it.
         var unitPrice = menu.BasePrice;
         var customization = ResolveCustomizationPrice(itemDto, pricesAreTrusted);
-        order.Items.Add(new OrderItem
+        return new OrderItem
         {
             Id = Guid.NewGuid(),
             ProductId = itemDto.ProductId,
@@ -72,13 +91,11 @@ public partial class OrderItemFactory
             ItemTotal = (unitPrice * itemDto.Quantity) + customization,
             SpecialInstructions = itemDto.SpecialInstructions,
             IngredientQuantitiesJson = SerializeIngredients(ingredientQuantities),
-            IngredientSnapshots = OrderIngredientSnapshot.Build(
+            IngredientSnapshots = BuildIngredientSnapshots(
                 menuProduct?.DetailedIngredients,
                 ingredientQuantities,
-                _currentUserService.GetAuditIdentifier(),
-                metadataAreTrusted ? itemDto.IngredientQuantityBasis : QuantityBasis.Unknown,
-                metadataAreTrusted ? itemDto.IngredientConfigurationScope : ConfigurationScope.Unknown,
-                metadataAreTrusted ? itemDto.IngredientCompositionRoles : null),
+                itemDto,
+                metadataAreTrusted),
             QuantityBasis = metadataAreTrusted ? itemDto.QuantityBasis ?? QuantityBasis.Unknown : QuantityBasis.Unknown,
             ConfigurationScope = metadataAreTrusted
                 ? itemDto.ConfigurationScope ?? ConfigurationScope.Unknown
@@ -88,8 +105,6 @@ public partial class OrderItemFactory
             PresentationOrder = metadataAreTrusted ? itemDto.PresentationOrder : null,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _currentUserService.GetAuditIdentifier(),
-        });
-
-        return null;
+        };
     }
 }

@@ -7,7 +7,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Products.Services;
 
-internal static class CustomerStepManifestRules
+internal static partial class CustomerStepManifestRules
 {
     public static async Task ValidateAsync(
         ApplicationDbContext context, Product product, CustomerStepManifestDto manifest,
@@ -34,27 +34,33 @@ internal static class CustomerStepManifestRules
     {
         var identities = new HashSet<string>(StringComparer.Ordinal);
         foreach (var step in steps)
-        {
-            if (step is null)
-                throw new BadRequestException("Customer-step manifest cannot contain null steps.");
-            if (step.PresentationOrder < 0 || step.PresentationLabel?.Length > 120)
-                throw new BadRequestException("Customer-step order or label is invalid.");
-            if (step.CompositionRole == CompositionRole.Unknown)
-                throw new BadRequestException("Unknown composition roles are read-only.");
-            if (step.PresentationLabel is not null && step.CompositionRole != CompositionRole.Dish)
-                throw new BadRequestException("Presentation labels are supported only for explicit Dish relationships.");
+            ValidateStepShape(step, identities);
 
-            var identity = StepIdentity(step);
-            if (!identities.Add(identity))
-                throw new BadRequestException("The customer-step manifest contains a duplicate stable reference.");
-        }
-
-        foreach (var orderGroup in steps.GroupBy(step => step.PresentationOrder))
-        {
-            if (orderGroup.Select(ScreenIdentity).Distinct(StringComparer.Ordinal).Skip(1).Any())
-                throw new BadRequestException("Rows sharing a presentation order must belong to one customer screen.");
-        }
+        if (HasMultipleScreensAtSameOrder(steps))
+            throw new BadRequestException("Rows sharing a presentation order must belong to one customer screen.");
     }
+
+    private static void ValidateStepShape(
+        CustomerStepManifestStepDto step, HashSet<string> identities)
+    {
+        if (step is null)
+            throw new BadRequestException("Customer-step manifest cannot contain null steps.");
+        if (step.PresentationOrder < 0 || step.PresentationLabel?.Length > 120)
+            throw new BadRequestException("Customer-step order or label is invalid.");
+        if (step.CompositionRole == CompositionRole.Unknown)
+            throw new BadRequestException("Unknown composition roles are read-only.");
+        if (step.PresentationLabel is not null && step.CompositionRole != CompositionRole.Dish)
+            throw new BadRequestException("Presentation labels are supported only for explicit Dish relationships.");
+        if (!identities.Add(StepIdentity(step)))
+            throw new BadRequestException("The customer-step manifest contains a duplicate stable reference.");
+    }
+
+    private static bool HasMultipleScreensAtSameOrder(IReadOnlyList<CustomerStepManifestStepDto> steps) =>
+        steps.GroupBy(step => step.PresentationOrder)
+            .Any(group => HasMultipleScreens(group));
+
+    private static bool HasMultipleScreens(IEnumerable<CustomerStepManifestStepDto> steps) =>
+        steps.Select(ScreenIdentity).Distinct(StringComparer.Ordinal).Skip(1).Any();
 
     private static void ValidateProduct(Product product, IReadOnlyList<CustomerStepManifestStepDto> steps)
     {
@@ -96,111 +102,6 @@ internal static class CustomerStepManifestRules
             throw new BadRequestException("Variation and sauce options for one selection owner must share one customer screen.");
     }
 
-    private static async Task ValidateBundleAsync(
-        ApplicationDbContext context, Product product,
-        IReadOnlyList<CustomerStepManifestStepDto> steps, CancellationToken cancellationToken)
-    {
-        var sections = product.MenuDefinition?.Sections.ToList() ?? [];
-        var sectionRows = sections.SelectMany(section => section.Items.Select(item => (Section: section, Item: item)))
-            .ToDictionary(pair => pair.Item.Id);
-        var componentIds = steps.Where(step => IsBundleComponentKind(step.Kind) && step.ProductId.HasValue)
-            .Select(step => step.ProductId!.Value).Distinct().ToList();
-        var components = await context.Products.AsNoTracking().AsSplitQuery()
-            .Where(candidate => componentIds.Contains(candidate.Id) && !candidate.IsDeleted)
-            .Include(candidate => candidate.Variations)
-            .Include(candidate => candidate.DetailedIngredients)
-            .Include(candidate => candidate.CustomizationGroups)
-            .Include(candidate => candidate.SuggestedSideItems)
-            .ToDictionaryAsync(candidate => candidate.Id, cancellationToken);
-
-        foreach (var step in steps)
-        {
-            if (step.Kind == CustomerStepKind.BundleSection)
-            {
-                var sectionExists = step.TargetId.HasValue && sections.Any(section => section.Id == step.TargetId);
-                Require(sectionExists, step);
-                if (step.SectionId.HasValue || step.SectionItemId.HasValue || step.ProductId.HasValue || step.ScopeId.HasValue)
-                    throw new BadRequestException("Bundle section steps may only use targetId and parentComponentId.");
-                ValidateRole(step);
-                continue;
-            }
-
-            if (!IsBundleComponentKind(step.Kind) || step.TargetId.HasValue || !step.SectionId.HasValue
-                || !step.SectionItemId.HasValue || !step.ProductId.HasValue || !step.ScopeId.HasValue
-                || step.ParentComponentId.HasValue)
-                throw new BadRequestException("Bundle component steps require sectionId, sectionItemId, productId, and scopeId.");
-
-            var rowMatches = sectionRows.TryGetValue(step.SectionItemId.Value, out var owner)
-                && owner.Section.Id == step.SectionId && owner.Item.ProductId == step.ProductId;
-            Require(rowMatches, step);
-            if (step.Kind == CustomerStepKind.BundleComponentVariation && step.PresentationLabel is not null)
-            {
-                var ownerStep = steps.FirstOrDefault(candidate =>
-                    candidate.Kind == CustomerStepKind.BundleSection && candidate.TargetId == owner.Section.Id);
-                if (ownerStep?.CompositionRole != CompositionRole.Dish)
-                    throw new BadRequestException(
-                        "A component variation label requires an explicitly Dish-role bundle section.");
-            }
-            if (!components.TryGetValue(step.ProductId.Value, out var component))
-                throw new BadRequestException("A bundle component product is missing or deleted.");
-
-            var scopeMatches = step.Kind switch
-            {
-                CustomerStepKind.BundleComponentVariation => component.Variations.Any(row => row.Id == step.ScopeId),
-                CustomerStepKind.BundleComponentIngredient => component.DetailedIngredients.Any(
-                    row => row.Id == step.ScopeId && row.Kind == IngredientKind.Ingredient),
-                CustomerStepKind.BundleComponentSauce => component.DetailedIngredients.Any(
-                    row => row.Id == step.ScopeId && row.Kind == IngredientKind.Sauce),
-                CustomerStepKind.BundleComponentCustomizationGroup => component.CustomizationGroups.Any(row => row.Id == step.ScopeId),
-                CustomerStepKind.BundleComponentSide => component.SuggestedSideItems.Any(row => row.Id == step.ScopeId),
-                _ => false
-            };
-            Require(scopeMatches, step);
-            ValidateRole(step);
-        }
-
-        ValidateDependencies(steps, sections, sectionRows);
-        ValidateBundleComponentOrder(steps, sectionSteps: steps.Where(step =>
-            step.Kind == CustomerStepKind.BundleSection && step.TargetId.HasValue)
-            .ToDictionary(step => step.TargetId!.Value), sectionRows);
-    }
-
-    private static void ValidateDependencies(
-        IReadOnlyList<CustomerStepManifestStepDto> steps,
-        IReadOnlyList<MenuSection> sections,
-        Dictionary<Guid, (MenuSection Section, MenuSectionItem Item)> sectionRows)
-    {
-        var sectionSteps = steps.Where(step => step.Kind == CustomerStepKind.BundleSection && step.TargetId.HasValue)
-            .ToDictionary(step => step.TargetId!.Value);
-        var edges = new Dictionary<Guid, Guid>();
-        foreach (var step in sectionSteps.Values)
-        {
-            if (!step.ParentComponentId.HasValue) continue;
-            if (!sectionRows.TryGetValue(step.ParentComponentId.Value, out var parent))
-                throw new BadRequestException("A dependent section references a stale parent component.");
-            if (!sectionSteps.TryGetValue(parent.Section.Id, out var parentStep)
-                || parentStep.PresentationOrder >= step.PresentationOrder
-                || parentStep.CompositionRole != CompositionRole.Dish)
-                throw new BadRequestException("A parent component selection must precede its dependent section.");
-            edges[step.TargetId!.Value] = parent.Section.Id;
-        }
-
-        var visited = new HashSet<Guid>();
-        var active = new HashSet<Guid>();
-        foreach (var section in sections) Visit(section.Id, edges, visited, active);
-    }
-
-    private static void Visit(Guid sectionId, IReadOnlyDictionary<Guid, Guid> edges,
-        ISet<Guid> visited, ISet<Guid> active)
-    {
-        if (active.Contains(sectionId))
-            throw new BadRequestException("Customer-step section dependencies cannot contain cycles.");
-        if (!visited.Add(sectionId)) return;
-        active.Add(sectionId);
-        if (edges.TryGetValue(sectionId, out var parentId)) Visit(parentId, edges, visited, active);
-        active.Remove(sectionId);
-    }
-
     private static void ValidateRole(CustomerStepManifestStepDto step)
     {
         if (!step.CompositionRole.HasValue) return;
@@ -238,24 +139,6 @@ internal static class CustomerStepManifestRules
                     : !IsBundleKind(step.Kind)));
             if (requiredChoices.Any(step => step.PresentationOrder >= extra.PresentationOrder))
                 throw new BadRequestException("Required choices must precede optional extras in the customer-step plan.");
-        }
-    }
-
-    private static void ValidateBundleComponentOrder(
-        IReadOnlyList<CustomerStepManifestStepDto> steps,
-        Dictionary<Guid, CustomerStepManifestStepDto> sectionSteps,
-        Dictionary<Guid, (MenuSection Section, MenuSectionItem Item)> sectionRows)
-    {
-        foreach (var step in steps.Where(candidate => IsBundleComponentKind(candidate.Kind)))
-        {
-            if (!step.SectionId.HasValue || !step.SectionItemId.HasValue)
-                throw new BadRequestException("A component preparation screen must follow its owning section selection.");
-            if (!sectionSteps.TryGetValue(step.SectionId.Value, out var ownerStep)
-                || ownerStep.PresentationOrder >= step.PresentationOrder)
-                throw new BadRequestException("A component preparation screen must follow its owning section selection.");
-            if (!sectionRows.TryGetValue(step.SectionItemId.Value, out var owner)
-                || owner.Section.Id != step.SectionId.Value)
-                throw new BadRequestException("A component preparation screen must follow its owning section selection.");
         }
     }
 

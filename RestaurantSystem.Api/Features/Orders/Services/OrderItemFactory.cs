@@ -94,26 +94,7 @@ public partial class OrderItemFactory : IOrderItemFactory
         Dictionary<Guid, Guid> explicitParentRefs,
         CancellationToken cancellationToken)
     {
-        // DetailedIngredients is loaded for the ingredient snapshot below, not for pricing — money
-        // is settled before this factory runs (see ResolvePricing). Sibling collections, hence split.
-        var product = _context.Products.Local.FirstOrDefault(
-            candidate => candidate.Id == itemDto.ProductId && !candidate.IsDeleted);
-        product ??= await _context.Products
-            .Include(candidate => candidate.Variations)
-            .Include(candidate => candidate.DetailedIngredients)
-            .Include(candidate => candidate.CustomizationGroups)
-                .ThenInclude(group => group.IngredientOptions)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(candidate => candidate.Id == itemDto.ProductId && !candidate.IsDeleted,
-                cancellationToken);
-
-        if (product == null)
-        {
-            // Throws — matches the original recursive method's behaviour for
-            // both top-level and nested products. The top-level
-            // not-found-as-Failure semantics only applies to menus.
-            throw new NotFoundException($"Product {itemDto.ProductId} not found");
-        }
+        var product = await LoadProductAsync(itemDto.ProductId, cancellationToken);
 
         if (parentItem is null)
         {
@@ -127,102 +108,76 @@ public partial class OrderItemFactory : IOrderItemFactory
         var choice = OrderLineIngredientChoice.Resolve(
             _lineCustomizationBuilder, itemDto, product, isRootLine: parentItem == null);
 
-        var (unitPrice, variationName) = ResolvePricing(itemDto, product, pricesAreTrusted && choice.Price is null);
-        var customization = choice.Price ?? ResolveCustomizationPrice(itemDto, pricesAreTrusted);
-        if (choice.Price is not null && parentItem != null && itemDto.Kind == OrderItemKind.SideItem)
-        {
-            customization *= parentItem.Quantity;
-        }
-
-        // Convention mirrors BasketService.AddItemToBasketAsync (Features/Basket/Services/BasketService.cs:230-245):
-        // child rows carry UnitPrice for display but ItemTotal = 0, because the
-        // parent's ItemTotal already includes the rolled-up combo price.
-        // Without this, any caller that goes through OrderPricingService's
-        // legacy compute path (no command.BasketSubTotal — e.g. admin tooling,
-        // bulk import, refunds-as-new-orders) double-counts every child's
-        // UnitPrice on top of the parent. See issue #54.
-        //
-        // A child's CustomizationPrice (e.g. extra toppings on a child pizza
-        // option) is NOT pre-rolled into the parent's UnitPrice by all callers.
-        // BasketService rolls it up by adding to the parent's ItemTotal/UnitPrice
-        // (BasketService.cs:215, 243-245). OrderItem has no CustomizationPrice
-        // column, so we add the child's CustomizationPrice contribution
-        // directly to the parent's ItemTotal here. (DTO contract: per
-        // CreateOrderItemDto.cs:11-14, CustomizationPrice is "for the WHOLE line,
-        // not per unit", so no extra Quantity multiplier — consistent with the
-        // top-level branch below and the menu path on line 61. BasketToOrderTranslator
-        // sends 0 here for both child kinds, so no basket-sourced DTO reaches this
-        // line at all; it exists for a caller that hand-builds POST /api/orders.)
-        var itemTotal = ResolveItemTotal(
-            parentItem, unitPrice, itemDto.Quantity, customization);
-
-        var orderItem = new OrderItem
-        {
-            Id = Guid.NewGuid(),
-            ParentOrderItemId = parentItem?.Id,
-            ProductId = itemDto.ProductId,
-            ProductVariationId = itemDto.ProductVariationId,
-            MenuId = itemDto.MenuId,
-            ProductName = product.Name,
-            VariationName = variationName,
-            Quantity = itemDto.Quantity,
-            UnitPrice = unitPrice,
-            ItemTotal = itemTotal,
-            SpecialInstructions = itemDto.SpecialInstructions,
-            IngredientQuantitiesJson = SerializeIngredients(choice.Quantities),
-            // THE FREEZE POINT for the ingredient half of the line. Everything else on this row is
-            // already a snapshot (ProductName, VariationName, UnitPrice, ItemTotal); until S1 the
-            // ingredients were bare ids re-resolved against the live catalog on every read, so a
-            // rename or a delete rewrote a receipt already printed. D2, owner-confirmed 2026-08-24.
-            IngredientSnapshots = OrderIngredientSnapshot.Build(
-                product.DetailedIngredients,
-                choice.Quantities,
-                _currentUserService.GetAuditIdentifier(),
-                metadataAreTrusted ? itemDto.IngredientQuantityBasis : QuantityBasis.Unknown,
-                metadataAreTrusted ? itemDto.IngredientConfigurationScope : ConfigurationScope.Unknown,
-                metadataAreTrusted ? itemDto.IngredientCompositionRoles : null),
-            ParentOrderItem = parentItem,
-            // A kind belongs to a CHILD row. Discarded on a root even if a caller sent one, so the
-            // column cannot come to mean two things (#318).
-            Kind = parentItem != null ? itemDto.Kind : null,
-            SectionId = await ResolveChoiceSectionAsync(parentItem, itemDto, cancellationToken),
-            MenuSectionItemId = itemDto.MenuSectionItemId,
-            SuggestedSideItemId = metadataAreTrusted ? itemDto.SuggestedSideItemId : null,
-            ParentComponentOrderItemId = metadataAreTrusted && parentItem is not null
-                && (parentItem.CompositionRole == CompositionRole.Dish
-                    || parentItem.Kind == OrderItemKind.BundleChild && parentItem.MenuSectionItemId.HasValue)
-                && itemDto.Kind == OrderItemKind.SideItem
-                ? parentItem.Id
-                : null,
-            QuantityBasis = metadataAreTrusted ? itemDto.QuantityBasis ?? QuantityBasis.Unknown : QuantityBasis.Unknown,
-            ConfigurationScope = metadataAreTrusted
-                ? itemDto.ConfigurationScope ?? ConfigurationScope.Unknown
-                : ConfigurationScope.Unknown,
-            CompositionRole = metadataAreTrusted
-                ? itemDto.CompositionRole ?? CompositionRole.Unknown
-                : CompositionRole.Unknown,
-            PresentationLabel = metadataAreTrusted ? itemDto.PresentationLabel : null,
-            PresentationOrder = metadataAreTrusted ? itemDto.PresentationOrder : null,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = _currentUserService.GetAuditIdentifier(),
-        };
+        var orderItem = await CreateProductOrderItemAsync(
+            itemDto, product, parentItem, choice, pricesAreTrusted, metadataAreTrusted, cancellationToken);
 
         order.Items.Add(orderItem);
+        RememberExplicitParentReference(orderItem, itemDto, metadataAreTrusted, explicitParentRefs);
+        await AddChildItemsAsync(order, itemDto, orderItem, pricesAreTrusted, metadataAreTrusted,
+            explicitParentRefs, cancellationToken);
+        AssignExplicitComponentParentsIfBundle(orderItem, itemDto, product, parentItem, order.Items,
+            explicitParentRefs);
+    }
 
+    private async Task<Product> LoadProductAsync(Guid? productId, CancellationToken cancellationToken)
+    {
+        // DetailedIngredients is loaded for the ingredient snapshot below, not for pricing — money
+        // is settled before this factory runs (see ResolvePricing). Sibling collections, hence split.
+        var product = _context.Products.Local.FirstOrDefault(
+            candidate => candidate.Id == productId && !candidate.IsDeleted);
+        product ??= await _context.Products
+            .Include(candidate => candidate.Variations)
+            .Include(candidate => candidate.DetailedIngredients)
+            .Include(candidate => candidate.CustomizationGroups)
+                .ThenInclude(group => group.IngredientOptions)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(candidate => candidate.Id == productId && !candidate.IsDeleted,
+                cancellationToken);
+
+        // Throws — matches the original recursive method's behaviour for both top-level and nested
+        // products. The top-level not-found-as-Failure semantics only applies to menus.
+        return product ?? throw new NotFoundException($"Product {productId} not found");
+    }
+
+    private static void RememberExplicitParentReference(
+        OrderItem orderItem,
+        CreateOrderItemDto itemDto,
+        bool metadataAreTrusted,
+        Dictionary<Guid, Guid> explicitParentRefs)
+    {
         if (metadataAreTrusted && itemDto.ParentComponentMenuSectionItemId.HasValue)
             explicitParentRefs.Add(orderItem.Id, itemDto.ParentComponentMenuSectionItemId.Value);
+    }
 
-        if (itemDto.ChildItems != null)
+    private async Task AddChildItemsAsync(
+        Order order,
+        CreateOrderItemDto itemDto,
+        OrderItem orderItem,
+        bool pricesAreTrusted,
+        bool metadataAreTrusted,
+        Dictionary<Guid, Guid> explicitParentRefs,
+        CancellationToken cancellationToken)
+    {
+        if (itemDto.ChildItems is null)
+            return;
+
+        foreach (var childDto in itemDto.ChildItems)
         {
-            foreach (var childDto in itemDto.ChildItems)
-            {
-                await AddProductItemRecursiveAsync(order, childDto, orderItem, pricesAreTrusted, metadataAreTrusted,
-                    explicitParentRefs, cancellationToken);
-            }
+            await AddProductItemRecursiveAsync(order, childDto, orderItem, pricesAreTrusted, metadataAreTrusted,
+                explicitParentRefs, cancellationToken);
         }
+    }
 
+    private static void AssignExplicitComponentParentsIfBundle(
+        OrderItem orderItem,
+        CreateOrderItemDto itemDto,
+        Product product,
+        OrderItem? parentItem,
+        IEnumerable<OrderItem> orderItems,
+        Dictionary<Guid, Guid> explicitParentRefs)
+    {
         if (parentItem is null && product.Type == ProductType.Menu && itemDto.ChildItems is { Count: > 0 })
-            AssignExplicitComponentParents(orderItem, order.Items, explicitParentRefs);
+            AssignExplicitComponentParents(orderItem, orderItems, explicitParentRefs);
     }
 
     private static void AssignExplicitComponentParents(
