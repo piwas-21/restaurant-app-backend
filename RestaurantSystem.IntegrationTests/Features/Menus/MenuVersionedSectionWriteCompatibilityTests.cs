@@ -4,6 +4,8 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderFromBasketCommand;
+using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Api.Features.Products.Commands.UpdateProductCommand;
 using RestaurantSystem.Api.Features.Products.Dtos;
@@ -11,6 +13,7 @@ using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
+using System.Text.Json.Nodes;
 
 namespace RestaurantSystem.IntegrationTests.Features.Menus;
 
@@ -89,6 +92,56 @@ public sealed class MenuVersionedSectionWriteCompatibilityTests : IntegrationTes
         persisted.Name.Should().Be("Edited in authoring API");
         persisted.Items.Single().Id.Should().Be(SectionItemId);
         (await ReadStoredProductNameAsync()).Should().Be("Non-section product edit");
+    }
+
+    [Fact]
+    public async Task NonVersionedManifestOnlyMenuPutsPreserveSectionAndItemIds()
+    {
+        AuthenticateAsAdmin();
+        var first = await PutManifestAsync(revision: 0);
+        first.StatusCode.Should().Be(HttpStatusCode.OK, await first.Content.ReadAsStringAsync());
+        var afterFirst = await ReadStoredSectionAsync();
+        afterFirst.Id.Should().Be(SectionId);
+        afterFirst.Items.Single().Id.Should().Be(SectionItemId);
+
+        var repeated = await PutManifestAsync(revision: 1);
+        repeated.StatusCode.Should().Be(HttpStatusCode.OK, await repeated.Content.ReadAsStringAsync());
+        var afterRepeated = await ReadStoredSectionAsync();
+        afterRepeated.Id.Should().Be(SectionId);
+        afterRepeated.Items.Single().Id.Should().Be(SectionItemId);
+
+        var read = await Client.GetAsync($"/api/Menus/{BundleId}");
+        read.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = JsonNode.Parse(await read.Content.ReadAsStringAsync())!;
+        body["data"]!["customerStepManifest"]!["revision"]!.GetValue<int>().Should().Be(2);
+        body["data"]!["customerStepManifest"]!["steps"]![0]!["targetId"]!.GetValue<Guid>()
+            .Should().Be(SectionId);
+        body["data"]!["customerStepManifest"]!["steps"]![0]!["compositionRole"]!.GetValue<string>()
+            .Should().Be(nameof(CompositionRole.Side));
+        (await ReadVersionedEditingStartedAsync()).Should().BeFalse();
+
+        Client.DefaultRequestHeaders.Add("X-Session-Id", Guid.NewGuid().ToString());
+        var add = await Client.PostAsJsonAsync("/api/basket/items", new
+        {
+            productId = BundleId,
+            quantity = 1,
+            selectedMenuOptions = new[]
+            {
+                new { sectionId = SectionId, itemId = ChoiceProductId, menuSectionItemId = SectionItemId, quantity = 1 }
+            }
+        });
+        add.StatusCode.Should().Be(HttpStatusCode.OK, await add.Content.ReadAsStringAsync());
+
+        var checkout = await Client.PostAsJsonAsync("/api/orders/from-basket", new CreateOrderFromBasketCommand
+        {
+            Type = OrderType.Takeaway,
+            CustomerName = "Section side projection"
+        });
+        checkout.StatusCode.Should().Be(HttpStatusCode.OK, await checkout.Content.ReadAsStringAsync());
+        var order = (await ReadResponseAsync<ApiResponse<OrderDto>>(checkout))!.Data!;
+        order.Items.Should().ContainSingle();
+        order.Items.Single().SideItems!.Should().ContainSingle()
+            .Which.CompositionRole.Should().Be(CompositionRole.Side);
     }
 
     [Fact]
@@ -230,6 +283,25 @@ public sealed class MenuVersionedSectionWriteCompatibilityTests : IntegrationTes
         },
         content = new Dictionary<string, object>()
     };
+
+    private Task<HttpResponseMessage> PutManifestAsync(int revision)
+    {
+        var payload = System.Text.Json.JsonSerializer.SerializeToNode(
+            BundlePutPayload("Section test bundle", OriginalSectionName), JsonOptions)!.AsObject();
+        payload["customerStepManifest"] = new JsonObject
+        {
+            ["schemaVersion"] = 1,
+            ["revision"] = revision,
+            ["steps"] = new JsonArray(new JsonObject
+            {
+                ["kind"] = "bundleSection",
+                ["targetId"] = SectionId,
+                ["compositionRole"] = "side",
+                ["presentationOrder"] = 0
+            })
+        };
+        return Client.PutAsJsonAsync($"/api/Menus/{BundleId}", payload, JsonOptions);
+    }
 
     private UpdateProductCommand ProductPutCommand(string sectionName) => new(
         Id: BundleId,

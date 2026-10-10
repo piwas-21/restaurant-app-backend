@@ -118,6 +118,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                 .Select(si => new SideItemDto
                 {
                     Id = si.SideItemProduct.Id,
+                    SuggestedSideItemId = si.Id,
                     Name = si.SideItemProduct.Name,
                     Description = si.SideItemProduct.Description,
                     Price = si.SideItemProduct.BasePrice,

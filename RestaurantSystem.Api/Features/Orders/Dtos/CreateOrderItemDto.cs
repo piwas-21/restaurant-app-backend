@@ -1,10 +1,10 @@
-﻿
+
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 
 namespace RestaurantSystem.Api.Features.Orders.Dtos;
 
-public record CreateOrderItemDto
+public partial record CreateOrderItemDto
 {
     public Guid? ProductId { get; set; }
     public Guid? ProductVariationId { get; set; }
@@ -40,6 +40,7 @@ public record CreateOrderItemDto
     // prices the exact section membership rather than choosing the first matching product across
     // sections. Additive metadata: roots and non-bundle children leave it null.
     public Guid? SectionId { get; set; }
+    public Guid? MenuSectionItemId { get; set; }
 
     // For Menu Bundles
     public List<CreateOrderItemDto>? ChildItems { get; set; }
@@ -50,4 +51,5 @@ public record CreateOrderItemDto
     // that hand-builds POST /api/orders may leave it null, and the renderer keeps the old derivation
     // as its fallback for those and for every row written before the column existed.
     public OrderItemKind? Kind { get; set; }
+
 }

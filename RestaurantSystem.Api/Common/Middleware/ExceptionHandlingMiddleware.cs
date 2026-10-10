@@ -120,6 +120,8 @@ public class ExceptionHandlingMiddleware
             (not null, null) => ApiResponse<object>.FailureWithCode(detail, errorCode, message),
             (not null, not null) => ApiResponse<object>.FailureWithCode(reasons, errorCode, message),
         };
+        if (exception is ConflictException { CurrentRevision: int currentRevision })
+            response.Data = new { currentRevision };
 
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;

@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
@@ -37,7 +38,10 @@ internal static class OrderIngredientSnapshot
     internal static List<OrderItemIngredient> Build(
         IEnumerable<ProductIngredient>? recipe,
         Dictionary<Guid, int>? savedQuantities,
-        string createdBy)
+        string createdBy,
+        QuantityBasis? quantityBasis,
+        ConfigurationScope? configurationScope,
+        IReadOnlyDictionary<Guid, CompositionRole>? compositionRoles = null)
     {
         if (recipe == null || savedQuantities == null || savedQuantities.Count == 0)
         {
@@ -57,6 +61,13 @@ internal static class OrderIngredientSnapshot
                 IngredientId = row.IngredientId,
                 IngredientName = row.IngredientName,
                 Quantity = row.Quantity,
+                QuantityBasis = quantityBasis,
+                ConfigurationScope = configurationScope,
+                CompositionRole = compositionRoles is not null
+                    && compositionRoles.TryGetValue(row.IngredientId, out var authoredRole)
+                        ? authoredRole
+                        : row.CompositionRole ?? CompositionRole.Unknown,
+                PresentationOrder = row.PresentationOrder,
                 IsRemoved = row.IsRemoved,
                 IsAddOn = row.IsAddOn,
                 SortOrder = index,

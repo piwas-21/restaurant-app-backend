@@ -40,7 +40,18 @@ public partial class FidelityPointsServiceTests
             CreatedBy = "PreLoyaltyMigrationFixture"
         };
         await context.SaveChangesAsync();
-        await LegacyEntityFixture.InsertAsync(context, item, "section_id");
+        await LegacyEntityFixture.InsertAsync(
+            context,
+            item,
+            "section_id",
+            "composition_role",
+            "configuration_scope",
+            "menu_section_item_id",
+            "parent_component_order_item_id",
+            "presentation_label",
+            "presentation_order",
+            "quantity_basis",
+            "suggested_side_item_id");
         order.Items.Add(item);
         context.Entry(item).State = EntityState.Unchanged;
 

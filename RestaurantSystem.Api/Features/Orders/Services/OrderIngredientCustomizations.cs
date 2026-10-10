@@ -161,7 +161,11 @@ internal static class OrderIngredientCustomizations
                 IngredientName = row.IngredientName,
                 Quantity = row.Quantity,
                 IsRemoved = row.IsRemoved,
-                IsAddOn = row.IsAddOn
+                IsAddOn = row.IsAddOn,
+                QuantityBasis = row.QuantityBasis,
+                ConfigurationScope = row.ConfigurationScope,
+                CompositionRole = row.CompositionRole,
+                PresentationOrder = row.PresentationOrder
             })
             .Where(IsDisplayWorthy)
             .ToList();
@@ -229,7 +233,11 @@ internal static class OrderIngredientCustomizations
                     IngredientName = ing.Name,
                     Quantity = quantity,
                     IsRemoved = IngredientRecipeRules.IsRemoved(ing, quantity),
-                    IsAddOn = isAddOn
+                    IsAddOn = isAddOn,
+                    CompositionRole = ing.Kind == RestaurantSystem.Domain.Common.Enums.IngredientKind.Sauce
+                        ? RestaurantSystem.Domain.Common.Enums.CompositionRole.Sauce
+                        : RestaurantSystem.Domain.Common.Enums.CompositionRole.Ingredient,
+                    PresentationOrder = ing.DisplayOrder
                 };
 
                 // A base-recipe row the guest left at its default quantity is the dish itself, and
@@ -252,7 +260,11 @@ internal static class OrderIngredientCustomizations
                     IngredientName = ing.Name,
                     Quantity = 0,
                     IsRemoved = true,
-                    IsAddOn = false
+                    IsAddOn = false,
+                    CompositionRole = ing.Kind == RestaurantSystem.Domain.Common.Enums.IngredientKind.Sauce
+                        ? RestaurantSystem.Domain.Common.Enums.CompositionRole.Sauce
+                        : RestaurantSystem.Domain.Common.Enums.CompositionRole.Ingredient,
+                    PresentationOrder = ing.DisplayOrder
                 });
             }
         }

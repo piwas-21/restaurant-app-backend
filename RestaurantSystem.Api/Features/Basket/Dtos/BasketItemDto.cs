@@ -1,6 +1,7 @@
-﻿namespace RestaurantSystem.Api.Features.Basket.Dtos;
 
-public record BasketItemDto
+namespace RestaurantSystem.Api.Features.Basket.Dtos;
+
+public partial record BasketItemDto
 {
     // Basket item identifier (required for updates/deletes)
     public Guid? Id { get; set; }

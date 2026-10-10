@@ -80,7 +80,9 @@ public sealed class OrderBillingEarningDispositionMigrationTests(DatabaseFixture
             context.Orders.AddRange(orders);
             await context.SaveChangesAsync();
             foreach (var item in items)
-                await LegacyEntityFixture.InsertAsync(context, item, "section_id");
+                await LegacyEntityFixture.InsertAsync(context, item, "section_id", "composition_role",
+                    "configuration_scope", "menu_section_item_id", "parent_component_order_item_id",
+                    "presentation_label", "presentation_order", "quantity_basis", "suggested_side_item_id");
 
             await using var evidenceTransaction = await context.Database.BeginTransactionAsync();
             await LegacyOrderBillingSnapshotFixture.InsertAsync(context, positiveBuilt.Header);
@@ -208,7 +210,12 @@ public sealed class OrderBillingEarningDispositionMigrationTests(DatabaseFixture
     private async Task<string> CaptureRowsAsync(string tableName, bool removeDisposition = false)
     {
         var payload = removeDisposition ? "to_jsonb(row) - 'earning_disposition'" : "to_jsonb(row)";
-        if (tableName == "\"OrderItems\"") payload += " - 'section_id'";
+        if (tableName == "\"OrderItems\"")
+        {
+            payload += " - 'section_id' - 'composition_role' - 'configuration_scope' - 'menu_section_item_id'"
+                + " - 'parent_component_order_item_id' - 'presentation_label' - 'presentation_order'"
+                + " - 'quantity_basis' - 'suggested_side_item_id'";
+        }
         var sql = $"SELECT COALESCE(jsonb_agg(payload ORDER BY payload ->> 'id')::text, '[]') "
             + $"FROM (SELECT {payload} AS payload FROM {tableName} AS row) AS rows";
         await using var connection = new NpgsqlConnection(fixture.ConnectionString);

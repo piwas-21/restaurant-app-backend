@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using System.Text.Json.Serialization;
 using RestaurantSystem.Api.Features.Products.Queries.GetProductByIdQuery;
 using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
@@ -55,7 +56,23 @@ public record UpdateProductCommand(
     bool IsComponent = false,
     List<ProductCustomizationGroupDto>? CustomizationGroups = null,
     TranslationOwnerMetadataDto? TranslationMetadata = null
-) : ICommand<ApiResponse<ProductDto>>;
+) : ICommand<ApiResponse<ProductDto>>
+{
+    private CustomerStepManifestDto? _customerStepManifest;
+
+    [JsonIgnore]
+    public bool CustomerStepManifestSpecified { get; private set; }
+
+    public CustomerStepManifestDto? CustomerStepManifest
+    {
+        get => _customerStepManifest;
+        init
+        {
+            _customerStepManifest = value;
+            CustomerStepManifestSpecified = true;
+        }
+    }
+}
 
 public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand, ApiResponse<ProductDto>>
 {
@@ -111,6 +128,9 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             }
 
             MenuOfferLinkConflict.ThrowIfExpected(exception);
+            if (CustomerStepManifestStore.IsRevisionWriteConflict(exception))
+                throw await CustomerStepManifestStore.RevisionWriteConflictAsync(
+                    _context, command.Id, exception, cancellationToken);
             throw;
         }
     }
@@ -136,7 +156,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 .ThenInclude(group => group.IngredientOptions)
             .Include(p => p.CustomizationGroups)
                 .ThenInclude(group => group.ProductOptions)
-            .Include(p => p.MenuDefinition)
+            .Include(p => p.MenuDefinition!.Sections)
+                    .ThenInclude(section => section.Items)
             .FirstOrDefaultAsync(p => p.Id == command.Id && !p.IsDeleted, cancellationToken);
 
         if (product == null)
@@ -235,6 +256,9 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         // a supported shape, since the field is nullable on the command and means "no ingredient
         // instruction", not "no menu instruction".
         await UpdateMenuDefinitionAsync(product, command, cancellationToken);
+
+        await CustomerStepManifestStore.ApplyAsync(_context, product,
+            command.CustomerStepManifestSpecified, command.CustomerStepManifest, cancellationToken);
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -452,18 +476,46 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             return;
         }
 
-        _context.ProductSideItems.RemoveRange(product.SuggestedSideItems);
+        var existingByProductId = product.SuggestedSideItems
+            .OrderBy(side => side.DisplayOrder)
+            .ThenBy(side => side.Id)
+            .GroupBy(side => side.SideItemProductId)
+            .ToDictionary(group => group.Key, group => new Queue<ProductSideItem>(group));
+        var retained = new HashSet<ProductSideItem>();
+        var additions = new List<ProductSideItem>();
         var auditIdentifier = _currentUserService.GetAuditIdentifier();
-        var sideItems = suggestedSideItemIds.Select((sideItemId, displayOrder) => new ProductSideItem
+
+        for (var displayOrder = 0; displayOrder < suggestedSideItemIds.Count; displayOrder++)
         {
-            MainProductId = product.Id,
-            SideItemProductId = sideItemId,
-            IsRequired = false,
-            DisplayOrder = displayOrder,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = auditIdentifier
-        });
-        await _context.ProductSideItems.AddRangeAsync(sideItems, cancellationToken);
+            var sideItemId = suggestedSideItemIds[displayOrder];
+            if (existingByProductId.TryGetValue(sideItemId, out var matches) && matches.TryDequeue(out var existing))
+            {
+                // The association row is the stable manifest scope ID. Keep its identity and
+                // requiredness when a full product PUT merely reorders the same side product.
+                existing.DisplayOrder = displayOrder;
+                retained.Add(existing);
+                continue;
+            }
+
+            var added = new ProductSideItem
+            {
+                MainProductId = product.Id,
+                SideItemProductId = sideItemId,
+                IsRequired = false,
+                DisplayOrder = displayOrder,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = auditIdentifier
+            };
+            additions.Add(added);
+            product.SuggestedSideItems.Add(added);
+        }
+
+        var removed = product.SuggestedSideItems.Where(side => !retained.Contains(side)
+            && !additions.Contains(side)).ToList();
+        _context.ProductSideItems.RemoveRange(removed);
+        foreach (var side in removed)
+            product.SuggestedSideItems.Remove(side);
+        await _context.ProductSideItems.AddRangeAsync(additions, cancellationToken);
     }
 
     private async Task UpdateDetailedIngredientsAsync(

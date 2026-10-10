@@ -2,6 +2,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
@@ -96,6 +97,34 @@ internal sealed class OrderAmendmentLineSnapshotBuilder
         current.ItemTotal = previous.ItemTotal;
         current.KitchenType = previous.KitchenType;
         current.Kind = previous.Kind;
+        current.SectionId = previous.SectionId;
+        current.MenuSectionItemId = previous.MenuSectionItemId;
+        current.SuggestedSideItemId = previous.SuggestedSideItemId;
+        current.ParentComponentOrderItemId = previous.ParentComponentOrderItemId;
+        current.QuantityBasis = previous.QuantityBasis;
+        current.ConfigurationScope = previous.ConfigurationScope;
+        current.CompositionRole = previous.CompositionRole;
+        current.PresentationLabel = previous.PresentationLabel;
+        current.PresentationOrder = previous.PresentationOrder;
+        var priorIngredients = (previous.IngredientCustomizations ?? [])
+            .ToDictionary(ingredient => ingredient.IngredientId);
+        foreach (var ingredient in current.IngredientCustomizations ?? [])
+        {
+            if (priorIngredients.TryGetValue(ingredient.IngredientId, out var prior))
+            {
+                ingredient.QuantityBasis = prior.QuantityBasis;
+                ingredient.ConfigurationScope = prior.ConfigurationScope;
+                ingredient.CompositionRole = prior.CompositionRole;
+                ingredient.PresentationOrder = prior.PresentationOrder;
+            }
+            else
+            {
+                ingredient.QuantityBasis = QuantityBasis.Unknown;
+                ingredient.ConfigurationScope = ConfigurationScope.Unknown;
+                ingredient.CompositionRole = CompositionRole.Unknown;
+                ingredient.PresentationOrder = null;
+            }
+        }
         var oldChildren = previous.SideItems ?? [];
         var newChildren = current.SideItems ?? [];
         for (var index = 0; index < oldChildren.Count; index++)

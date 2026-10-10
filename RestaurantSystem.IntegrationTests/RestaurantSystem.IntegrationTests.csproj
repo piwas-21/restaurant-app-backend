@@ -55,5 +55,11 @@
 		<Content Include="Features/Orders/printer-feed.golden.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
+		<Content Include="Features/Orders/printer-feed-quantity-contract.golden.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Features/Orders/printer-basket-order-quantity-contract.golden.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
 	</ItemGroup>
 </Project>

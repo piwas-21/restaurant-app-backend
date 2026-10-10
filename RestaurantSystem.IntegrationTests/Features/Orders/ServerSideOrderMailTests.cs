@@ -113,7 +113,9 @@ public class ServerSideOrderMailTests : IntegrationTestBase
         AuthenticateAsAnonymous();
         var orderId = await PlaceOrderAsync(OrderType.Takeaway, GuestEmail);
 
-        await WaitUntilAsync(async () => (await ClaimsForAsync(orderId, OutboundEmailTypes.OrderReceived)).Count == 0);
+        await WaitUntilAsync(async () =>
+            Volatile.Read(ref attempts) == 1
+            && (await ClaimsForAsync(orderId, OutboundEmailTypes.OrderReceived)).Count == 0);
 
         var resend = await Client.PostAsync($"/api/orders/{orderId}/send-confirmation-email", content: null);
 

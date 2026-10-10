@@ -1,11 +1,15 @@
 ﻿using FluentValidation;
+using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.Basket.Commands.AddToBasketCommand;
 
 public class AddToBasketCommandValidator : AbstractValidator<AddToBasketCommand>
 {
-    public AddToBasketCommandValidator()
+    public AddToBasketCommandValidator(IOptions<BasketSettings>? basketSettings = null)
     {
+        var maxQuantityPerItem = (basketSettings?.Value ?? new BasketSettings()).MaxQuantityPerItem;
+
         RuleFor(x => x.SessionId)
             .NotEmpty().WithMessage("Session ID is required");
 
@@ -14,7 +18,8 @@ public class AddToBasketCommandValidator : AbstractValidator<AddToBasketCommand>
 
         RuleFor(x => x.Quantity)
             .GreaterThan(0).WithMessage("Quantity must be greater than 0")
-            .LessThanOrEqualTo(100).WithMessage("Quantity cannot exceed 100");
+            .LessThanOrEqualTo(maxQuantityPerItem)
+            .WithMessage($"Quantity cannot exceed {maxQuantityPerItem}");
 
         RuleFor(x => x.SpecialInstructions)
             .MaximumLength(500).WithMessage("Special instructions cannot exceed 500 characters");
@@ -31,7 +36,8 @@ public class AddToBasketCommandValidator : AbstractValidator<AddToBasketCommand>
             // (#308), so 30,000,000 was accepted and overflowed the decimal price column later.
             option.RuleFor(o => o.Quantity)
                 .GreaterThan(0).WithMessage("Menu option quantity must be greater than 0")
-                .LessThanOrEqualTo(100).WithMessage("Menu option quantity cannot exceed 100");
+                .LessThanOrEqualTo(maxQuantityPerItem)
+                .WithMessage($"Menu option quantity cannot exceed {maxQuantityPerItem}");
         });
 
         // The command's other client-supplied quantity, same hole (#308), measured at 500 on the
@@ -41,7 +47,8 @@ public class AddToBasketCommandValidator : AbstractValidator<AddToBasketCommand>
         RuleForEach(x => x.SelectedSideItems).ChildRules(sideItem =>
         {
             sideItem.RuleFor(si => si.Quantity)
-                .LessThanOrEqualTo(100).WithMessage("Side item quantity cannot exceed 100");
+                .LessThanOrEqualTo(maxQuantityPerItem)
+                .WithMessage($"Side item quantity cannot exceed {maxQuantityPerItem}");
         });
     }
 }
