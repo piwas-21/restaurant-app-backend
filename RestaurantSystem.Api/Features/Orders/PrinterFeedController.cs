@@ -5,7 +5,9 @@ using RestaurantSystem.Api.Common.Filters;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
 using RestaurantSystem.Api.Features.Orders.Models;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedUpdatesQuery;
+using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.Orders;
@@ -62,10 +64,16 @@ public class PrinterFeedController : ControllerBase
         [FromQuery] string? language,
         [FromQuery] string? updateCursor,
         [FromQuery] string? orderCursor,
+        [FromQuery] int? projectionVersion,
         [ModelBinder(Name = "X-Device-Id", BinderType = typeof(OptionalDeviceHeaderModelBinder))]
         OptionalDeviceHeader deviceHeader,
         CancellationToken cancellationToken)
     {
+        var requestedProjectionVersion = projectionVersion ?? 1;
+        if (requestedProjectionVersion is not (1 or 2))
+            throw new RestaurantSystem.Api.Common.Exceptions.BadRequestException(
+                "Printer projectionVersion must be 1 or 2.");
+
         try
         {
             var deviceId = deviceHeader.IsPresent
@@ -75,31 +83,27 @@ public class PrinterFeedController : ControllerBase
                 orderCursor, _timeProvider.GetUtcNow().UtcDateTime, _routingSettings);
             var orderDtos = await _mediator.SendQuery(
                 new PrinterFeedQuery(
-                    modifiedSince, language, deviceId, orderCursor, recoveryFence.CutoffUtc),
+                    modifiedSince, language, deviceId, orderCursor, recoveryFence.CutoffUtc,
+                    requestedProjectionVersion),
                 cancellationToken);
             var updatePage = await _mediator.SendQuery(
                 new PrinterFeedUpdatesQuery(modifiedSince, updateCursor), cancellationToken);
 
+            if (requestedProjectionVersion == 2)
+                PrinterFeedV2Projection.NormalizeUpdates(updatePage.Items);
+
             return Ok(new
             {
                 success = true,
-                data = new
-                {
-                    items = orderDtos,
-                    totalCount = orderDtos.Count,
-                    page = 1,
-                    pageSize = PrinterFeedQuery.MaxOrdersPerPoll,
-                    // A full page conservatively requests one more page, including an empty
-                    // terminal page at an exact multiple. Older clients ignore these fields.
-                    hasMoreOrders = orderDtos.Count == PrinterFeedQuery.MaxOrdersPerPoll,
-                    nextOrderCursor = orderDtos.Count > 0
+                data = PrinterFeedResponseBuilder.BuildData(
+                    orderDtos,
+                    orderDtos.Count == PrinterFeedQuery.MaxOrdersPerPoll,
+                    orderDtos.Count > 0
                         ? PrinterFeedOrderCursor.Encode(
                             orderDtos[^1], recoveryFence.CutoffUtc, recoveryFence.IssuedAtUtc)
                         : null,
-                    updates = updatePage.Items,
-                    nextUpdateCursor = updatePage.NextUpdateCursor,
-                    hasMoreUpdates = updatePage.HasMoreUpdates
-                }
+                    updatePage,
+                    requestedProjectionVersion)
             });
         }
         catch (Exception ex)
@@ -109,18 +113,8 @@ public class PrinterFeedController : ControllerBase
             {
                 success = false,
                 message = "Printer feed request failed. Retry shortly.",
-                data = new
-                {
-                    items = Array.Empty<object>(),
-                    totalCount = 0,
-                    hasMoreOrders = false,
-                    nextOrderCursor = (string?)null,
-                    updates = Array.Empty<object>(),
-                    nextUpdateCursor = (string?)null,
-                    hasMoreUpdates = false
-                }
+                data = PrinterFeedResponseBuilder.BuildErrorData(projectionVersion)
             });
         }
     }
-
 }

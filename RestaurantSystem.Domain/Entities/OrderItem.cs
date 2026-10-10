@@ -12,6 +12,16 @@ public class OrderItem : Entity
     /// <summary>Frozen bundle-choice grouping, preserved if the catalog section is later deleted.</summary>
     public Guid? SectionId { get; set; }
     public Guid? ParentOrderItemId { get; set; }
+    /// <summary>Owning selected Dish row for explicitly related bundle-choice/side presentation.</summary>
+    public Guid? ParentComponentOrderItemId { get; set; }
+    public Guid? MenuSectionItemId { get; set; }
+    /// <summary>Frozen ProductSideItem association selected by this row, when it is a suggested side.</summary>
+    public Guid? SuggestedSideItemId { get; set; }
+    public QuantityBasis? QuantityBasis { get; set; }
+    public ConfigurationScope? ConfigurationScope { get; set; }
+    public CompositionRole? CompositionRole { get; set; }
+    public string? PresentationLabel { get; set; }
+    public int? PresentationOrder { get; set; }
 
     /// <summary>
     /// What this CHILD row is — see <see cref="OrderItemKind"/>. Null on a top-level line and on

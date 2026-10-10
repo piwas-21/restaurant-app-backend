@@ -3,6 +3,8 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
+using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -19,6 +21,7 @@ public partial class BasketItemFactory
         // Calculate total price including options
         decimal menuTotalPrice = product.BasePrice;
         var selectedOptions = item.SelectedMenuOptions ?? new List<SelectedMenuOptionDto>();
+        var customerSteps = CustomerStepManifestStore.Read(product)?.Steps;
 
         // Basket and staff counter orders share one exact section rule. It validates required/min/max
         // counts, quantities, and that every option belongs to the section named by the request.
@@ -32,10 +35,14 @@ public partial class BasketItemFactory
         {
             BasketId = basketId,
             ProductId = item.ProductId,
+            ProductVariationId = item.ProductVariationId,
             Quantity = item.Quantity,
             UnitPrice = menuTotalPrice,
             ItemTotal = menuTotalPrice * item.Quantity,
             SpecialInstructions = item.SpecialInstructions,
+            QuantityBasis = QuantityBasis.LineTotal,
+            ConfigurationScope = ConfigurationScope.SharedAcrossParentUnits,
+            CompositionRole = CompositionRole.Menu,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = auditIdentifier
         };
@@ -59,6 +66,13 @@ public partial class BasketItemFactory
             // inheriting option as unrestricted, which is worse than no guard — it looks like one.
             .Include(p => p.ProductCategories)
                 .ThenInclude(pc => pc.Category)
+            .Include(p => p.SuggestedSideItems)
+                .ThenInclude(side => side.SideItemProduct)
+                    .ThenInclude(sideProduct => sideProduct.ProductCategories)
+                        .ThenInclude(category => category.Category)
+            .Include(p => p.SuggestedSideItems)
+                .ThenInclude(side => side.SideItemProduct)
+                    .ThenInclude(sideProduct => sideProduct.Variations)
             .Where(p => childProductIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id);
 
@@ -80,6 +94,11 @@ public partial class BasketItemFactory
         // ChildBasketItems navigation (rather than added to the context here) so the caller
         // persists the whole graph with a single Add — and nothing is saved if any child fails.
         decimal totalCustomizationPrice = 0;
+        var receiptOrder = product.MenuDefinition.Sections
+            .OrderBy(section => section.DisplayOrder)
+            .SelectMany(section => section.Items.OrderBy(row => row.DisplayOrder))
+            .Select((row, index) => (row.Id, index))
+            .ToDictionary(pair => pair.Id, pair => pair.index);
 
         foreach (var option in selectedOptions)
         {
@@ -89,10 +108,35 @@ public partial class BasketItemFactory
                 product.MenuDefinition.Sections,
                 option.SectionId,
                 option.ItemId,
-                option.ProductVariationId);
+                option.ProductVariationId,
+                option.MenuSectionItemId);
 
             if (!childProducts.TryGetValue(option.ItemId, out var childProduct))
                 throw new NotFoundException($"Child product not found: {option.ItemId}");
+            var componentVariation = BundleComponentSelection.ResolveVariation(
+                childProduct, sectionItem, option.ComponentProductVariationId);
+            var variationStep = customerSteps?.FirstOrDefault(step =>
+                step.Kind == CustomerStepKind.BundleComponentVariation
+                && step.SectionItemId == sectionItem.Id
+                && step.ProductId == childProduct.Id
+                && step.ScopeId == componentVariation?.Id
+                && step.CompositionRole == CompositionRole.Dish);
+            if (!sectionItem.ProductVariationId.HasValue && componentVariation is not null)
+                menuTotalPrice += componentVariation.PriceModifier * option.Quantity;
+
+            var sectionStep = customerSteps?.FirstOrDefault(step =>
+                step.Kind == CustomerStepKind.BundleSection && step.TargetId == sectionItem.MenuSectionId);
+            var parentOption = sectionStep?.ParentComponentId is Guid parentMenuSectionItemId
+                ? selectedOptions.FirstOrDefault(selected =>
+                    MenuBundleSelectionRules.ResolveSectionItem(
+                        product.MenuDefinition.Sections, selected.SectionId, selected.ItemId,
+                        selected.ProductVariationId, selected.MenuSectionItemId).Id == parentMenuSectionItemId)
+                : null;
+            if (sectionStep?.ParentComponentId.HasValue == true && parentOption is null)
+                throw new BadRequestException("This menu section depends on a selected component that is missing.");
+            var parentLabel = parentOption is not null && childProducts.TryGetValue(parentOption.ItemId, out var parentProduct)
+                ? parentProduct.Name
+                : null;
 
             var explicitSelection = ExplicitCustomizationSelection.Resolve(
                 childProduct, option.CustomizationSelections);
@@ -120,8 +164,12 @@ public partial class BasketItemFactory
                 childProduct.DetailedIngredients, selectedIngredients,
                 ingredientQuantities, preferProvidedQuantities: false,
                 options: LineCustomizationOptions.FromProduct(childProduct));
+            var nestedSides = BundleComponentSelection.ResolveSides(
+                childProduct, sectionItem.Id, option.SelectedSideItems, customerSteps, basketOrderType);
+            var nestedSidePrice = nestedSides.Sum(side => side.UnitPrice * side.Selection.Quantity);
 
             totalCustomizationPrice += childCustomization.CustomizationPrice * option.Quantity;
+            totalCustomizationPrice += nestedSidePrice * option.Quantity;
             totalCustomizationPrice += explicitSelection.ProductOptions.Sum(
                 selected => selected.AdditionalPrice * selected.Quantity * option.Quantity);
 
@@ -131,14 +179,29 @@ public partial class BasketItemFactory
                 ProductId = option.ItemId, // The actual product ID of the option (e.g., Coke)
                 ParentBasketItem = basketItem,
                 Quantity = item.Quantity * option.Quantity, // Scale by main item quantity
-                ProductVariationId = sectionItem.ProductVariationId,
+                ProductVariationId = componentVariation?.Id ?? sectionItem.ProductVariationId,
                 SectionId = sectionItem.MenuSectionId,
-                UnitPrice = MenuBundleSelectionRules.PriceFor(sectionItem),
+                MenuSectionItemId = sectionItem.Id,
+                ParentComponentMenuSectionItemId = sectionStep?.ParentComponentId,
+                QuantityBasis = QuantityBasis.LineTotal,
+                ConfigurationScope = ConfigurationScope.SharedAcrossParentUnits,
+                CompositionRole = sectionStep?.CompositionRole,
+                PresentationLabel = sectionStep?.CompositionRole == CompositionRole.Dish
+                    ? variationStep?.PresentationLabel ?? sectionStep.PresentationLabel ?? childProduct.Name
+                    : parentLabel,
+                PresentationOrder = receiptOrder.GetValueOrDefault(sectionItem.Id),
+                UnitPrice = MenuBundleSelectionRules.PriceFor(sectionItem)
+                    + (!sectionItem.ProductVariationId.HasValue ? componentVariation?.PriceModifier ?? 0m : 0m),
                 ItemTotal = 0, // Included in parent total to avoid double counting in recalculation
                 CustomizationPrice = childCustomization.CustomizationPrice, // Store customization price for this child
                 SpecialInstructions = option.SpecialInstructions,
                 SelectedIngredients = childCustomization.SelectedIngredients,
                 IngredientQuantitiesJson = childCustomization.IngredientQuantitiesJson,
+                IngredientCompositionRolesJson = SerializeIngredientRoles(
+                    CustomerStepManifestStore.IngredientRolesFor(customerSteps, childProduct.Id, sectionItem.Id)),
+                SelectedSideItemsJson = nestedSides.Count > 0
+                    ? System.Text.Json.JsonSerializer.Serialize(nestedSides.Select(side => side.Selection).ToList())
+                    : null,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = auditIdentifier
             };
@@ -166,4 +229,5 @@ public partial class BasketItemFactory
 
         return basketItem;
     }
+
 }

@@ -87,6 +87,7 @@ public class MenuBundleDto
     /// channel-inheritance anchor. Null for an orphan bundle (no links, or none primary).
     /// </summary>
     public Guid? PrimaryCategoryId { get; set; }
+    public CustomerStepManifestDto? CustomerStepManifest { get; set; }
 }
 
 /// <summary>
@@ -158,8 +159,10 @@ public class MenuBundleSectionItemDto
     public List<string>? Allergens { get; set; }
     public ItemAvailabilityDto Availability { get; set; } = new();
     public List<MenuBundleIngredientDto>? DetailedIngredients { get; set; }
+    public List<ProductVariationDto> Variations { get; set; } = [];
     public List<MenuBundleSuggestedSideItemDto>? SuggestedSideItems { get; set; }
     public List<ProductCustomizationGroupDto> CustomizationGroups { get; set; } = [];
+    public bool HideBaseProduct { get; set; }
 
     /// <summary>
     /// The OPTION PRODUCT's own sauce group rule (S6, plan D9/D9a/D10), copied from its product row:
@@ -228,6 +231,8 @@ public class MenuBundleSuggestedSideItemDto
     public string? SideItemProductName { get; set; }
     public decimal SideItemBasePrice { get; set; }
     public ProductType SideItemProductType { get; set; }
+    public ItemAvailabilityDto Availability { get; set; } = new();
+    public List<ProductVariationDto> Variations { get; set; } = [];
     public bool IsRequired { get; set; }
     public int DisplayOrder { get; set; }
 }

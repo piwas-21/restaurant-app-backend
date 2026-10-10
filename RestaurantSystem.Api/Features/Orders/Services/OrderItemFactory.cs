@@ -44,10 +44,14 @@ public partial class OrderItemFactory : IOrderItemFactory
         // values (or values prepared by a server-owned quote) may affect money.
         var pricesAreTrusted = itemsAreServerPriced
             || (allowStaffPrices && _currentUserService.IsStaff);
+        // Only the basket translator is allowed to freeze authored composition semantics. Staff
+        // prices can be trusted for the till, but a hand-built order DTO is not a source of stable
+        // manifest identity or per-parent quantity guarantees.
+        var metadataAreTrusted = itemsAreServerPriced;
 
         if (itemDto.MenuId.HasValue)
         {
-            return await AddMenuItemAsync(order, itemDto, pricesAreTrusted, cancellationToken);
+            return await AddMenuItemAsync(order, itemDto, pricesAreTrusted, metadataAreTrusted, cancellationToken);
         }
         if (itemDto.ProductId.HasValue)
         {
@@ -70,7 +74,8 @@ public partial class OrderItemFactory : IOrderItemFactory
                 return "A composed item cannot be ordered through this endpoint; check out from the basket instead.";
             }
 
-            await AddProductItemRecursiveAsync(order, itemDto, parentItem: null, pricesAreTrusted, cancellationToken);
+            await AddProductItemRecursiveAsync(order, itemDto, parentItem: null, pricesAreTrusted, metadataAreTrusted,
+                new Dictionary<Guid, Guid>(), cancellationToken);
         }
         // Neither MenuId nor ProductId: preserve the original fall-through.
         return null;
@@ -80,80 +85,13 @@ public partial class OrderItemFactory : IOrderItemFactory
         _context.Products.AnyAsync(
             p => p.Id == productId && !p.IsDeleted && p.Type == ProductType.Menu, cancellationToken);
 
-    private async Task<string?> AddMenuItemAsync(
-        Order order, CreateOrderItemDto itemDto, bool pricesAreTrusted, CancellationToken cancellationToken)
-    {
-        // The recipe behind the menu's first item is what the order line's ingredient snapshot is
-        // projected against — the same resolution the read path uses for a menu-backed line
-        // (OrderIngredientCustomizations). Split, because MenuItems and the products' ingredient
-        // collections cartesian-multiply in EF's default single-query mode.
-        var menu = _tenantFeatures.EnforceSauceMinimum
-            ? null
-            : _context.Menus.Local.FirstOrDefault(
-                candidate => candidate.Id == itemDto.MenuId && !candidate.IsDeleted);
-        menu ??= await _context.Menus
-            .Include(candidate => candidate.MenuItems)
-                .ThenInclude(item => item.Product.DetailedIngredients)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(candidate => candidate.Id == itemDto.MenuId && !candidate.IsDeleted,
-                cancellationToken);
-
-        if (menu == null)
-        {
-            return $"Menu {itemDto.MenuId} not found";
-        }
-
-        // The menu's first product is also the recipe used for its ingredient snapshot below. When
-        // sauce-minimum enforcement is enabled, resolve the explicit selection against that recipe
-        // just as the ProductId path does. Menu lines keep Menus.BasePrice; product customization
-        // pricing cannot replace the menu's price. Skipping selection resolution while the flag is
-        // off preserves the legacy MenuId payload exactly.
-        var menuProduct = menu.MenuItems.FirstOrDefault()?.Product;
-        if (_tenantFeatures.EnforceSauceMinimum && menu.MenuItems.Count > 0 && menuProduct is null)
-        {
-            return "This menu's ingredient details are unavailable. Refresh the menu and try again.";
-        }
-
-        var ingredientQuantities = itemDto.IngredientQuantities;
-        if (_tenantFeatures.EnforceSauceMinimum && menuProduct is not null)
-        {
-            ingredientQuantities = OrderLineIngredientChoice.Resolve(
-                _lineCustomizationBuilder,
-                itemDto,
-                menuProduct,
-                isRootLine: false).Quantities;
-        }
-
-        var unitPrice = menu.BasePrice;
-        var customization = ResolveCustomizationPrice(itemDto, pricesAreTrusted);
-        order.Items.Add(new OrderItem
-        {
-            ProductId = itemDto.ProductId,
-            ProductVariationId = itemDto.ProductVariationId,
-            MenuId = itemDto.MenuId,
-            ProductName = menu.Name,
-            VariationName = null,
-            Quantity = itemDto.Quantity,
-            UnitPrice = unitPrice,
-            ItemTotal = (unitPrice * itemDto.Quantity) + customization,
-            SpecialInstructions = itemDto.SpecialInstructions,
-            IngredientQuantitiesJson = SerializeIngredients(ingredientQuantities),
-            IngredientSnapshots = OrderIngredientSnapshot.Build(
-                menuProduct?.DetailedIngredients,
-                ingredientQuantities,
-                _currentUserService.GetAuditIdentifier()),
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = _currentUserService.GetAuditIdentifier(),
-        });
-
-        return null;
-    }
-
     private async Task AddProductItemRecursiveAsync(
         Order order,
         CreateOrderItemDto itemDto,
         OrderItem? parentItem,
         bool pricesAreTrusted,
+        bool metadataAreTrusted,
+        Dictionary<Guid, Guid> explicitParentRefs,
         CancellationToken cancellationToken)
     {
         // DetailedIngredients is loaded for the ingredient snapshot below, not for pricing — money
@@ -220,6 +158,8 @@ public partial class OrderItemFactory : IOrderItemFactory
 
         var orderItem = new OrderItem
         {
+            Id = Guid.NewGuid(),
+            ParentOrderItemId = parentItem?.Id,
             ProductId = itemDto.ProductId,
             ProductVariationId = itemDto.ProductVariationId,
             MenuId = itemDto.MenuId,
@@ -237,24 +177,71 @@ public partial class OrderItemFactory : IOrderItemFactory
             IngredientSnapshots = OrderIngredientSnapshot.Build(
                 product.DetailedIngredients,
                 choice.Quantities,
-                _currentUserService.GetAuditIdentifier()),
+                _currentUserService.GetAuditIdentifier(),
+                metadataAreTrusted ? itemDto.IngredientQuantityBasis : QuantityBasis.Unknown,
+                metadataAreTrusted ? itemDto.IngredientConfigurationScope : ConfigurationScope.Unknown,
+                metadataAreTrusted ? itemDto.IngredientCompositionRoles : null),
             ParentOrderItem = parentItem,
             // A kind belongs to a CHILD row. Discarded on a root even if a caller sent one, so the
             // column cannot come to mean two things (#318).
             Kind = parentItem != null ? itemDto.Kind : null,
             SectionId = await ResolveChoiceSectionAsync(parentItem, itemDto, cancellationToken),
+            MenuSectionItemId = itemDto.MenuSectionItemId,
+            SuggestedSideItemId = metadataAreTrusted ? itemDto.SuggestedSideItemId : null,
+            ParentComponentOrderItemId = metadataAreTrusted && parentItem is not null
+                && (parentItem.CompositionRole == CompositionRole.Dish
+                    || parentItem.Kind == OrderItemKind.BundleChild && parentItem.MenuSectionItemId.HasValue)
+                && itemDto.Kind == OrderItemKind.SideItem
+                ? parentItem.Id
+                : null,
+            QuantityBasis = metadataAreTrusted ? itemDto.QuantityBasis ?? QuantityBasis.Unknown : QuantityBasis.Unknown,
+            ConfigurationScope = metadataAreTrusted
+                ? itemDto.ConfigurationScope ?? ConfigurationScope.Unknown
+                : ConfigurationScope.Unknown,
+            CompositionRole = metadataAreTrusted
+                ? itemDto.CompositionRole ?? CompositionRole.Unknown
+                : CompositionRole.Unknown,
+            PresentationLabel = metadataAreTrusted ? itemDto.PresentationLabel : null,
+            PresentationOrder = metadataAreTrusted ? itemDto.PresentationOrder : null,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _currentUserService.GetAuditIdentifier(),
         };
 
         order.Items.Add(orderItem);
 
+        if (metadataAreTrusted && itemDto.ParentComponentMenuSectionItemId.HasValue)
+            explicitParentRefs.Add(orderItem.Id, itemDto.ParentComponentMenuSectionItemId.Value);
+
         if (itemDto.ChildItems != null)
         {
             foreach (var childDto in itemDto.ChildItems)
             {
-                await AddProductItemRecursiveAsync(order, childDto, orderItem, pricesAreTrusted, cancellationToken);
+                await AddProductItemRecursiveAsync(order, childDto, orderItem, pricesAreTrusted, metadataAreTrusted,
+                    explicitParentRefs, cancellationToken);
             }
+        }
+
+        if (parentItem is null && product.Type == ProductType.Menu && itemDto.ChildItems is { Count: > 0 })
+            AssignExplicitComponentParents(orderItem, order.Items, explicitParentRefs);
+    }
+
+    private static void AssignExplicitComponentParents(
+        OrderItem bundle, IEnumerable<OrderItem> orderItems, Dictionary<Guid, Guid> explicitParentRefs)
+    {
+        var directChildren = orderItems.Where(item => item.ParentOrderItemId == bundle.Id).ToList();
+        foreach (var child in directChildren.Where(item => explicitParentRefs.ContainsKey(item.Id)))
+        {
+            var parentMenuSectionItemId = explicitParentRefs[child.Id];
+            var parent = directChildren.SingleOrDefault(candidate =>
+                candidate.MenuSectionItemId == parentMenuSectionItemId
+                && candidate.Kind == OrderItemKind.BundleChild);
+            if (parent is null)
+                throw new BadRequestException("A dependent bundle choice references a missing selected component.");
+            if (parent.CompositionRole != CompositionRole.Dish)
+                throw new BadRequestException("A dependent bundle choice must reference an explicit Dish component.");
+
+            child.ParentComponentOrderItemId = parent.Id;
+            child.PresentationLabel = parent.PresentationLabel ?? parent.ProductName;
         }
     }
 

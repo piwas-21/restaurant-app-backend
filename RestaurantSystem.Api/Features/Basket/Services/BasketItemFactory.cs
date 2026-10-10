@@ -3,6 +3,8 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
+using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -49,7 +51,12 @@ public partial class BasketItemFactory : IBasketItemFactory
             BasketChannelGuard.EnsureOrderable(option.Product, basketOrderType);
         }
 
+        var customerSteps = CustomerStepManifestStore.Read(product)?.Steps;
         var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0);
+        var selectedVariationStep = customerSteps?.FirstOrDefault(step =>
+            step.Kind == CustomerStepKind.ProductVariation
+            && step.TargetId == variation?.Id
+            && step.CompositionRole == CompositionRole.Dish);
 
         // Ingredient customization (price + quantities JSON) via the single shared writer, so the
         // regular and bundle-child paths can never diverge on a new field. Regular items keep the
@@ -72,7 +79,42 @@ public partial class BasketItemFactory : IBasketItemFactory
         string? selectedSideItemsJson = null;
         if (validSideItems is { Count: > 0 })
         {
+            var sideSteps = CustomerStepManifestStore.Read(product)?.Steps;
             var sideItemIds = validSideItems.Select(s => s.Id).ToList();
+            var memberships = await _context.ProductSideItems.AsNoTracking()
+                .Where(row => row.MainProductId == product.Id)
+                .ToListAsync();
+            var resolvedSides = new List<SelectedSideItemDto>(validSideItems.Count);
+            foreach (var selection in validSideItems)
+            {
+                var candidates = memberships.Where(row => row.SideItemProductId == selection.Id).ToList();
+                var membership = selection.SuggestedSideItemId is Guid associationId
+                    ? candidates.SingleOrDefault(row => row.Id == associationId)
+                    : candidates.Count == 1 ? candidates[0] : null;
+                var legacyUnassociatedSelection = membership is null
+                    && selection.SuggestedSideItemId is null
+                    && memberships.Count == 0;
+                if (membership is null && !legacyUnassociatedSelection)
+                    throw new BadRequestException("A selected side is stale or ambiguous; refresh the product and try again.");
+                var step = sideSteps?.FirstOrDefault(candidate =>
+                    membership is not null
+                    && candidate.Kind == CustomerStepKind.ProductSuggestedSide
+                    && candidate.TargetId == membership.Id);
+                resolvedSides.Add(selection with
+                {
+                    SuggestedSideItemId = membership?.Id,
+                    PresentationOrder = membership?.DisplayOrder,
+                    CompositionRole = step?.CompositionRole
+                        ?? (membership is null ? CompositionRole.Unknown : CompositionRole.Side),
+                });
+            }
+            var selectedAssociationIds = resolvedSides
+                .Where(selection => selection.SuggestedSideItemId.HasValue)
+                .Select(selection => selection.SuggestedSideItemId!.Value)
+                .ToHashSet();
+            if (memberships.Any(row => row.IsRequired && !selectedAssociationIds.Contains(row.Id)))
+                throw new BadRequestException("This product requires one or more suggested side items.");
+
             var sideItems = await _context.Products
                 .AsNoTracking()
                 // ProductCategories -> Category is what makes the guard below MEAN anything: an
@@ -81,6 +123,7 @@ public partial class BasketItemFactory : IBasketItemFactory
                 // #231/#236/#237/#241 class).
                 .Include(p => p.ProductCategories)
                     .ThenInclude(pc => pc.Category)
+                .Include(p => p.Variations)
                 .Where(p => sideItemIds.Contains(p.Id) && p.IsActive && p.IsAvailable)
                 .ToListAsync();
 
@@ -96,18 +139,30 @@ public partial class BasketItemFactory : IBasketItemFactory
             // side (`IsAvailable = false`, a routine pairing with a channel restriction) or one that
             // simply does not exist — reach the line unpriced and unguarded, and from there the
             // kitchen ticket. That is the "stale tab or tampered payload" case this guard exists for.
-            var resolvedSides = new List<SelectedSideItemDto>();
-            foreach (var selectedSide in validSideItems)
+            var verifiedSides = new List<SelectedSideItemDto>(resolvedSides.Count);
+            foreach (var selectedSide in resolvedSides)
             {
                 var sideItem = sideItems.FirstOrDefault(s => s.Id == selectedSide.Id);
-                if (sideItem != null)
-                {
-                    customizationPrice += sideItem.BasePrice * selectedSide.Quantity;
-                    resolvedSides.Add(selectedSide);
-                }
+                if (sideItem is null)
+                    throw new BadRequestException("A selected side is no longer available.");
+                var sideVariation = selectedSide.ProductVariationId.HasValue
+                    ? sideItem.Variations.FirstOrDefault(row => row.Id == selectedSide.ProductVariationId.Value)
+                    : null;
+                if (selectedSide.ProductVariationId.HasValue
+                    && (sideVariation is null || !sideVariation.IsActive || sideVariation.IsDeleted))
+                    throw new BadRequestException("The selected side variation is not available.");
+                BasketBaseProductGuard.EnsureVariationChosen(sideItem, sideVariation);
+                customizationPrice += (sideItem.BasePrice + (sideVariation?.PriceModifier ?? 0m))
+                    * selectedSide.Quantity;
+                verifiedSides.Add(selectedSide);
             }
 
-            selectedSideItemsJson = resolvedSides.Count > 0 ? JsonSerializer.Serialize(resolvedSides) : null;
+            selectedSideItemsJson = verifiedSides.Count > 0 ? JsonSerializer.Serialize(verifiedSides) : null;
+        }
+        else if (await _context.ProductSideItems.AsNoTracking()
+            .AnyAsync(row => row.MainProductId == product.Id && row.IsRequired))
+        {
+            throw new BadRequestException("This product requires one or more suggested side items.");
         }
 
         var basketItem = new BasketItem
@@ -115,6 +170,10 @@ public partial class BasketItemFactory : IBasketItemFactory
             BasketId = basketId,
             ProductId = item.ProductId,
             ProductVariationId = item.ProductVariationId,
+            QuantityBasis = QuantityBasis.LineTotal,
+            ConfigurationScope = ConfigurationScope.SharedAcrossParentUnits,
+            CompositionRole = CompositionRole.Dish,
+            PresentationLabel = selectedVariationStep?.PresentationLabel,
             Quantity = item.Quantity,
             UnitPrice = unitPrice,
             ItemTotal = (unitPrice + customizationPrice) * item.Quantity,
@@ -122,6 +181,8 @@ public partial class BasketItemFactory : IBasketItemFactory
             SelectedIngredients = customization.SelectedIngredients,
             AddedIngredients = item.AddedIngredients,
             IngredientQuantitiesJson = customization.IngredientQuantitiesJson,
+            IngredientCompositionRolesJson = SerializeIngredientRoles(
+                CustomerStepManifestStore.IngredientRolesFor(customerSteps, product.Id)),
             CustomizationPrice = customizationPrice,
             SelectedSideItemsJson = selectedSideItemsJson,
             CreatedAt = DateTime.UtcNow,
@@ -153,5 +214,7 @@ public partial class BasketItemFactory : IBasketItemFactory
         return basketItem;
     }
 
+    private static string? SerializeIngredientRoles(Dictionary<Guid, CompositionRole>? roles) =>
+        roles is { Count: > 0 } ? JsonSerializer.Serialize(roles) : null;
 
 }

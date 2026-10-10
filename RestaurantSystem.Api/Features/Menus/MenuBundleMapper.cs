@@ -2,6 +2,7 @@ using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -10,9 +11,8 @@ namespace RestaurantSystem.Api.Features.Menus;
 /// <summary>
 /// The single <c>Product</c> (Type=Menu) → <see cref="MenuBundleDto"/> mapper for the bundle list
 /// and detail queries (menu-bundles redesign #156). Produces the full nested tree
-/// (sections → items → per-option <c>DetailedIngredients</c>) the customization drill-in needs; the
-/// dead per-option <c>SuggestedSideItems</c> (removed at both ends in slice 1) are no longer
-/// projected. Previously the list query carried the full tree while the detail query returned a thin
+/// (sections → items → per-option ingredients, variations and suggested sides) the customization
+/// drill-in needs. Previously the list query carried the full tree while the detail query returned a thin
 /// subset — this unifies them (list keeps its ingredients; detail gains them). The caller loads the
 /// navigations it reads (menu-definition → sections → items → product → detailed-ingredients →
 /// descriptions, plus descriptions and images).
@@ -57,6 +57,7 @@ public static class MenuBundleMapper
             // doc) — so grouping comes free, no extra round-trip.
             CategoryIds = product.ProductCategories.Select(pc => pc.CategoryId).ToList(),
             PrimaryCategoryId = product.ProductCategories.FirstOrDefault(pc => pc.IsPrimary)?.CategoryId,
+            CustomerStepManifest = CustomerStepManifestStore.Read(product),
             // The bundle's OWN labelling. The one other `Allergens` in this file is a section
             // item's, and mapping only that meant a labelled combo reached the guest indis-
             // tinguishable from an unlabelled one — which the menu filter reads as "free of
@@ -188,6 +189,14 @@ public static class MenuBundleMapper
             SauceMin = item.Product?.SauceMin ?? 0,
             SauceMax = item.Product?.SauceMax,
             SauceIncludedFree = item.Product?.SauceIncludedFree ?? 0,
+            Variations = item.Product?.Variations
+                .Where(variation => !variation.IsDeleted)
+                .OrderBy(variation => variation.DisplayOrder)
+                .ThenBy(variation => variation.Id)
+                .Select(variation => MapVariation(item.Product, variation))
+                .ToList() ?? [],
+            HideBaseProduct = item.Product?.HideBaseProduct ?? false,
+            SuggestedSideItems = MenuBundleSuggestedSideItemMapper.Map(item.Product, requestedOrderType),
             CustomizationGroups = item.Product?.CustomizationGroups
                 .OrderBy(group => group.DisplayOrder)
                 .Select(group => ProductDtoMapper.MapCustomizationGroup(group, requestedOrderType))
@@ -220,6 +229,27 @@ public static class MenuBundleMapper
                         )
                 }).ToList()
         };
+
+    internal static ProductVariationDto MapVariation(Product product, ProductVariation variation) => new()
+    {
+        Id = variation.Id,
+        Name = variation.Name,
+        Description = variation.Description,
+        PriceModifier = variation.PriceModifier,
+        FinalPrice = product.BasePrice + variation.PriceModifier,
+        IsActive = variation.IsActive,
+        DisplayOrder = variation.DisplayOrder,
+        GlobalVariationId = variation.GlobalVariationId,
+        Content = variation.Descriptions
+            .GroupBy(description => description.LanguageCode)
+            .Select(group => group.First())
+            .ToDictionary(description => description.LanguageCode,
+                description => new ProductVariationContentDto
+                {
+                    Name = description.Name,
+                    Description = description.Description
+                })
+    };
 
     /// <summary>
     /// A section-item's display ingredient names: the active detailed-ingredient names when the

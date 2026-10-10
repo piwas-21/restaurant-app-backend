@@ -13,14 +13,17 @@ internal static class MenuSectionReplacementGuard
         MenuDefinition definition,
         IReadOnlyCollection<MenuSectionDto> proposedSections)
     {
+        if (IsUnchangedSnapshot(definition.Sections, proposedSections))
+        {
+            return false;
+        }
+
         if (!definition.VersionedSectionEditingStarted)
         {
             return true;
         }
 
-        return IsUnchangedSnapshot(definition.Sections, proposedSections)
-            ? false
-            : throw new ConflictException(VersionedEditConflictMessage);
+        throw new ConflictException(VersionedEditConflictMessage);
     }
 
     internal static bool IsUnchangedSnapshot(

@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using System.Text.Json.Serialization;
 using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
@@ -52,7 +53,23 @@ public record CreateProductCommand(
     bool IsComponent = false,
     List<ProductCustomizationGroupDto>? CustomizationGroups = null,
     TranslationOwnerMetadataDto? TranslationMetadata = null
-) : ICommand<ApiResponse<ProductDto>>;
+) : ICommand<ApiResponse<ProductDto>>
+{
+    private CustomerStepManifestDto? _customerStepManifest;
+
+    [JsonIgnore]
+    public bool CustomerStepManifestSpecified { get; private set; }
+
+    public CustomerStepManifestDto? CustomerStepManifest
+    {
+        get => _customerStepManifest;
+        init
+        {
+            _customerStepManifest = value;
+            CustomerStepManifestSpecified = true;
+        }
+    }
+}
 
 public record CreateProductVariationDto(
     string Name,
@@ -355,6 +372,8 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         (pair.Key, (string?)pair.Value.Name, (string?)pair.Value.Description))),
                 cancellationToken);
 
+            await CustomerStepManifestStore.ApplyAsync(_context, product,
+                command.CustomerStepManifestSpecified, command.CustomerStepManifest, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
 
             if (ownsTransaction)

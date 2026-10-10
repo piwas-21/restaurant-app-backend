@@ -6,6 +6,8 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Services;
+using System.Text.Json.Serialization;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -38,7 +40,23 @@ public record UpdateMenuBundleCommand(
     List<string>? Allergens = null,
     TranslationOwnerMetadataDto? TranslationMetadata = null,
     int? ExpectedAuthoringVersion = null
-) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
+) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields
+{
+    private CustomerStepManifestDto? _customerStepManifest;
+
+    [JsonIgnore]
+    public bool CustomerStepManifestSpecified { get; private set; }
+
+    public CustomerStepManifestDto? CustomerStepManifest
+    {
+        get => _customerStepManifest;
+        init
+        {
+            _customerStepManifest = value;
+            CustomerStepManifestSpecified = true;
+        }
+    }
+}
 
 public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCommand, ApiResponse<ProductDto>>
 {
@@ -247,6 +265,8 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
                         (pair.Key, (string?)pair.Value.Name, (string?)pair.Value.Description))),
                 cancellationToken);
 
+            await CustomerStepManifestStore.ApplyAsync(_context, product,
+                command.CustomerStepManifestSpecified, command.CustomerStepManifest, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
@@ -273,6 +293,9 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
             }
 
             MenuOfferLinkConflict.ThrowIfExpected(exception);
+            if (CustomerStepManifestStore.IsRevisionWriteConflict(exception))
+                throw await CustomerStepManifestStore.RevisionWriteConflictAsync(
+                    _context, command.Id, exception, cancellationToken);
             throw;
         }
     }

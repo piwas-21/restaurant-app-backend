@@ -32,6 +32,11 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasColumnType("jsonb")
             .HasConversion<List<string>>();
 
+        builder.Property(p => p.CustomerStepManifestJson).HasColumnType("jsonb");
+        builder.Property(p => p.CustomerStepManifestRevision)
+            .HasDefaultValue(0)
+            .IsConcurrencyToken();
+
         builder.Property(p => p.IsActive)
             .HasDefaultValue(true);
 
