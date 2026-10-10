@@ -1,9 +1,9 @@
-﻿using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Base;
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
-public class Product : SoftDeleteEntity
+public partial class Product : SoftDeleteEntity
 {
     public string Name { get; set; } = null!;
     public string? Description { get; set; }

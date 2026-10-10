@@ -16,5 +16,19 @@ public sealed class ConflictException : Exception
         ErrorCode = errorCode;
     }
 
+    public ConflictException(string message, string errorCode, int currentRevision) : base(message)
+    {
+        ErrorCode = errorCode;
+        CurrentRevision = currentRevision;
+    }
+
+    public ConflictException(string message, Exception innerException, string errorCode, int currentRevision)
+        : base(message, innerException)
+    {
+        ErrorCode = errorCode;
+        CurrentRevision = currentRevision;
+    }
+
     public string? ErrorCode { get; }
+    public int? CurrentRevision { get; }
 }

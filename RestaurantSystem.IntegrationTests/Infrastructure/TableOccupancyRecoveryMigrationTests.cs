@@ -10,6 +10,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 public sealed class TableOccupancyRecoveryMigrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private const string PriorMigration = "20261009140008_AddOrderPaymentTips";
+    private const string RefusalMigration = "20261009195653_AddTableOccupancyRecoveryAndEqualShareRounding"; // pragma: allowlist secret
     private const string LatestMigration = TestDatabaseCluster.CurrentSchemaMigration;
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
@@ -66,9 +67,19 @@ public sealed class TableOccupancyRecoveryMigrationTests(DatabaseFixture fixture
             await context.SaveChangesAsync();
         }
 
-        var rollback = () => MigrateAsync(PriorMigration);
-        (await rollback.Should().ThrowAsync<PostgresException>()).Which.SqlState
-            .Should().Be(PostgresErrorCodes.CheckViolation);
+        try
+        {
+            var rollback = () => MigrateAsync(PriorMigration);
+            (await rollback.Should().ThrowAsync<PostgresException>()).Which.SqlState
+                .Should().Be(PostgresErrorCodes.CheckViolation);
+            (await LatestAppliedMigrationAsync()).Should().Be(RefusalMigration,
+                "the newer additive migrations can roll back before the older refusal migration rejects data loss");
+        }
+        finally
+        {
+            await MigrateAsync();
+        }
+
         (await LatestAppliedMigrationAsync()).Should().Be(LatestMigration);
     }
 

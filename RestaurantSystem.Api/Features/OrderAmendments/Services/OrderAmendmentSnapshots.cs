@@ -60,9 +60,22 @@ internal static class OrderAmendmentSnapshots
             IngredientName = ingredient.IngredientName,
             Quantity = ingredient.Quantity,
             IsRemoved = ingredient.IsRemoved,
-            IsAddOn = ingredient.IsAddOn
+            IsAddOn = ingredient.IsAddOn,
+            QuantityBasis = ingredient.QuantityBasis,
+            ConfigurationScope = ingredient.ConfigurationScope,
+            CompositionRole = ingredient.CompositionRole,
+            PresentationOrder = ingredient.PresentationOrder
         }).ToList(),
         SideItems = item.SideItems?.Select(CloneItem).ToList(),
+        SectionId = item.SectionId,
+        MenuSectionItemId = item.MenuSectionItemId,
+        SuggestedSideItemId = item.SuggestedSideItemId,
+        ParentComponentOrderItemId = item.ParentComponentOrderItemId,
+        QuantityBasis = item.QuantityBasis,
+        ConfigurationScope = item.ConfigurationScope,
+        CompositionRole = item.CompositionRole,
+        PresentationLabel = item.PresentationLabel,
+        PresentationOrder = item.PresentationOrder,
         Kind = item.Kind
     };
 

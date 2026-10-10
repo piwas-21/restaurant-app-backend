@@ -1,4 +1,5 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -10,6 +11,14 @@ public class BasketItem : Entity
     public Guid? MenuId { get; set; }
     /// <summary>Frozen membership of a validated bundle choice; no catalog FK.</summary>
     public Guid? SectionId { get; set; }
+    /// <summary>Stable selected menu-section row identity; no catalog FK.</summary>
+    public Guid? MenuSectionItemId { get; set; }
+    public Guid? ParentComponentMenuSectionItemId { get; set; }
+    public QuantityBasis? QuantityBasis { get; set; }
+    public ConfigurationScope? ConfigurationScope { get; set; }
+    public CompositionRole? CompositionRole { get; set; }
+    public string? PresentationLabel { get; set; }
+    public int? PresentationOrder { get; set; }
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal ItemTotal { get; set; }
@@ -19,6 +28,8 @@ public class BasketItem : Entity
     public List<Guid>? SelectedIngredients { get; set; } // IDs of selected optional ingredients
     public List<Guid>? AddedIngredients { get; set; } // IDs of optional ingredients added
     public string? IngredientQuantitiesJson { get; set; } // JSON: { ingredientId: quantity }
+    /// <summary>Server-verified authored ingredient roles, frozen when the basket selection is accepted.</summary>
+    public string? IngredientCompositionRolesJson { get; set; }
     public decimal CustomizationPrice { get; set; } // Additional price from customizations
 
     // Selected side items (stored as JSON: {id, quantity} pairs)

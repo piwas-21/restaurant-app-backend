@@ -3,6 +3,8 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
+using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -19,6 +21,7 @@ public partial class BasketItemFactory
         // Calculate total price including options
         decimal menuTotalPrice = product.BasePrice;
         var selectedOptions = item.SelectedMenuOptions ?? new List<SelectedMenuOptionDto>();
+        var customerSteps = CustomerStepManifestStore.Read(product)?.Steps;
 
         // Basket and staff counter orders share one exact section rule. It validates required/min/max
         // counts, quantities, and that every option belongs to the section named by the request.
@@ -32,10 +35,14 @@ public partial class BasketItemFactory
         {
             BasketId = basketId,
             ProductId = item.ProductId,
+            ProductVariationId = item.ProductVariationId,
             Quantity = item.Quantity,
             UnitPrice = menuTotalPrice,
             ItemTotal = menuTotalPrice * item.Quantity,
             SpecialInstructions = item.SpecialInstructions,
+            QuantityBasis = QuantityBasis.LineTotal,
+            ConfigurationScope = ConfigurationScope.SharedAcrossParentUnits,
+            CompositionRole = CompositionRole.Menu,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = auditIdentifier
         };
@@ -43,24 +50,7 @@ public partial class BasketItemFactory
         // Batch-load every selected option's child product (with ingredients) in one query
         // instead of one round-trip per option (avoids N+1).
         var childProductIds = selectedOptions.Select(o => o.ItemId).Distinct().ToList();
-        var childProducts = await _context.Products
-            .AsSplitQuery()
-            .Include(p => p.DetailedIngredients)
-            .Include(p => p.Variations)
-            .Include(p => p.CustomizationGroups)
-                .ThenInclude(group => group.IngredientOptions)
-                    .ThenInclude(membership => membership.ProductIngredient)
-            .Include(p => p.CustomizationGroups)
-                .ThenInclude(group => group.ProductOptions)
-                    // Nested product choices can inherit channel masks from their primary category.
-                    .ThenInclude(membership => membership.OptionProduct.ProductCategories)
-                        .ThenInclude(category => category.Category)
-            // See the side-item load: without the inheritance chain the guard below resolves every
-            // inheriting option as unrestricted, which is worse than no guard — it looks like one.
-            .Include(p => p.ProductCategories)
-                .ThenInclude(pc => pc.Category)
-            .Where(p => childProductIds.Contains(p.Id))
-            .ToDictionaryAsync(p => p.Id);
+        var childProducts = await LoadMenuChildProductsAsync(childProductIds);
 
         // §9.3: a combo being orderable on this channel says nothing about the components chosen
         // inside it, and the caller's guard only ever saw the combo. `OrderChannelGuard` already
@@ -77,88 +67,29 @@ public partial class BasketItemFactory
         }
 
         // Create Child Basket Items for selected options. They are attached to the parent's
-        // ChildBasketItems navigation (rather than added to the context here) so the caller
-        // persists the whole graph with a single Add — and nothing is saved if any child fails.
-        decimal totalCustomizationPrice = 0;
-
-        foreach (var option in selectedOptions)
+        // ChildBasketItems navigation rather than added here so a failed child leaves no saved row.
+        var receiptOrder = product.MenuDefinition.Sections
+            .OrderBy(section => section.DisplayOrder)
+            .SelectMany(section => section.Items.OrderBy(row => row.DisplayOrder))
+            .Select((row, index) => (row.Id, index))
+            .ToDictionary(pair => pair.Id, pair => pair.index);
+        var resolvedOptions = ResolveMenuOptions(product, selectedOptions);
+        var selectedOptionsByRowId = resolvedOptions.GroupBy(resolved => resolved.SectionItem.Id)
+            .ToDictionary(group => group.Key, group => group.First());
+        var buildContext = new MenuBuildContext
         {
-            // The shared rule already validated this exact section/item pair. Resolve through the
-            // same helper here so the child row cannot silently drift to another section's price.
-            var sectionItem = MenuBundleSelectionRules.ResolveSectionItem(
-                product.MenuDefinition.Sections,
-                option.SectionId,
-                option.ItemId,
-                option.ProductVariationId);
-
-            if (!childProducts.TryGetValue(option.ItemId, out var childProduct))
-                throw new NotFoundException($"Child product not found: {option.ItemId}");
-
-            var explicitSelection = ExplicitCustomizationSelection.Resolve(
-                childProduct, option.CustomizationSelections);
-            foreach (var selected in explicitSelection.ProductOptions)
-            {
-                BasketChannelGuard.EnsureOrderable(selected.Product, basketOrderType);
-            }
-            var hasExplicitGroups = childProduct.CustomizationGroups.Any(group => group.IsActive);
-            var selectedIngredients = hasExplicitGroups
-                ? explicitSelection.SelectedIngredientIds
-                : option.SelectedIngredients;
-            var ingredientQuantities = hasExplicitGroups
-                ? explicitSelection.IngredientQuantities
-                : option.IngredientQuantities;
-
-            // Ingredient customization (price + quantities JSON) via the single shared writer.
-            // Bundle children keep the "backfill from the selection when present" precedence so a
-            // deselected optional's "NO xxx" reaches the kitchen ticket (issue #150), while an
-            // explicit client quantity still wins inside the backfill.
-            //
-            // S6 decision (plan D10): a bundle option follows the OPTION PRODUCT's own sauce rule,
-            // not the parent bundle's — the option IS that product, and the parent bundle owns no
-            // sauce rows at all for a per-product allowance to be applied to.
-            var childCustomization = _lineCustomizationBuilder.Build(
-                childProduct.DetailedIngredients, selectedIngredients,
-                ingredientQuantities, preferProvidedQuantities: false,
-                options: LineCustomizationOptions.FromProduct(childProduct));
-
-            totalCustomizationPrice += childCustomization.CustomizationPrice * option.Quantity;
-            totalCustomizationPrice += explicitSelection.ProductOptions.Sum(
-                selected => selected.AdditionalPrice * selected.Quantity * option.Quantity);
-
-            var childItem = new BasketItem
-            {
-                BasketId = basketId,
-                ProductId = option.ItemId, // The actual product ID of the option (e.g., Coke)
-                ParentBasketItem = basketItem,
-                Quantity = item.Quantity * option.Quantity, // Scale by main item quantity
-                ProductVariationId = sectionItem.ProductVariationId,
-                SectionId = sectionItem.MenuSectionId,
-                UnitPrice = MenuBundleSelectionRules.PriceFor(sectionItem),
-                ItemTotal = 0, // Included in parent total to avoid double counting in recalculation
-                CustomizationPrice = childCustomization.CustomizationPrice, // Store customization price for this child
-                SpecialInstructions = option.SpecialInstructions,
-                SelectedIngredients = childCustomization.SelectedIngredients,
-                IngredientQuantitiesJson = childCustomization.IngredientQuantitiesJson,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = auditIdentifier
-            };
-            foreach (var selected in explicitSelection.ProductOptions)
-            {
-                childItem.ChildBasketItems.Add(new BasketItem
-                {
-                    BasketId = basketId,
-                    ProductId = selected.Product.Id,
-                    ParentBasketItem = childItem,
-                    ProductCustomizationOptionId = selected.MembershipId,
-                    Quantity = item.Quantity * option.Quantity * selected.Quantity,
-                    UnitPrice = selected.AdditionalPrice,
-                    ItemTotal = 0,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = auditIdentifier
-                });
-            }
-            basketItem.ChildBasketItems.Add(childItem);
-        }
+            ParentBasketItem = basketItem,
+            RootItem = item,
+            OptionsByRowId = selectedOptionsByRowId,
+            ChildProducts = childProducts,
+            CustomerSteps = customerSteps,
+            ReceiptOrder = receiptOrder,
+            BasketOrderType = basketOrderType,
+            AuditIdentifier = auditIdentifier
+        };
+        var childBuild = BuildMenuChildren(buildContext, resolvedOptions, menuTotalPrice);
+        menuTotalPrice = childBuild.MenuPrice;
+        var totalCustomizationPrice = childBuild.CustomizationPrice;
 
         basketItem.UnitPrice = menuTotalPrice + totalCustomizationPrice;
         basketItem.ItemTotal = basketItem.UnitPrice * item.Quantity;
@@ -166,4 +97,60 @@ public partial class BasketItemFactory
 
         return basketItem;
     }
+
+    private async Task<Dictionary<Guid, Product>> LoadMenuChildProductsAsync(IReadOnlyCollection<Guid> childProductIds)
+    {
+        var childProducts = await _context.Products
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(p => p.DetailedIngredients)
+            .Include(p => p.Variations)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.IngredientOptions)
+                    .ThenInclude(membership => membership.ProductIngredient)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.ProductOptions)
+                    // Nested product choices can inherit channel masks from their primary category.
+                    .ThenInclude(membership => membership.OptionProduct.ProductCategories)
+                        .ThenInclude(category => category.Category)
+            // See the side-item load: without the inheritance chain the guard below resolves every
+            // inheriting option as unrestricted, which is worse than no guard — it looks like one.
+            .Include(p => p.ProductCategories)
+                .ThenInclude(pc => pc.Category)
+            .Include(p => p.SuggestedSideItems)
+            .Where(p => childProductIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id);
+        await LoadMenuSideProductsAsync(childProducts.Values);
+        return childProducts;
+    }
+
+    private async Task LoadMenuSideProductsAsync(IEnumerable<Product> childProducts)
+    {
+        var memberships = childProducts.SelectMany(product => product.SuggestedSideItems
+            .Select(membership => (Owner: product, Membership: membership))).ToList();
+        var sideProductIds = memberships.Select(row => row.Membership.SideItemProductId)
+            .Distinct().ToList();
+        if (sideProductIds.Count == 0) return;
+
+        var sideProducts = await _context.Products.AsNoTracking().AsSplitQuery()
+            .Include(product => product.ProductCategories)
+                .ThenInclude(category => category.Category)
+            .Include(product => product.Variations)
+            .Where(product => sideProductIds.Contains(product.Id))
+            .ToDictionaryAsync(product => product.Id);
+        foreach (var row in memberships)
+        {
+            if (sideProducts.TryGetValue(row.Membership.SideItemProductId, out var sideProduct))
+            {
+                row.Membership.SideItemProduct = sideProduct;
+                continue;
+            }
+
+            // The former Include chain applied Product's soft-delete filter to this required
+            // reference and omitted the association row. Keep that behavior in the batch path.
+            row.Owner.SuggestedSideItems.Remove(row.Membership);
+        }
+    }
+
+
 }

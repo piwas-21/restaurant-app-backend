@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -42,6 +43,10 @@ public class OrderItemIngredient : Entity
     public required string IngredientName { get; set; }
 
     public int Quantity { get; set; }
+    public QuantityBasis? QuantityBasis { get; set; }
+    public ConfigurationScope? ConfigurationScope { get; set; }
+    public CompositionRole? CompositionRole { get; set; }
+    public int? PresentationOrder { get; set; }
 
     /// <summary>Frozen answer of <c>IngredientRecipeRules.IsRemoved</c> at checkout.</summary>
     public bool IsRemoved { get; set; }

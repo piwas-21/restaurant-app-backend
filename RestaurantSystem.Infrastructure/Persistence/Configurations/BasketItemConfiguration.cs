@@ -10,6 +10,10 @@ public class BasketItemConfiguration : IEntityTypeConfiguration<BasketItem>
     {
         builder.ToTable("BasketItems");
 
+        builder.Property(bi => bi.MenuSectionItemId);
+        builder.Property(bi => bi.ParentComponentMenuSectionItemId);
+        builder.Property(bi => bi.PresentationLabel).HasMaxLength(120);
+
         builder.Property(bi => bi.Quantity)
             .IsRequired();
 
@@ -27,6 +31,9 @@ public class BasketItemConfiguration : IEntityTypeConfiguration<BasketItem>
             .HasColumnType("jsonb");
 
         builder.Property(bi => bi.AddedIngredients)
+            .HasColumnType("jsonb");
+
+        builder.Property(bi => bi.IngredientCompositionRolesJson)
             .HasColumnType("jsonb");
 
         builder.Property(bi => bi.CustomizationPrice)

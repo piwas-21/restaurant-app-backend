@@ -2,6 +2,7 @@ using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Catalog.Dtos;
 using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -44,6 +45,7 @@ public static class ProductDtoMapper
             SauceMin = product.SauceMin,
             SauceMax = product.SauceMax,
             SauceIncludedFree = product.SauceIncludedFree,
+            CustomerStepManifest = CustomerStepManifestStore.Read(product),
             PreparationTimeMinutes = product.PreparationTimeMinutes,
             Type = product.Type,
             KitchenType = product.KitchenType,
@@ -105,6 +107,7 @@ public static class ProductDtoMapper
             SuggestedSideItems = product.SuggestedSideItems.Select(si => new SideItemDto
             {
                 Id = si.SideItemProduct.Id,
+                SuggestedSideItemId = si.Id,
                 Name = si.SideItemProduct.Name,
                 Description = si.SideItemProduct.Description,
                 Price = si.SideItemProduct.BasePrice,

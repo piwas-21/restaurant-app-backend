@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
@@ -58,13 +59,16 @@ public partial class OrderMappingService
         if (childItems.Any())
         {
             sideItems = childItems
-                .OrderBy(child => child.CreatedAt).ThenBy(child => child.Id)
+                .OrderBy(child => child.PresentationOrder.HasValue ? 0 : 1)
+                .ThenBy(child => child.PresentationOrder)
+                .ThenBy(child => child.CreatedAt).ThenBy(child => child.Id)
                 .GroupBy(child => child.SectionId ?? child.Id).SelectMany(group => group)
                 .Select(child =>
                 {
                     var childDto = MapOrderItem(child, childrenByParent);
                     childDto.Kind = OrderChildRendering.DisplayKind(child, item);
                     childDto.Quantity = OrderChildRendering.LineQuantity(child, item);
+                    childDto.QuantityBasis = QuantityBasis.LineTotal;
                     return childDto;
                 })
                 .ToList();
@@ -77,6 +81,14 @@ public partial class OrderMappingService
             ProductVariationId = item.ProductVariationId,
             MenuID = item.MenuId,
             SectionId = item.SectionId,
+            MenuSectionItemId = item.MenuSectionItemId,
+            SuggestedSideItemId = item.SuggestedSideItemId,
+            ParentComponentOrderItemId = item.ParentComponentOrderItemId,
+            QuantityBasis = item.ParentOrderItemId.HasValue ? QuantityBasis.LineTotal : item.QuantityBasis ?? QuantityBasis.LineTotal,
+            ConfigurationScope = item.ConfigurationScope,
+            CompositionRole = item.CompositionRole,
+            PresentationLabel = item.PresentationLabel,
+            PresentationOrder = item.PresentationOrder,
             ProductName = item.ProductName,
             VariationName = item.VariationName,
             Quantity = item.Quantity,

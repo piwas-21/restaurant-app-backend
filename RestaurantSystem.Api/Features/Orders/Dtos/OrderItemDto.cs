@@ -24,6 +24,10 @@ public record OrderItemIngredientDto
     // pre-flag rendering. The pre-S1 fallback (OrderIngredientCustomizations.ProjectRecipe)
     // computes the flag from the live recipe — the only path where that is still the catalog's call.
     public bool IsAddOn { get; set; }
+    public QuantityBasis? QuantityBasis { get; set; }
+    public ConfigurationScope? ConfigurationScope { get; set; }
+    public CompositionRole? CompositionRole { get; set; }
+    public int? PresentationOrder { get; set; }
 }
 
 public record OrderItemDto
@@ -33,6 +37,14 @@ public record OrderItemDto
     public Guid? ProductVariationId { get; set; }
     public Guid? MenuID { get; set; }
     public Guid? SectionId { get; set; }
+    public Guid? MenuSectionItemId { get; set; }
+    public Guid? SuggestedSideItemId { get; set; }
+    public Guid? ParentComponentOrderItemId { get; set; }
+    public QuantityBasis? QuantityBasis { get; set; }
+    public ConfigurationScope? ConfigurationScope { get; set; }
+    public CompositionRole? CompositionRole { get; set; }
+    public string? PresentationLabel { get; set; }
+    public int? PresentationOrder { get; set; }
     public string ProductName { get; set; } = null!;
     public string? VariationName { get; set; }
     public int Quantity { get; set; }

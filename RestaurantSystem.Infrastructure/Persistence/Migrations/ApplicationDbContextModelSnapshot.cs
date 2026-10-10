@@ -773,8 +773,9 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnName("payload_hash");
 
                     b.Property<int>("RoundingIncrementMinor")
-                        .HasDefaultValue(1)
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
+                        .HasDefaultValue(1)
                         .HasColumnName("rounding_increment_minor");
 
                     b.Property<string>("ScopeJson")
@@ -1545,6 +1546,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("basket_id");
 
+                    b.Property<int?>("CompositionRole")
+                        .HasColumnType("integer")
+                        .HasColumnName("composition_role");
+
+                    b.Property<int?>("ConfigurationScope")
+                        .HasColumnType("integer")
+                        .HasColumnName("configuration_scope");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1560,6 +1569,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("decimal(10,2)")
                         .HasColumnName("customization_price");
 
+                    b.Property<string>("IngredientCompositionRolesJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("ingredient_composition_roles_json");
+
                     b.Property<string>("IngredientQuantitiesJson")
                         .HasColumnType("text")
                         .HasColumnName("ingredient_quantities_json");
@@ -1572,9 +1585,26 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("menu_id");
 
+                    b.Property<Guid?>("MenuSectionItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("menu_section_item_id");
+
                     b.Property<Guid?>("ParentBasketItemId")
                         .HasColumnType("uuid")
                         .HasColumnName("parent_basket_item_id");
+
+                    b.Property<Guid?>("ParentComponentMenuSectionItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_component_menu_section_item_id");
+
+                    b.Property<string>("PresentationLabel")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("presentation_label");
+
+                    b.Property<int?>("PresentationOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("presentation_order");
 
                     b.Property<Guid?>("ProductCustomizationOptionId")
                         .HasColumnType("uuid")
@@ -1591,6 +1621,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
+
+                    b.Property<int?>("QuantityBasis")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity_basis");
 
                     b.Property<Guid?>("SectionId")
                         .HasColumnType("uuid")
@@ -7178,6 +7212,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnName("id")
                         .HasDefaultValueSql("gen_random_uuid()");
 
+                    b.Property<int?>("CompositionRole")
+                        .HasColumnType("integer")
+                        .HasColumnName("composition_role");
+
+                    b.Property<int?>("ConfigurationScope")
+                        .HasColumnType("integer")
+                        .HasColumnName("configuration_scope");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -7205,13 +7247,30 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("menu_id");
 
+                    b.Property<Guid?>("MenuSectionItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("menu_section_item_id");
+
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
 
+                    b.Property<Guid?>("ParentComponentOrderItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_component_order_item_id");
+
                     b.Property<Guid?>("ParentOrderItemId")
                         .HasColumnType("uuid")
                         .HasColumnName("parent_order_item_id");
+
+                    b.Property<string>("PresentationLabel")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("presentation_label");
+
+                    b.Property<int?>("PresentationOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("presentation_order");
 
                     b.Property<Guid?>("ProductId")
                         .HasColumnType("uuid")
@@ -7231,6 +7290,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
 
+                    b.Property<int?>("QuantityBasis")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity_basis");
+
                     b.Property<Guid?>("SectionId")
                         .HasColumnType("uuid")
                         .HasColumnName("section_id");
@@ -7239,6 +7302,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("special_instructions");
+
+                    b.Property<Guid?>("SuggestedSideItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("suggested_side_item_id");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("decimal(10,2)")
@@ -7266,6 +7333,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrderId")
                         .HasDatabaseName("ix_order_items_order_id");
 
+                    b.HasIndex("ParentComponentOrderItemId");
+
                     b.HasIndex("ParentOrderItemId")
                         .HasDatabaseName("ix_order_items_parent_order_item_id");
 
@@ -7285,6 +7354,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id")
                         .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int?>("CompositionRole")
+                        .HasColumnType("integer")
+                        .HasColumnName("composition_role");
+
+                    b.Property<int?>("ConfigurationScope")
+                        .HasColumnType("integer")
+                        .HasColumnName("configuration_scope");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -7319,9 +7396,17 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("order_item_id");
 
+                    b.Property<int?>("PresentationOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("presentation_order");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
+
+                    b.Property<int?>("QuantityBasis")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity_basis");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer")
@@ -8142,6 +8227,17 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("created_by");
+
+                    b.Property<string>("CustomerStepManifestJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("customer_step_manifest_json");
+
+                    b.Property<int>("CustomerStepManifestRevision")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("customer_step_manifest_revision");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
@@ -12515,6 +12611,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_order_items_orders_order_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderItem", null)
+                        .WithMany()
+                        .HasForeignKey("ParentComponentOrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("RestaurantSystem.Domain.Entities.OrderItem", "ParentOrderItem")
                         .WithMany("ChildOrderItems")

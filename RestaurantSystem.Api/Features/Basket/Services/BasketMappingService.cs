@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Basket.Dtos;
@@ -7,7 +8,6 @@ using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
-using System.Text.Json;
 using DomainBasket = RestaurantSystem.Domain.Entities.Basket;
 
 namespace RestaurantSystem.Api.Features.Basket.Services;
@@ -58,12 +58,14 @@ public class BasketMappingService : IBasketMappingService
             }
         }
 
-        // Mapped sequentially (not Task.WhenAll): the per-item side-item lookup
-        // below queries the shared ApplicationDbContext, and EF Core forbids
-        // concurrent operations on one context instance — running these in
-        // parallel throws once two items carry side items.
+        var selectedSideItemsByBasketItemId = await BasketSelectedSideMapper.MapAllAsync(
+            _context, _logger, basket.Items);
         var allItems = new List<BasketItemDto>();
-        foreach (var item in basket.Items)
+        foreach (var item in basket.Items
+            .OrderBy(row => row.CreatedAt)
+            .ThenBy(row => row.ProductId)
+            .ThenBy(row => row.SpecialInstructions, StringComparer.Ordinal)
+            .ThenBy(row => row.Id))
         {
             // Get ingredient names from product's detailed ingredients
             var productIngredients = item.Product?.DetailedIngredients ?? new List<ProductIngredient>();
@@ -75,46 +77,6 @@ public class BasketMappingService : IBasketMappingService
             var addedNames = item.AddedIngredients?
                 .Select(id => productIngredients.FirstOrDefault(pi => pi.Id == id)?.Name ?? id.ToString())
                 .ToList();
-
-            // Deserialize and fetch side items details
-            List<BasketSideItemDto>? selectedSideItems = null;
-            if (!string.IsNullOrEmpty(item.SelectedSideItemsJson))
-            {
-                try
-                {
-                    var selectedSides = JsonSerializer.Deserialize<List<SelectedSideItemDto>>(item.SelectedSideItemsJson);
-                    if (selectedSides != null && selectedSides.Count > 0)
-                    {
-                        var sideItemIds = selectedSides.Select(s => s.Id).ToList();
-                        var sideItems = await _context.Products
-                            .Where(p => sideItemIds.Contains(p.Id))
-                            .ToListAsync();
-
-                        selectedSideItems = selectedSides.Select(selectedSide =>
-                        {
-                            var sideItem = sideItems.FirstOrDefault(s => s.Id == selectedSide.Id);
-                            if (sideItem != null)
-                            {
-                                return new BasketSideItemDto
-                                {
-                                    Id = sideItem.Id,
-                                    Name = sideItem.Name,
-                                    Description = sideItem.Description,
-                                    Price = sideItem.BasePrice,
-                                    ImageUrl = sideItem.ImageUrl,
-                                    Quantity = selectedSide.Quantity,
-                                    SubTotal = sideItem.BasePrice * selectedSide.Quantity
-                                };
-                            }
-                            return null;
-                        }).OfType<BasketSideItemDto>().ToList();
-                    }
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogWarning(ex, "Failed to deserialize side items JSON for basket item {BasketItemId}", item.Id);
-                }
-            }
 
             // Deserialize ingredient quantities
             var ingredientQuantities = DeserializeIngredientQuantities(item.IngredientQuantitiesJson, item.Id);
@@ -130,6 +92,14 @@ public class BasketMappingService : IBasketMappingService
                 ProductDescription = item.Product != null ? item.Product.Description : item.Menu?.Description ?? string.Empty,
                 ProductImageUrl = item.Product?.ImageUrl ?? string.Empty,
                 ProductVariationId = item.ProductVariationId,
+                SectionId = item.SectionId,
+                MenuSectionItemId = item.MenuSectionItemId,
+                ParentComponentMenuSectionItemId = item.ParentComponentMenuSectionItemId,
+                QuantityBasis = item.QuantityBasis,
+                ConfigurationScope = item.ConfigurationScope,
+                CompositionRole = item.CompositionRole,
+                PresentationLabel = item.PresentationLabel,
+                PresentationOrder = item.PresentationOrder,
                 VariationName = item.ProductVariation?.Name,
                 // Descriptions is a non-nullable collection (initialised to []),
                 // so only the ProductVariation qualifier needs the null-conditional.
@@ -144,12 +114,13 @@ public class BasketMappingService : IBasketMappingService
                 SelectedIngredients = item.SelectedIngredients,
                 AddedIngredients = item.AddedIngredients,
                 IngredientQuantities = ingredientQuantities,
+                IngredientCompositionRoles = DeserializeIngredientRoles(item.IngredientCompositionRolesJson),
                 CustomizationPrice = item.CustomizationPrice,
                 SelectedIngredientNames = selectedNames,
                 AddedIngredientNames = addedNames,
                 RemovedIngredientNames = removedNames,
-                SelectedSideItems = selectedSideItems,
-                ChildItems = item.ChildBasketItems.Select(MapChildItem).ToList()
+                SelectedSideItems = selectedSideItemsByBasketItemId.GetValueOrDefault(item.Id),
+                ChildItems = MapChildItems(item.ChildBasketItems, selectedSideItemsByBasketItemId)
             });
         }
 
@@ -203,13 +174,39 @@ public class BasketMappingService : IBasketMappingService
         }
     }
 
+    private static Dictionary<Guid, RestaurantSystem.Domain.Common.Enums.CompositionRole>? DeserializeIngredientRoles(
+        string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<Guid, RestaurantSystem.Domain.Common.Enums.CompositionRole>>(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>
     /// Maps one bundle component. A child carries the same IDs, quantities, display names and
     /// removals as a root basket line: <c>OrderLineSummary</c> renders the tree recursively on the
     /// basket flyout, cart and checkout. Omitting its selected names silently hid a bundle option's
     /// added ingredients and sauces even though checkout persisted them (#150).
     /// </summary>
-    private BasketItemDto MapChildItem(BasketItem child)
+    private List<BasketItemDto> MapChildItems(
+        IEnumerable<BasketItem> children,
+        IReadOnlyDictionary<Guid, List<BasketSideItemDto>> selectedSideItemsByBasketItemId)
+    {
+        var mapped = new List<BasketItemDto>();
+        foreach (var child in children)
+            mapped.Add(MapChildItem(child, selectedSideItemsByBasketItemId));
+        return mapped;
+    }
+
+    private BasketItemDto MapChildItem(
+        BasketItem child,
+        IReadOnlyDictionary<Guid, List<BasketSideItemDto>> selectedSideItemsByBasketItemId)
     {
         var childIngredients = child.Product?.DetailedIngredients ?? new List<ProductIngredient>();
         var childQuantities = DeserializeIngredientQuantities(child.IngredientQuantitiesJson, child.Id);
@@ -223,6 +220,13 @@ public class BasketMappingService : IBasketMappingService
             ProductId = child.ProductId,
             ProductCustomizationOptionId = child.ProductCustomizationOptionId,
             SectionId = child.SectionId,
+            MenuSectionItemId = child.MenuSectionItemId,
+            ParentComponentMenuSectionItemId = child.ParentComponentMenuSectionItemId,
+            QuantityBasis = child.QuantityBasis,
+            ConfigurationScope = child.ConfigurationScope,
+            CompositionRole = child.CompositionRole,
+            PresentationLabel = child.PresentationLabel,
+            PresentationOrder = child.PresentationOrder,
             ProductName = child.Product?.Name,
             ProductVariationId = child.ProductVariationId,
             VariationName = child.ProductVariation?.Name,
@@ -239,10 +243,12 @@ public class BasketMappingService : IBasketMappingService
             SpecialInstructions = child.SpecialInstructions,
             SelectedIngredients = child.SelectedIngredients,
             IngredientQuantities = childQuantities,
+            IngredientCompositionRoles = DeserializeIngredientRoles(child.IngredientCompositionRolesJson),
             SelectedIngredientNames = childSelectedNames,
             RemovedIngredientNames = BuildRemovedIngredientNames(
                 childIngredients, childQuantities, child.SelectedIngredients),
-            ChildItems = child.ChildBasketItems.Select(MapChildItem).ToList(),
+            SelectedSideItems = selectedSideItemsByBasketItemId.GetValueOrDefault(child.Id),
+            ChildItems = MapChildItems(child.ChildBasketItems, selectedSideItemsByBasketItemId),
         };
     }
 

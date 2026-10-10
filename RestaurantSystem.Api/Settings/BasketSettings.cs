@@ -2,6 +2,8 @@
 
 public class BasketSettings
 {
+    public const string SectionName = "Basket";
+
     public int SessionExpiryDays { get; set; } = 7;
     public int CacheExpiryMinutes { get; set; } = 30;
     public int MaxItemsPerBasket { get; set; } = 100;

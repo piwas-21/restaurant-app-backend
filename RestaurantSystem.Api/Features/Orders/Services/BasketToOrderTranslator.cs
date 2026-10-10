@@ -36,6 +36,13 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
             CustomizationPrice = LineAbsoluteCustomization(item),
             SpecialInstructions = item.SpecialInstructions,
             IngredientQuantities = BuildIngredientQuantities(item),
+            QuantityBasis = item.QuantityBasis ?? QuantityBasis.Unknown,
+            ConfigurationScope = item.ConfigurationScope ?? ConfigurationScope.Unknown,
+            CompositionRole = item.CompositionRole ?? CompositionRole.Unknown,
+            PresentationLabel = item.PresentationLabel,
+            IngredientQuantityBasis = IngredientBasis(item),
+            IngredientConfigurationScope = item.ConfigurationScope ?? ConfigurationScope.Unknown,
+            IngredientCompositionRoles = item.IngredientCompositionRoles,
         };
 
         var childItems = new List<CreateOrderItemDto>();
@@ -52,10 +59,19 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
             childItems.AddRange(item.SelectedSideItems.Select(side => new CreateOrderItemDto
             {
                 ProductId = side.Id,
+                ProductVariationId = side.ProductVariationId,
                 Quantity = side.Quantity,
                 UnitPrice = side.Price,
                 CustomizationPrice = 0m,
                 Kind = OrderItemKind.SideItem,
+                QuantityBasis = QuantityBasis.PerParentUnit,
+                ConfigurationScope = item.ConfigurationScope ?? ConfigurationScope.Unknown,
+                CompositionRole = side.CompositionRole ?? CompositionRole.Unknown,
+                PresentationLabel = item.CompositionRole == CompositionRole.Dish
+                    ? item.PresentationLabel ?? item.ProductName
+                    : null,
+                PresentationOrder = side.PresentationOrder,
+                SuggestedSideItemId = side.SuggestedSideItemId,
             }));
         }
 
@@ -142,6 +158,13 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
         var childItem = new CreateOrderItemDto
         {
             SectionId = child.SectionId,
+            MenuSectionItemId = child.MenuSectionItemId,
+            ParentComponentMenuSectionItemId = child.ParentComponentMenuSectionItemId,
+            QuantityBasis = child.QuantityBasis,
+            ConfigurationScope = child.ConfigurationScope,
+            CompositionRole = child.CompositionRole,
+            PresentationLabel = child.PresentationLabel,
+            PresentationOrder = child.PresentationOrder,
             ProductId = child.ProductId,
             ProductVariationId = child.ProductVariationId,
             // Already LINE-ABSOLUTE when it was written: BuildMenuItemAsync stores
@@ -153,15 +176,41 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
             CustomizationPrice = 0m,
             SpecialInstructions = child.SpecialInstructions,
             IngredientQuantities = BuildIngredientQuantities(child),
+            IngredientQuantityBasis = IngredientBasis(child),
+            IngredientConfigurationScope = child.ConfigurationScope ?? ConfigurationScope.Unknown,
+            IngredientCompositionRoles = child.IngredientCompositionRoles,
             Kind = child.ProductCustomizationOptionId.HasValue
                 ? OrderItemKind.CustomizationOption
                 : OrderItemKind.BundleChild,
         };
 
+        var nestedChildren = new List<CreateOrderItemDto>();
+        if (child.SelectedSideItems is { Count: > 0 })
+        {
+            nestedChildren.AddRange(child.SelectedSideItems.Select(side => new CreateOrderItemDto
+            {
+                ProductId = side.Id,
+                ProductVariationId = side.ProductVariationId,
+                Quantity = side.Quantity,
+                UnitPrice = side.Price,
+                CustomizationPrice = 0m,
+                Kind = OrderItemKind.SideItem,
+                QuantityBasis = QuantityBasis.PerParentUnit,
+                ConfigurationScope = child.ConfigurationScope ?? ConfigurationScope.Unknown,
+                CompositionRole = side.CompositionRole ?? CompositionRole.Unknown,
+                PresentationLabel = child.CompositionRole == CompositionRole.Dish
+                    ? child.PresentationLabel ?? child.ProductName
+                    : null,
+                PresentationOrder = side.PresentationOrder,
+                SuggestedSideItemId = side.SuggestedSideItemId
+            }));
+        }
+
         if (child.ChildItems is { Count: > 0 })
         {
-            childItem.ChildItems = child.ChildItems.Select(MapBundleChild).ToList();
+            nestedChildren.AddRange(child.ChildItems.Select(MapBundleChild));
         }
+        if (nestedChildren.Count > 0) childItem.ChildItems = nestedChildren;
 
         return childItem;
     }
@@ -195,4 +244,9 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
 
         return processed;
     }
+
+    private static QuantityBasis IngredientBasis(BasketItemDto item) =>
+        item.ConfigurationScope == ConfigurationScope.SharedAcrossParentUnits
+            ? QuantityBasis.PerParentUnit
+            : QuantityBasis.Unknown;
 }

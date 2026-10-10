@@ -6,6 +6,8 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Services;
+using System.Text.Json.Serialization;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -34,163 +36,20 @@ public record CreateMenuBundleCommand(
     // See IMenuBundleCommandFields for the contract the two paths do and do not share.
     List<string>? Allergens = null,
     TranslationOwnerMetadataDto? TranslationMetadata = null
-) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
-
-public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCommand, ApiResponse<ProductDto>>
+) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields
 {
-    private readonly ApplicationDbContext _context;
-    private readonly ICurrentUserService _currentUserService;
-    private readonly ILogger<CreateMenuBundleCommandHandler> _logger;
-    private readonly ITranslationProvenanceWriter _translationProvenanceWriter;
+    private CustomerStepManifestDto? _customerStepManifest;
 
-    public CreateMenuBundleCommandHandler(ApplicationDbContext context, ICurrentUserService currentUserService,
-        ILogger<CreateMenuBundleCommandHandler> logger,
-        ITranslationProvenanceWriter? translationProvenanceWriter = null)
+    [JsonIgnore]
+    public bool CustomerStepManifestSpecified { get; private set; }
+
+    public CustomerStepManifestDto? CustomerStepManifest
     {
-        _context = context;
-        _currentUserService = currentUserService;
-        _logger = logger;
-        _translationProvenanceWriter = translationProvenanceWriter ??
-            new TranslationProvenanceWriter(context, currentUserService);
-    }
-
-    public async Task<ApiResponse<ProductDto>> Handle(CreateMenuBundleCommand command, CancellationToken cancellationToken)
-    {
-        var transaction = _context.Database.CurrentTransaction;
-        var ownsTransaction = transaction is null;
-        transaction ??= await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        await using var ownedTransaction = ownsTransaction ? transaction : null;
-
-        try
+        get => _customerStepManifest;
+        init
         {
-            var product = new Product
-            {
-                Id = Guid.NewGuid(),
-                Name = command.Name,
-                Description = command.Description,
-                BasePrice = command.BasePrice,
-                IsActive = command.IsActive,
-                IsSpecial = command.IsSpecial,
-                IsAvailable = command.IsAvailable,
-                PreparationTimeMinutes = command.PreparationTimeMinutes,
-                AvailableOrderTypes = command.AvailableOrderTypes,
-                Allergens = command.Allergens,
-                Type = ProductType.Menu, // Hardcoded
-                KitchenType = KitchenType.None, // Menus usually don't have kitchen type directly, or maybe FrontKitchen?
-                DisplayOrder = command.DisplayOrder,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.GetAuditIdentifier()
-            };
-
-            _context.Products.Add(product);
-
-            if (command.MenuDefinition.OfferParentSpecified)
-            {
-                await MenuOfferLinkRules.EnsureValidAsync(
-                    _context,
-                    product.Id,
-                    command.MenuDefinition.ParentOfferProductId,
-                    command.MenuDefinition.ParentOfferVariationId,
-                    cancellationToken);
-            }
-
-            var displayOrder = 0;
-
-            if (command.CategoryIds != null)
-            {
-                foreach (var categoryId in command.CategoryIds)
-                {
-                    var productCategory = new ProductCategory
-                    {
-                        CategoryId = categoryId,
-                        IsPrimary = categoryId == command.PrimaryCategoryId,
-                        DisplayOrder = displayOrder++,
-                        CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.GetAuditIdentifier()
-                    };
-                    _context.ProductCategories.Add(productCategory);
-                    product.ProductCategories.Add(productCategory);
-                }
-            }
-
-            MenuBundleContentWriter.Add(_context, product, command.Content,
-                _currentUserService.GetAuditIdentifier());
-
-            // Add Menu Definition
-            var menuDef = new MenuDefinition
-            {
-                ProductId = product.Id,
-                ParentOfferProductId = command.MenuDefinition.ParentOfferProductId,
-                ParentOfferVariationId = command.MenuDefinition.ParentOfferVariationId,
-                IsAlwaysAvailable = command.MenuDefinition.IsAlwaysAvailable,
-                StartTime = command.MenuDefinition.StartTime,
-                EndTime = command.MenuDefinition.EndTime,
-                AvailableMonday = command.MenuDefinition.AvailableMonday,
-                AvailableTuesday = command.MenuDefinition.AvailableTuesday,
-                AvailableWednesday = command.MenuDefinition.AvailableWednesday,
-                AvailableThursday = command.MenuDefinition.AvailableThursday,
-                AvailableFriday = command.MenuDefinition.AvailableFriday,
-                AvailableSaturday = command.MenuDefinition.AvailableSaturday,
-                AvailableSunday = command.MenuDefinition.AvailableSunday,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.GetAuditIdentifier()
-            };
-
-            _context.MenuDefinitions.Add(menuDef);
-
-            // Absent sections were always harmless on a create — there is nothing to erase — so
-            // this guard never cost anyone data the way its update-path twins did (#191). It is
-            // rewritten anyway because the shared MenuDefinitionDto lost its initializer and the
-            // shared MenuBundleCommandValidatorBase now requires the key on BOTH bundle commands:
-            // leaving create silently tolerant would put a second, quieter contract on one DTO.
-            var sections = command.MenuDefinition.Sections
-                ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
-
-            await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
-
-            var written = MenuSectionWriter.ReplaceSections(_context, menuDef, sections,
-                _currentUserService.GetAuditIdentifier());
-            foreach (var (input, section) in written)
-            {
-                await _translationProvenanceWriter.RecordAsync("menuSection", section.Id,
-                    input.TranslationMetadata, TranslationTextMap.FromSection(input), cancellationToken);
-            }
-            await _translationProvenanceWriter.RecordAsync("product", product.Id,
-                command.TranslationMetadata,
-                TranslationTextMap.Create(command.Name, command.Description,
-                    command.Content.Select(pair =>
-                        (pair.Key, (string?)pair.Value.Name, (string?)pair.Value.Description))),
-                cancellationToken);
-
-            await _context.SaveChangesAsync(cancellationToken);
-            if (ownsTransaction) await transaction.CommitAsync(cancellationToken);
-
-            // Re-fetch with the navigations the shared ProductDtoMapper reads, then map.
-
-            var createdProduct = await _context.Products
-                .WithProductDtoNavigations()
-                .FirstAsync(p => p.Id == product.Id, cancellationToken);
-
-            var productDto = ProductDtoMapper.MapToProductDto(createdProduct);
-
-            _logger.LogInformation("Menu Bundle {ProductId} created successfully by user {UserId}",
-                    product.Id, _currentUserService.UserId);
-
-            return ApiResponse<ProductDto>.SuccessWithData(productDto, "Menu Bundle created successfully");
-        }
-        catch (Exception exception)
-        {
-            if (ownsTransaction)
-            {
-                try { await transaction.RollbackAsync(cancellationToken); }
-                catch (Exception rollbackEx)
-                {
-                    _logger.LogWarning(rollbackEx, "Transaction rollback failed during menu bundle create");
-                }
-            }
-
-            MenuOfferLinkConflict.ThrowIfExpected(exception);
-            throw;
+            _customerStepManifest = value;
+            CustomerStepManifestSpecified = true;
         }
     }
 }

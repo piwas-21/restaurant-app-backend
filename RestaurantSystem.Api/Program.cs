@@ -312,6 +312,11 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 (emailSettings.Get<EmailSettings>() ?? new EmailSettings()).Validate();
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
+builder.Services.AddOptions<BasketSettings>()
+    .Bind(builder.Configuration.GetSection(BasketSettings.SectionName))
+    .Validate(settings => settings.MaxQuantityPerItem > 0,
+        "Basket maximum quantity per item must be positive")
+    .ValidateOnStart();
 builder.Services.AddOptions<MenuAuthoringPaginationSettings>()
     .Bind(builder.Configuration.GetSection(MenuAuthoringPaginationSettings.SectionName))
     .Validate(settings => settings.MinimumPageSize >= 1

@@ -85,7 +85,8 @@ public class BundleReadContractAgreementTests : IntegrationTestBase
         {
             "id", "productId", "productVariationId", "productVariationName",
             "productVariationPriceModifier", "productName", "additionalPrice", "displayOrder", "isDefault",
-            "ingredients", "allergens", "availability", "detailedIngredients", "suggestedSideItems",
+            "ingredients", "allergens", "availability", "detailedIngredients", "variations",
+            "suggestedSideItems", "hideBaseProduct",
             "customizationGroups",
             "sauceMin", "sauceMax", "sauceIncludedFree"
         };

@@ -53,6 +53,20 @@ public class GetMenuBundlesQueryHandler(
                     .ThenInclude(i => i.ProductVariation)
             .Include(p => p.MenuDefinition!.Sections)
                 .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.Variations)
+                        .ThenInclude(variation => variation.Descriptions)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.SuggestedSideItems)
+                        .ThenInclude(side => side.SideItemProduct.ProductCategories)
+                            .ThenInclude(category => category.Category)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.SuggestedSideItems)
+                        .ThenInclude(side => side.SideItemProduct.Variations)
+                            .ThenInclude(variation => variation.Descriptions)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
                         .ThenInclude(i => i.Product)
                             .ThenInclude(p => p.DetailedIngredients)
                                 .ThenInclude(di => di.Descriptions)
@@ -93,6 +107,9 @@ public class GetMenuBundlesQueryHandler(
 
         var totalCount = await queryable.CountAsync(cancellationToken);
 
+        // GetMenuBundlesQueryValidator bounds root rows by CatalogSettings.MaxPageSize. The child
+        // variation/side/customization graph remains required by the guest planner and is loaded
+        // only for that page; AsSplitQuery keeps its collection Includes from multiplying rows.
         var products = await queryable
             // See GetProductsQuery: the split above and ThenBy(Id) travel together under Skip/Take.
             .OrderBy(p => p.DisplayOrder)
