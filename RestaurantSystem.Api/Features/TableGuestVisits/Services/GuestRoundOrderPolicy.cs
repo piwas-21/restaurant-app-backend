@@ -20,7 +20,9 @@ internal static class GuestRoundOrderPolicy
             return null;
         }
 
+        // A tableless dine-in checkout has no table visit to join.
         return tableVisitReadinessEnabled && command.Type == OrderType.DineIn
+            && command.TableNumber.HasValue
             ? ApiResponse<OrderDto>.FailureWithCode(
                 "Dine-in orders must join the current table visit before they can be submitted.",
                 ErrorCodes.TableServiceSessionRequired)
