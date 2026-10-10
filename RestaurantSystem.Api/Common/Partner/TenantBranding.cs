@@ -84,7 +84,7 @@ public sealed class TenantBranding : ITenantBranding, IDisposable
         }
         catch (Exception exception) when (exception is HttpRequestException or JsonException or OperationCanceledException)
         {
-            _logger.LogWarning("Tenant branding refresh unavailable ({FailureType}); cached attribution expires",
+            _logger.LogWarning(exception, "Tenant branding refresh unavailable ({FailureType}); cached attribution expires",
                 exception.GetType().Name);
         }
     }

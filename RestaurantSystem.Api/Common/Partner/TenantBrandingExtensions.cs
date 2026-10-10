@@ -10,9 +10,10 @@ public static class TenantBrandingExtensions
             .Validate(settings => string.IsNullOrWhiteSpace(settings.RuntimeUrl)
                 || (Uri.TryCreate(settings.RuntimeUrl, UriKind.Absolute, out var uri)
                     && uri.Scheme == Uri.UriSchemeHttps && string.IsNullOrEmpty(uri.UserInfo)
-                    && System.Text.RegularExpressions.Regex.IsMatch(settings.TenantSlug, "^[a-z0-9][a-z0-9-]{0,62}$")
-                    && settings.RefreshSeconds > 0 && settings.MaxStaleSeconds >= settings.RefreshSeconds
-                    && settings.RequestTimeoutSeconds > 0), "Invalid tenant branding configuration")
+                    && settings.RequestTimeoutSeconds > 0
+                    && System.Text.RegularExpressions.Regex.IsMatch(settings.TenantSlug, "^[a-z0-9][a-z0-9-]{0,62}$",
+                        System.Text.RegularExpressions.RegexOptions.NonBacktracking, TimeSpan.FromSeconds(settings.RequestTimeoutSeconds))
+                    && settings.RefreshSeconds > 0 && settings.MaxStaleSeconds >= settings.RefreshSeconds), "Invalid tenant branding configuration")
             .ValidateOnStart();
         services.AddHttpClient(nameof(TenantBranding))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
