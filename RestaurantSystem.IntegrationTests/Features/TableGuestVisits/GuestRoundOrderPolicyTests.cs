@@ -2,6 +2,7 @@ using FluentAssertions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Domain.Common.Enums;
 
@@ -44,5 +45,18 @@ public sealed class GuestRoundOrderPolicyTests
 
         GuestRoundOrderPolicy.ValidateSubmission(command, tableVisitReadinessEnabled: true)
             .Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Readiness_allows_tableless_dine_in_and_it_still_waits_for_staff(bool paysOnline)
+    {
+        var command = new CreateOrderCommand { Type = OrderType.DineIn };
+
+        GuestRoundOrderPolicy.ValidateSubmission(command, tableVisitReadinessEnabled: true)
+            .Should().BeNull();
+        OnlinePaymentIntent.InitialStatus(OrderType.DineIn, tableNumber: null, paysOnline)
+            .Should().Be(OrderStatus.Pending);
     }
 }
