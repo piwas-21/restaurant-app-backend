@@ -99,6 +99,10 @@ public partial class OrderMappingService : IOrderMappingService
             DeliveryAddress = MapToDeliveryAddressDto(order.DeliveryAddress),
             Items = items
                 .Where(i => !i.ParentOrderItemId.HasValue)
+                .OrderBy(i => i.CreatedAt)
+                .ThenBy(i => i.ProductId)
+                .ThenBy(i => i.SpecialInstructions, StringComparer.Ordinal)
+                .ThenBy(i => i.Id)
                 .Select(i => MapOrderItem(i, childrenByParent))
                 .ToList(),
             Payments = order.Payments?.Select(MapToOrderPaymentDto).ToList() ?? new List<OrderPaymentDto>(),

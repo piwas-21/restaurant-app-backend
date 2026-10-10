@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -86,6 +87,20 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 .ThenInclude(section => section.Items)
                     .ThenInclude(item => item.ProductVariation)
             .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Items)
+                    .ThenInclude(item => item.Product.Variations)
+                        .ThenInclude(variation => variation.Descriptions)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Items)
+                    .ThenInclude(item => item.Product.SuggestedSideItems)
+                        .ThenInclude(side => side.SideItemProduct.ProductCategories)
+                            .ThenInclude(category => category.Category)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Items)
+                    .ThenInclude(item => item.Product.SuggestedSideItems)
+                        .ThenInclude(side => side.SideItemProduct.Variations)
+                            .ThenInclude(variation => variation.Descriptions)
+            .Include(p => p.MenuDefinition!.Sections)
                 .ThenInclude(s => s.Items)
                     .ThenInclude(i => i.Product.DetailedIngredients)
                         .ThenInclude(di => di.Descriptions)
@@ -128,6 +143,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             SauceMin = product.SauceMin,
             SauceMax = product.SauceMax,
             SauceIncludedFree = product.SauceIncludedFree,
+            CustomerStepManifest = CustomerStepManifestStore.Read(product),
             PreparationTimeMinutes = product.PreparationTimeMinutes,
             Type = product.Type,
             KitchenType = product.KitchenType,
@@ -211,6 +227,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 .Select(si => new SideItemDto
                 {
                     Id = si.SideItemProduct.Id,
+                    SuggestedSideItemId = si.Id,
                     Name = si.SideItemProduct.Name,
                     Description = si.SideItemProduct.Description,
                     Price = si.SideItemProduct.BasePrice,

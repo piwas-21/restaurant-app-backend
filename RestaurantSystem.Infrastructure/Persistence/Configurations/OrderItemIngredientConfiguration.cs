@@ -21,6 +21,11 @@ public class OrderItemIngredientConfiguration : IEntityTypeConfiguration<OrderIt
         builder.Property(oii => oii.Quantity)
             .IsRequired();
 
+        builder.Property(oii => oii.QuantityBasis);
+        builder.Property(oii => oii.ConfigurationScope);
+        builder.Property(oii => oii.CompositionRole);
+        builder.Property(oii => oii.PresentationOrder);
+
         builder.Property(oii => oii.IsRemoved)
             .IsRequired();
 

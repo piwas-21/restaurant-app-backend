@@ -49,7 +49,8 @@ public static class MenuBundleSelectionRules
 
             optionsPrice += sectionSelections.Sum(selection =>
                 PriceFor(ResolveSectionItem(
-                    sectionList, selection.SectionId, selection.ItemId, selection.ProductVariationId))
+                    sectionList, selection.SectionId, selection.ItemId, selection.ProductVariationId,
+                    selection.MenuSectionItemId))
                 * selection.Quantity);
         }
 
@@ -65,14 +66,27 @@ public static class MenuBundleSelectionRules
         IEnumerable<MenuSection> sections,
         Guid sectionId,
         Guid itemId,
-        Guid? productVariationId = null)
+        Guid? productVariationId = null,
+        Guid? menuSectionItemId = null)
     {
         ArgumentNullException.ThrowIfNull(sections);
         var section = sections.FirstOrDefault(candidate => candidate.Id == sectionId)
             ?? throw new BadRequestException($"Invalid section '{sectionId}' for this menu");
 
-        return section.Items.FirstOrDefault(item => item.ProductId == itemId
-                && item.ProductVariationId == productVariationId)
+        if (menuSectionItemId.HasValue)
+        {
+            var selected = section.Items.FirstOrDefault(item => item.Id == menuSectionItemId.Value);
+            if (selected is null || selected.ProductId != itemId
+                || selected.ProductVariationId != productVariationId)
+                throw new BadRequestException("The selected menu-section row does not match the requested option.");
+            return selected;
+        }
+
+        var matches = section.Items.Where(item => item.ProductId == itemId
+            && item.ProductVariationId == productVariationId).Take(2).ToList();
+        if (matches.Count > 1)
+            throw new BadRequestException("This menu option appears more than once in the section; send menuSectionItemId.");
+        return matches.FirstOrDefault()
             ?? throw new NotFoundException($"Item not found in section '{section.Name}'");
     }
 
@@ -100,7 +114,8 @@ public static class MenuBundleSelectionRules
         IReadOnlyCollection<SelectedMenuOptionDto> selectedOptions)
     {
         if (selectedOptions
-            .GroupBy(selection => (selection.SectionId, selection.ItemId))
+            .GroupBy(selection => (selection.SectionId, selection.MenuSectionItemId,
+                selection.ItemId, selection.ProductVariationId))
             .Any(group => group.Count() > 1))
         {
             throw new BadRequestException("A menu option can only be selected once per section");
@@ -118,7 +133,8 @@ public static class MenuBundleSelectionRules
             }
 
             _ = ResolveSectionItem(
-                sections, selection.SectionId, selection.ItemId, selection.ProductVariationId);
+                sections, selection.SectionId, selection.ItemId, selection.ProductVariationId,
+                selection.MenuSectionItemId);
         }
     }
 }

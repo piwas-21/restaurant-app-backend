@@ -25,10 +25,12 @@ public class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
 
         builder.Property(i => i.SpecialInstructions)
             .HasMaxLength(500);
+        builder.Property(i => i.PresentationLabel).HasMaxLength(120);
 
         // Indexes
         builder.HasIndex(i => i.OrderId).HasDatabaseName("ix_order_items_order_id");
         builder.HasIndex(i => i.ProductId);
+        builder.HasIndex(i => i.ParentComponentOrderItemId);
 
         // Snapshot units reference an item together with its owner order, so a foreign-key
         // constraint can prove both identifiers belong to the same accepted order.
@@ -53,6 +55,11 @@ public class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
         builder.HasOne(i => i.Menu)
             .WithMany()
             .HasForeignKey(i => i.MenuId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<OrderItem>()
+            .WithMany()
+            .HasForeignKey(i => i.ParentComponentOrderItemId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

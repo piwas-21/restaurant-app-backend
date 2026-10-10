@@ -84,4 +84,7 @@ public record ProductDto
 
     /// <inheritdoc cref="SauceMin"/>
     public int SauceIncludedFree { get; init; }
+
+    /// <summary>Optional stable-ID screen order; null asks the guest flow to derive current defaults.</summary>
+    public CustomerStepManifestDto? CustomerStepManifest { get; init; }
 }

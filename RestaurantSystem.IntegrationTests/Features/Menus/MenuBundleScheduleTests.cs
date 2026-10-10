@@ -130,6 +130,31 @@ public class MenuBundleScheduleTests : ApiTokenScopeTestBase
         detail.Data!.Name.Should().Be(LunchName);
     }
 
+    [Theory]
+    [InlineData(0, 20)]
+    [InlineData(-1, 20)]
+    [InlineData(1, 0)]
+    [InlineData(1, -1)]
+    [InlineData(1, 201)]
+    [InlineData(int.MaxValue, 200)]
+    public async Task The_list_rejects_invalid_or_unbounded_pagination(int page, int pageSize)
+    {
+        var response = await Client.GetAsync($"/api/Menus?page={page}&pageSize={pageSize}");
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task The_list_accepts_the_configured_catalog_page_size_limit()
+    {
+        var response = await GetFromJsonAsync<ApiResponse<PagedResult<MenuBundleDto>>>(
+            "/api/Menus?page=1&pageSize=200");
+
+        response!.Success.Should().BeTrue(response.Message);
+        response.Data!.PageSize.Should().Be(200);
+        response.Data.Items.Should().Contain(bundle => bundle.Name == AlwaysName);
+    }
+
     private async Task<IReadOnlyList<string>> ListedNamesAsync()
     {
         var response = await GetFromJsonAsync<ApiResponse<PagedResult<MenuBundleDto>>>(

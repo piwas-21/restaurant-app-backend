@@ -1,8 +1,19 @@
+using System.Data.Common;
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
+using RestaurantSystem.Api.Features.Basket.Services;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
+using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Common;
@@ -183,5 +194,152 @@ public class LoginMergeCustomizationTests : IntegrationTestBase
         var line = roots.Should().ContainSingle().Subject;
         line.Quantity.Should().Be(3);
         line.ItemTotal.Should().Be(PlainLineTotal(3));
+    }
+
+    [Fact]
+    public async Task BasketRead_BatchesRootAndNestedSidesWithoutChangingSavedTotals()
+    {
+        var sideProductId = Guid.NewGuid();
+        const decimal sideBasePrice = 2.99m;
+        var regularId = Guid.NewGuid();
+        var largeId = Guid.NewGuid();
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var sideProduct = new Product
+            {
+                Id = sideProductId,
+                Name = "Batch-read drink",
+                BasePrice = sideBasePrice,
+                Type = ProductType.Beverage,
+                IsActive = true,
+                IsAvailable = true,
+                Ingredients = [],
+                Allergens = [],
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            };
+            sideProduct.Variations.Add(new ProductVariation
+            {
+                Id = regularId,
+                ProductId = sideProduct.Id,
+                Name = "Regular drink",
+                PriceModifier = 0.50m,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            });
+            sideProduct.Variations.Add(new ProductVariation
+            {
+                Id = largeId,
+                ProductId = sideProduct.Id,
+                Name = "Large drink",
+                PriceModifier = 1.25m,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            });
+            context.Products.Add(sideProduct);
+            await context.SaveChangesAsync();
+        }
+
+        var basketId = Guid.NewGuid();
+        var bundle = MappingLine(_pizza, basketId, 2,
+            SideJson(sideProductId, regularId, 2, CompositionRole.Drink, 4));
+        var child = MappingLine(_pizza, basketId, 4,
+            SideJson(sideProductId, largeId, 3, CompositionRole.Side, 1), bundle.Id);
+        var secondRoot = MappingLine(_pizza, basketId, 1,
+            SideJson(sideProductId, largeId, 1, CompositionRole.Drink, 8));
+        bundle.ChildBasketItems.Add(child);
+
+        var basket = new RestaurantSystem.Domain.Entities.Basket
+        {
+            Id = basketId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test",
+            SessionId = _sessionId,
+            SubTotal = 47.25m,
+            Total = 48.10m,
+            Items = [bundle, child, secondRoot]
+        };
+        var counter = new SelectCommandCounter();
+        await using var mappingContext = DatabaseFixture.CreateContext(counter);
+        var translator = new Mock<IBasketToOrderTranslator>();
+        translator.Setup(value => value.Translate(It.IsAny<IEnumerable<BasketItemDto>>()))
+            .Returns(new List<CreateOrderItemDto>());
+        var mapper = new BasketMappingService(mappingContext, Mock.Of<ICustomerDiscountService>(),
+            NullLogger<BasketMappingService>.Instance, translator.Object);
+
+        var mapped = await mapper.MapAsync(basket);
+
+        mapped.Items.Should().HaveCount(2);
+        mapped.SubTotal.Should().Be(47.25m);
+        mapped.Total.Should().Be(48.10m, "side display projection must not recalculate the server-saved basket total");
+        var mappedBundle = mapped.Items.Single(item => item.Id == bundle.Id);
+        var mappedBundleSide = mappedBundle.SelectedSideItems!.Should().ContainSingle().Subject;
+        mappedBundleSide.Quantity.Should().Be(2);
+        mappedBundleSide.VariationName.Should().Be("Regular drink");
+        mappedBundleSide.CompositionRole.Should().Be(CompositionRole.Drink);
+        mappedBundleSide.SubTotal.Should().Be((sideBasePrice + 0.50m) * 2);
+
+        var mappedChildSide = mappedBundle.ChildItems!.Should().ContainSingle().Subject
+            .SelectedSideItems!.Should().ContainSingle().Subject;
+        mappedChildSide.Quantity.Should().Be(3);
+        mappedChildSide.VariationName.Should().Be("Large drink");
+        mappedChildSide.CompositionRole.Should().Be(CompositionRole.Side);
+        mappedChildSide.PresentationOrder.Should().Be(1);
+        mappedChildSide.SubTotal.Should().Be((sideBasePrice + 1.25m) * 3);
+
+        var mappedSecondRootSide = mapped.Items.Single(item => item.Id == secondRoot.Id)
+            .SelectedSideItems!.Should().ContainSingle().Subject;
+        mappedSecondRootSide.Quantity.Should().Be(1);
+        mappedSecondRootSide.VariationName.Should().Be("Large drink");
+        mappedSecondRootSide.CompositionRole.Should().Be(CompositionRole.Drink);
+        mappedSecondRootSide.PresentationOrder.Should().Be(8);
+        counter.ReadCount.Should().Be(1, "side products and variations are loaded in one batch for all roots and children");
+    }
+
+    private static BasketItem MappingLine(
+        Product product, Guid basketId, int quantity, string sidesJson, Guid? parentItemId = null) => new()
+        {
+            Id = Guid.NewGuid(),
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test",
+            BasketId = basketId,
+            ProductId = product.Id,
+            Product = product,
+            ParentBasketItemId = parentItemId,
+            Quantity = quantity,
+            UnitPrice = product.BasePrice,
+            ItemTotal = product.BasePrice * quantity,
+            SelectedSideItemsJson = sidesJson
+        };
+
+    private static string SideJson(Guid productId, Guid variationId, int quantity,
+        CompositionRole role, int presentationOrder) => JsonSerializer.Serialize(new[]
+        {
+            new SelectedSideItemDto
+            {
+                Id = productId,
+                ProductVariationId = variationId,
+                Quantity = quantity,
+                CompositionRole = role,
+                PresentationOrder = presentationOrder
+            }
+        });
+
+    private sealed class SelectCommandCounter : DbCommandInterceptor
+    {
+        private int _readCount;
+        public int ReadCount => Volatile.Read(ref _readCount);
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command, CommandEventData eventData,
+            InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+                Interlocked.Increment(ref _readCount);
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
     }
 }
