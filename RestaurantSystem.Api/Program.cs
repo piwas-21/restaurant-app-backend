@@ -459,14 +459,9 @@ builder.Services.AddSingleton<ITenantFeatures, TenantFeatures>();
 // existing menu operation untouched and causes only catalogue discovery/import routes to fail closed.
 builder.Services.AddCentralCatalogue(builder.Configuration);
 
-// Partner attribution shown in the tenant footer (SOFRA-PARTNER-PLAN §11 / S4a). Same rail and
-// same lifetime as the modules above: the deploy repo's tenant compose template maps
-// TENANT_PARTNER_NAME / TENANT_PARTNER_URL onto Partner__Name / Partner__Url, and an instance
-// with neither publishes nothing — which is every instance until that mapping ships.
-builder.Services.Configure<RestaurantSystem.Api.Settings.PartnerSettings>(
-    builder.Configuration.GetSection(RestaurantSystem.Api.Settings.PartnerSettings.SectionName));
-builder.Services.AddSingleton<RestaurantSystem.Api.Common.Partner.ITenantPartner,
-    RestaurantSystem.Api.Common.Partner.TenantPartner>();
+// Public attribution refreshes from Sofra when runtime configuration is enabled.
+// Legacy environment attribution remains available only when the runtime URL is absent.
+RestaurantSystem.Api.Common.Partner.TenantBrandingExtensions.AddTenantBranding(builder.Services, builder.Configuration);
 
 // Order-level pricing. DeliveryFee defaults to 0 so an absent section preserves what every live
 // tenant charges today — see OrderSettings for why that is not the old 5.00 constant. A tenant

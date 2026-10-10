@@ -16,6 +16,8 @@ Index of ADRs for the RUMI Backend. New ADRs are numbered sequentially with no g
 | [004](ADR-004-anonymous-order-confirmation-email.md) | Anonymous access on send-confirmation-email | Accepted | 2026-05-27 | auth, security, orders, rate-limit |
 | [005](ADR-005-channel-gateway-sandbox-ingress.md) | Central channel gateway with durable Uber sandbox ingress | Accepted | 2026-10-01 | channels, webhooks, tenancy |
 
+| [006](ADR-006-runtime-tenant-branding.md) | Cached runtime platform and partner attribution | Accepted | 2026-10-10 | tenancy, configuration |
+
 ## Conventions
 
 - Filename: `ADR-NNN-kebab-case-title.md`
