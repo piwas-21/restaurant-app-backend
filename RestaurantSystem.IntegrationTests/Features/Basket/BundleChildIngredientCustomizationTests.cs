@@ -210,6 +210,28 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         return PostAsJsonAsync("/api/basket/items", request);
     }
 
+    [Theory]
+    [InlineData(100, HttpStatusCode.OK)]
+    [InlineData(101, HttpStatusCode.BadRequest)]
+    public async Task RootQuantity_UsesTheConfiguredDefaultAtTheHttpBoundary(
+        int quantity, HttpStatusCode expectedStatus)
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+        var response = await PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = _testCola.Id,
+            Quantity = quantity
+        });
+
+        response.StatusCode.Should().Be(expectedStatus, "response was {0}",
+            await response.Content.ReadAsStringAsync());
+        if (expectedStatus == HttpStatusCode.OK)
+        {
+            var basket = await ReadResponseAsync<ApiResponse<BasketDto>>(response);
+            basket!.Data!.Items.Should().ContainSingle().Which.Quantity.Should().Be(100);
+        }
+    }
+
     private static BasketItemDto GetChildItem(BasketDto basket, Guid parentProductId, Guid childProductId)
     {
         var parent = basket.Items.FirstOrDefault(i => i.ProductId == parentProductId);
@@ -675,9 +697,51 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
             Guid.NewGuid(),
             [selection],
             manifestSteps: null,
-            orderType: null);
+            orderType: null,
+            maxQuantityPerItem: 100);
 
         act.Should().Throw<BadRequestException>();
+    }
+
+    [Fact]
+    public void BundleComponentSide_UsesConfiguredBasketQuantityLimit()
+    {
+        var component = new Product { Id = Guid.NewGuid(), CreatedBy = "Test" };
+        var sideProduct = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Fries",
+            IsActive = true,
+            IsAvailable = true,
+            CreatedBy = "Test"
+        };
+        var membership = new ProductSideItem
+        {
+            Id = Guid.NewGuid(),
+            MainProductId = component.Id,
+            SideItemProductId = sideProduct.Id,
+            MainProduct = component,
+            SideItemProduct = sideProduct,
+            CreatedBy = "Test"
+        };
+        component.SuggestedSideItems.Add(membership);
+        var selection = new SelectedSideItemDto
+        {
+            Id = sideProduct.Id,
+            SuggestedSideItemId = membership.Id,
+            Quantity = 4
+        };
+
+        var act = () => BundleComponentSelection.ResolveSides(
+            component,
+            Guid.NewGuid(),
+            [selection],
+            manifestSteps: null,
+            orderType: null,
+            maxQuantityPerItem: 3);
+
+        act.Should().Throw<BadRequestException>()
+            .WithMessage("Component side selections must be unique with quantities from 1 to 3.");
     }
 
     [Fact]

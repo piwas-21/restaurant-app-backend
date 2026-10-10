@@ -1,6 +1,8 @@
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.Basket.Commands.AddToBasketCommand;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.IntegrationTests.Features.Basket;
 
@@ -16,17 +18,19 @@ public class AddToBasketCommandValidatorTests
 
     private static AddToBasketCommand BuildCommand(
         string? specialInstructions = null,
-        List<SelectedMenuOptionDto>? selectedMenuOptions = null) => new(
+        List<SelectedMenuOptionDto>? selectedMenuOptions = null,
+        int quantity = 1,
+        List<SelectedSideItemDto>? selectedSideItems = null) => new(
             SessionId: "session-1",
             ProductId: Guid.NewGuid(),
             ProductVariationId: null,
             MenuId: null,
-            Quantity: 1,
+            Quantity: quantity,
             SpecialInstructions: specialInstructions,
             SelectedIngredients: null,
             AddedIngredients: null,
             IngredientQuantities: null,
-            SelectedSideItems: null,
+            SelectedSideItems: selectedSideItems,
             SelectedMenuOptions: selectedMenuOptions);
 
     [Fact]
@@ -125,6 +129,33 @@ public class AddToBasketCommandValidatorTests
     public void Validate_OptionQuantityWithinTheBound_Passes(int optionQuantity)
     {
         _validator.Validate(BuildCommandWithOptionQuantity(optionQuantity)).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_UsesConfiguredQuantityLimitForRootOptionsAndSides()
+    {
+        var validator = new AddToBasketCommandValidator(Options.Create(new BasketSettings
+        {
+            MaxQuantityPerItem = 3
+        }));
+        var command = BuildCommand(
+            quantity: 4,
+            selectedMenuOptions: [new SelectedMenuOptionDto
+            {
+                SectionId = Guid.NewGuid(),
+                ItemId = Guid.NewGuid(),
+                Quantity = 4
+            }],
+            selectedSideItems: [new SelectedSideItemDto { Id = Guid.NewGuid(), Quantity = 4 }]);
+
+        var result = validator.Validate(command);
+
+        result.Errors.Should().Contain(error => error.PropertyName == "Quantity"
+            && error.ErrorMessage == "Quantity cannot exceed 3");
+        result.Errors.Should().Contain(error => error.PropertyName == "SelectedMenuOptions[0].Quantity"
+            && error.ErrorMessage == "Menu option quantity cannot exceed 3");
+        result.Errors.Should().Contain(error => error.PropertyName == "SelectedSideItems[0].Quantity"
+            && error.ErrorMessage == "Side item quantity cannot exceed 3");
     }
 
     [Fact]

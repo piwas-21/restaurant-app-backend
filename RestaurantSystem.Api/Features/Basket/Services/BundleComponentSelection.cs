@@ -10,7 +10,8 @@ internal static class BundleComponentSelection
 {
     public static List<(SelectedSideItemDto Selection, decimal UnitPrice)> ResolveSides(
         Product component, Guid sectionItemId, List<SelectedSideItemDto>? selections,
-        IReadOnlyList<CustomerStepManifestStepDto>? manifestSteps, OrderType? orderType)
+        IReadOnlyList<CustomerStepManifestStepDto>? manifestSteps, OrderType? orderType,
+        int maxQuantityPerItem)
     {
         var hasAuthoredSideScreen = manifestSteps?.Any(step =>
             step.Kind == CustomerStepKind.BundleComponentSide
@@ -29,10 +30,11 @@ internal static class BundleComponentSelection
                 throw new BadRequestException("This component requires one or more suggested side items.");
             return [];
         }
-        if (selections.Any(selection => selection.Quantity <= 0 || selection.Quantity > 100)
+        if (selections.Any(selection => selection.Quantity <= 0 || selection.Quantity > maxQuantityPerItem)
             || selections.Select(selection => selection.SuggestedSideItemId ?? selection.Id)
                 .Distinct().Count() != selections.Count)
-            throw new BadRequestException("Component side selections must be unique and have positive quantities.");
+            throw new BadRequestException(
+                $"Component side selections must be unique with quantities from 1 to {maxQuantityPerItem}.");
 
         var result = new List<(SelectedSideItemDto Selection, decimal UnitPrice)>();
         foreach (var selection in selections)

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
@@ -8,6 +9,7 @@ using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Api.Settings;
 using System.Text.Json;
 
 namespace RestaurantSystem.Api.Features.Basket.Services;
@@ -24,15 +26,18 @@ public partial class BasketItemFactory : IBasketItemFactory
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILineCustomizationBuilder _lineCustomizationBuilder;
+    private readonly int _maxQuantityPerItem;
 
     public BasketItemFactory(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
-        ILineCustomizationBuilder lineCustomizationBuilder)
+        ILineCustomizationBuilder lineCustomizationBuilder,
+        IOptions<BasketSettings> basketSettings)
     {
         _context = context;
         _currentUserService = currentUserService;
         _lineCustomizationBuilder = lineCustomizationBuilder;
+        _maxQuantityPerItem = basketSettings.Value.MaxQuantityPerItem;
     }
 
     public void EnsureAtLeastMinimum(BasketItem line) =>

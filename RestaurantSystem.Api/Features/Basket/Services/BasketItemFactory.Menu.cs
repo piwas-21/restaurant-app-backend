@@ -165,7 +165,8 @@ public partial class BasketItemFactory
                 ingredientQuantities, preferProvidedQuantities: false,
                 options: LineCustomizationOptions.FromProduct(childProduct));
             var nestedSides = BundleComponentSelection.ResolveSides(
-                childProduct, sectionItem.Id, option.SelectedSideItems, customerSteps, basketOrderType);
+                childProduct, sectionItem.Id, option.SelectedSideItems, customerSteps,
+                basketOrderType, _maxQuantityPerItem);
             var nestedSidePrice = nestedSides.Sum(side => side.UnitPrice * side.Selection.Quantity);
 
             totalCustomizationPrice += childCustomization.CustomizationPrice * option.Quantity;
