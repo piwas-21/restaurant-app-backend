@@ -1,10 +1,12 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
+using RestaurantSystem.Api.Features.Basket.Services;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -26,9 +28,9 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 //    IngredientQuantities / SpecialInstructions through the cart DTO,
 //  - OrderItemFactory persists child IngredientQuantities and
 //    OrderMappingService derives IsRemoved for child order items.
-// Issue #151 (redesign slice 1): the per-option SelectedSideItems field was removed
-// from SelectedMenuOptionDto (bundle-child sides were never persisted or displayed);
-// the last test pins that a stale client still sending it is tolerated and ignored.
+// Issue #151 (redesign slice 1): legacy per-option side payloads were ignored because
+// bundle-child sides were not previously supported. Authored component-side screens
+// now use stable association IDs; the legacy no-screen payload remains ignored below.
 [Collection("Database Lane 2")]
 public class BundleChildIngredientCustomizationTests : IntegrationTestBase
 {
@@ -605,11 +607,8 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         result!.Data!.Total.Should().Be((MenuBasePrice + MainAdditional + DrinkAdditional) * 2 + 4.00m);
     }
 
-    // Slice 1 (#151): the per-option `SelectedSideItems` field was removed from
-    // SelectedMenuOptionDto (bundle-child sides were never persisted or displayed).
-    // A stale client that still sends it must not break — System.Text.Json ignores
-    // the unknown property and the child is built from its ingredient customization
-    // only. Sent as raw JSON because the typed DTO no longer carries the field.
+    // Legacy component-side requests without configured side associations or an
+    // authored side screen remain ignored; they must not create child side snapshots.
     [Fact]
     public async Task BundleChild_LegacyPerOptionSelectedSideItems_AreAcceptedAndIgnored()
     {
@@ -639,8 +638,11 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         var response = await Client.PostAsync("/api/basket/items", content);
 
-        // The unknown per-option side field is tolerated — the request still succeeds.
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        // The legacy per-option side field is tolerated — the request still succeeds.
+        response.StatusCode.Should().Be(
+            HttpStatusCode.OK,
+            "the legacy per-option side field should be ignored; response was {0}",
+            await response.Content.ReadAsStringAsync());
 
         var basket = await ReadResponseAsync<ApiResponse<BasketDto>>(response);
         var pizzaChild = GetChildItem(basket!.Data!, _menuProduct.Id, _testPizza.Id);
@@ -655,6 +657,27 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var childRow = await context.BasketItems.SingleAsync(bi => bi.Id == pizzaChild.Id);
         childRow.SelectedSideItemsJson.Should().BeNull();
+    }
+
+    [Fact]
+    public void BundleComponentSide_ExplicitAssociationWithoutMembershipIsRejected()
+    {
+        var component = new Product { Id = Guid.NewGuid(), CreatedBy = "Test" };
+        var selection = new SelectedSideItemDto
+        {
+            Id = Guid.NewGuid(),
+            SuggestedSideItemId = Guid.NewGuid(),
+            Quantity = 1
+        };
+
+        var act = () => BundleComponentSelection.ResolveSides(
+            component,
+            Guid.NewGuid(),
+            [selection],
+            manifestSteps: null,
+            orderType: null);
+
+        act.Should().Throw<BadRequestException>();
     }
 
     [Fact]

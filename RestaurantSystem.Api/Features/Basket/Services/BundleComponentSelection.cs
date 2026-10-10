@@ -12,6 +12,17 @@ internal static class BundleComponentSelection
         Product component, Guid sectionItemId, List<SelectedSideItemDto>? selections,
         IReadOnlyList<CustomerStepManifestStepDto>? manifestSteps, OrderType? orderType)
     {
+        var hasAuthoredSideScreen = manifestSteps?.Any(step =>
+            step.Kind == CustomerStepKind.BundleComponentSide
+            && step.SectionItemId == sectionItemId
+            && step.ProductId == component.Id) == true;
+        var hasExplicitAssociationReference = selections?.Any(selection =>
+            selection.SuggestedSideItemId.HasValue) == true;
+        if (component.SuggestedSideItems.Count == 0
+            && !hasAuthoredSideScreen
+            && !hasExplicitAssociationReference)
+            return [];
+
         if (selections is null or { Count: 0 })
         {
             if (component.SuggestedSideItems.Any(side => side.IsRequired))

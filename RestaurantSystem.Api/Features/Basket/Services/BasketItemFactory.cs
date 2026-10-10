@@ -144,7 +144,15 @@ public partial class BasketItemFactory : IBasketItemFactory
             {
                 var sideItem = sideItems.FirstOrDefault(s => s.Id == selectedSide.Id);
                 if (sideItem is null)
+                {
+                    // Older clients could submit unassociated side product IDs. Before stable
+                    // association IDs existed, unresolved suggestions were filtered out silently.
+                    // Keep that behavior only for products with no configured side associations.
+                    if (selectedSide.SuggestedSideItemId is null && memberships.Count == 0)
+                        continue;
+
                     throw new BadRequestException("A selected side is no longer available.");
+                }
                 var sideVariation = selectedSide.ProductVariationId.HasValue
                     ? sideItem.Variations.FirstOrDefault(row => row.Id == selectedSide.ProductVariationId.Value)
                     : null;
