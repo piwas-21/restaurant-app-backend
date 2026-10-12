@@ -208,6 +208,25 @@ main                    ← production RELEASES ONLY; updated solely via a devel
 - One issue = one branch. Delete branch after merge (`gh pr merge --delete-branch`).
 - Branch naming: `feature/`, `fix/`, `chore/`, `docs/`, `test/`.
 
+### Preserve release ancestry under strict branch checks
+
+The `main-develop` ruleset requires the PR branch to include its target branch's latest commit.
+A production release creates a merge commit on `main`; identical file trees do not bring that
+commit back to `develop`. A later `develop` → `main` release can therefore be `BEHIND` even
+when its only runtime changes are the intended feature.
+
+After a release, or before promoting a branch that lacks current production ancestry, create a
+`chore/` branch from `develop` in an isolated worktree and merge `origin/main` into it. Review the
+parents and file diff, then open the branch's PR to `develop` through the normal push review and
+CI gates. Merge with the workspace's `scripts/pr-merge-gate.sh`; its backmerge detection retains
+a **merge commit** so production ancestry survives. A squash would discard that relationship.
+Then re-check the release diff and all required gates before merging the `develop` → `main` PR.
+
+Keep the shared clones untouched. Never push directly to `develop` or `main`, weaken branch
+protection, or use `gh pr update-branch` to skip the local review gate. If Sonar reports an
+unanalysed PR scope (`NONE` or no populated conditions), obtain a real analysis before merging;
+an empty issue response alone does not satisfy the gate.
+
 ### Commit messages
 
 Format: `type(scope): description`
