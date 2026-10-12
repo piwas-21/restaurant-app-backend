@@ -9481,6 +9481,26 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("theme_palette_key");
 
+                    b.Property<string>("TipPresetCurrency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("tip_preset_currency");
+
+                    b.Property<string>("TipPresetMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("percentage")
+                        .HasColumnName("tip_preset_mode");
+
+                    b.PrimitiveCollection<int[]>("TipPresetValues")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer[]")
+                        .HasDefaultValue(new[] { 10, 15, 20 })
+                        .HasColumnName("tip_preset_values");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");

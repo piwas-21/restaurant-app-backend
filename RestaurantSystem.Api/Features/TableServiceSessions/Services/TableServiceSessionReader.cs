@@ -235,7 +235,7 @@ public sealed partial class TableServiceSessionReader : ITableServiceSessionRead
                 && bill.EligibleOutstanding > _paymentTolerance && !hasPendingHandoff,
             HasPendingPaymentHandoff = hasPendingHandoff,
             CanClose = isOpen && assessment.CanClose && !hasPendingHandoff,
-            CanReleaseTable = isOpen && !isTableReleased && !hasPendingHandoff
+            CanReleaseTable = isOpen && !isTableReleased
                 && assessment.LegacyActiveOrderCount == 0,
             HasUnassignedActiveOrders = assessment.LegacyActiveOrderCount > 0,
             LegacyActiveOrderCount = assessment.LegacyActiveOrderCount,

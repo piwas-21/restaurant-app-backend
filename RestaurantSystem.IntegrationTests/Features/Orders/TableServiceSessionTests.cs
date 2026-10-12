@@ -845,16 +845,35 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         crossSession.Data.Payments.Should().BeEmpty();
     }
 
-    [Fact]
-    public async Task Releasing_a_table_preserves_payable_visit_and_allows_a_new_visit_on_the_same_table()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Releasing_a_table_preserves_payable_visit_and_allows_a_new_visit_on_the_same_table(bool markReady, bool pendingHandoff)
     {
         var tableId = await SeedTableAsync("47");
         var sessionId = await SeedStableSessionAsync(tableId);
         var orderId = await SeedStableOrderAsync(sessionId, tableId, "47", 18m, Utc(12, 0));
+        var handoffOperationId = Guid.NewGuid();
         TableServiceSessionDto released;
 
         await using (var context = _fixture.CreateContext())
         {
+            if (pendingHandoff)
+            {
+                context.TableServicePaymentHandoffs.Add(new TableServicePaymentHandoff
+                {
+                    ServiceSessionId = sessionId,
+                    OperationId = handoffOperationId,
+                    ExpectedVersion = 1,
+                    RequestedAmount = 18m,
+                    RequestedCurrency = "CHF",
+                    RequestedAt = Utc(12, 0),
+                    CreatedAt = Utc(12, 0),
+                    CreatedBy = "server-test"
+                });
+                await context.SaveChangesAsync();
+            }
             var reader = SessionReader(context);
             var current = new Mock<ICurrentUserService>();
             current.Setup(value => value.GetAuditIdentifier()).Returns("cashier-test");
@@ -868,6 +887,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
             {
                 ServiceSessionId = sessionId,
                 ExpectedVersion = 1,
+                MarkReady = markReady,
             }, CancellationToken.None);
 
             result.Success.Should().BeTrue();
@@ -890,6 +910,16 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
             oldVisit.Status.Should().Be(TableServiceSessionStatus.Open);
             oldVisit.ReleasedAt.Should().NotBeNull();
             oldVisit.Version.Should().Be(2);
+            if (pendingHandoff)
+            {
+                var handoff = await context.TableServicePaymentHandoffs.SingleAsync(value => value.ServiceSessionId == sessionId);
+                handoff.Status.Should().Be(TableServicePaymentHandoffStatus.Requested);
+                handoff.OperationId.Should().Be(handoffOperationId);
+                handoff.RequestedAmount.Should().Be(18m);
+            }
+            var table = await context.Tables.SingleAsync(value => value.Id == tableId);
+            table.ReadinessState.Should().Be(markReady ? TableReadinessState.ReadyForGuests : TableReadinessState.NeedsReset);
+            table.ReadinessVersion.Should().BeGreaterThan(1);
             (await context.Orders.SingleAsync(value => value.Id == orderId)).ServiceSessionId.Should().Be(sessionId);
         }
 
