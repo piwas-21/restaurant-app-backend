@@ -246,6 +246,8 @@ jobs:
         with:
           name: test-results-shard-${{ matrix.shard }}
           path: test-results/
+          # A retry must replace its failed attempt's incomplete count/report bundle.
+          overwrite: true
 
   # Aggregate for the sharded suite. THIS job carries the required check name
   # "dotnet test (integration)" — the per-shard jobs are suffixed with their shard
