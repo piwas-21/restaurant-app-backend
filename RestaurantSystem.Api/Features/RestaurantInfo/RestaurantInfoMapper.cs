@@ -45,7 +45,8 @@ public static class RestaurantInfoMapper
             info.Currency,
             info.BundlePresentationMode == Domain.Common.Enums.BundlePresentationMode.CategoryOffers
                 ? "categoryOffers"
-                : "legacySeparate");
+                : "legacySeparate",
+            new TipPreferencesDto(info.TipPresetMode, info.TipPresetValues, info.TipPresetCurrency));
 
     /// <summary>
     /// Joins a stored logo path onto the storage base URL, collapsing "no logo" to null.

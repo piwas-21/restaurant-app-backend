@@ -26,7 +26,8 @@ public record RestaurantInfoDto(
     /// </summary>
     string? Currency,
     /// <summary>Serialised as <c>legacySeparate</c> or <c>categoryOffers</c>.</summary>
-    string BundlePresentationMode);
+    string BundlePresentationMode,
+    TipPreferencesDto? TipPreferences = null);
 
 /// <summary>Which of the two stored logos an upload or delete is addressing.</summary>
 /// <remarks>

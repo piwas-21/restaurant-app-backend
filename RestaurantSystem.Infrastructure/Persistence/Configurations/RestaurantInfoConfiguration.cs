@@ -47,6 +47,9 @@ public class RestaurantInfoConfiguration : IEntityTypeConfiguration<RestaurantIn
         // ("no display currency declared"), not a default to paper over — the resolver on the
         // order side must be able to tell "unset" from a value.
         builder.Property(r => r.Currency).HasMaxLength(3);
+        builder.Property(r => r.TipPresetMode).HasMaxLength(16).HasDefaultValue("percentage");
+        builder.Property(r => r.TipPresetValues).HasColumnType("integer[]").HasDefaultValue(new[] { 10, 15, 20 });
+        builder.Property(r => r.TipPresetCurrency).HasMaxLength(3);
         // Percent coordinates (0–100) — 2 decimal places is ample granularity.
 
         builder.HasMany(r => r.PhoneNumbers)
