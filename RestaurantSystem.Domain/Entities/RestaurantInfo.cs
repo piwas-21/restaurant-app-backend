@@ -3,12 +3,7 @@ using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
-/// <summary>
-/// Restaurant identity + contact details. Singleton table — exactly one row
-/// is expected; seeded by migration from the current i18n fallback values
-/// so the deploy is non-breaking. Replaces hardcoded i18n keys
-/// (rumi_address_*, rumi_phone_number) with admin-editable data.
-/// </summary>
+/// <summary>Tenant identity and public preferences; a singleton seeded during provisioning.</summary>
 public class RestaurantInfo : Entity
 {
     public required string Name { get; set; }
@@ -84,6 +79,10 @@ public class RestaurantInfo : Entity
     /// tenant traded in EUR). Display metadata only; pricing and rounding are untouched.
     /// </summary>
     public string? Currency { get; set; }
+
+    public string TipPresetMode { get; set; } = "percentage";
+    public int[] TipPresetValues { get; set; } = [10, 15, 20];
+    public string? TipPresetCurrency { get; set; }
 
     public virtual ICollection<RestaurantPhoneNumber> PhoneNumbers { get; set; } = new List<RestaurantPhoneNumber>();
     public virtual ICollection<RestaurantLandingContent> LandingContents { get; set; } = new List<RestaurantLandingContent>();

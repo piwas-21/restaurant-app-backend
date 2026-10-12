@@ -20,6 +20,9 @@ public sealed record ReleaseTableServiceSessionCommand : ICommand<ApiResponse<Ta
 
     [JsonRequired]
     public int ExpectedVersion { get; init; }
+
+    /// <summary>Staff confirms the empty table has been cleaned for the next guests.</summary>
+    public bool MarkReady { get; init; }
 }
 
 public sealed class ReleaseTableServiceSessionCommandHandler
@@ -70,9 +73,8 @@ public sealed class ReleaseTableServiceSessionCommandHandler
         }
 
         if (session.Version != command.ExpectedVersion) return Stale(session.Version);
-        if (await TableServicePaymentHandoffRules.HasPendingAsync(
-                _context, session.Id, cancellationToken))
-            return Refused("Resolve the pending cashier collection request before releasing this table.");
+        // A handoff is a request to collect this visit's debt, not evidence of physical occupancy.
+        // Keep it on the released visit for the cashier; no money or allocation changes here.
         var currentVisit = await _reader.ReadAsync(session.Id, cancellationToken);
         if (currentVisit?.HasUnassignedActiveOrders == true)
             return Refused("Resolve the unassigned legacy orders before releasing this table.");
@@ -81,7 +83,8 @@ public sealed class ReleaseTableServiceSessionCommandHandler
         await _guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
         if (locked.Table is not null)
         {
-            locked.Table.ReadinessState = TableReadinessState.NeedsReset;
+            locked.Table.ReadinessState = command.MarkReady
+                ? TableReadinessState.ReadyForGuests : TableReadinessState.NeedsReset;
             locked.Table.ReadinessVersion++;
         }
 
