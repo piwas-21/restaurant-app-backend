@@ -1,3 +1,4 @@
+using RestaurantSystem.IntegrationTests.Common;
 using System.Data.Common;
 using System.Globalization;
 using FluentAssertions;
@@ -435,7 +436,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var assembler = new TableBillAssembler(
             context,
             new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-                NullLogger<OrderMappingService>.Instance),
+                NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc),
             NullLogger<TableBillAssembler>.Instance);
         var sessions = await new TableServiceSessionReader(context, assembler)
             .ReadActiveAsync(CancellationToken.None);
@@ -467,7 +468,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var assembler = new TableBillAssembler(
             context,
             new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-                NullLogger<OrderMappingService>.Instance),
+                NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc),
             NullLogger<TableBillAssembler>.Instance);
         var sessions = await new TableServiceSessionReader(context, assembler)
             .ReadActiveAsync(CancellationToken.None);
@@ -779,7 +780,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         {
             var reader = new TableServiceSessionReader(context, new TableBillAssembler(context,
                 new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-                    NullLogger<OrderMappingService>.Instance), NullLogger<TableBillAssembler>.Instance));
+                    NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc), NullLogger<TableBillAssembler>.Instance));
             var account = await reader.ReadAsync(sessionId, CancellationToken.None);
             account!.CanClose.Should().BeTrue();
             account.Outstanding.Should().Be(0m);
@@ -825,7 +826,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         await using var context = _fixture.CreateContext();
         var mapping = new OrderMappingService(
             context, new OrderDisplayCurrencyResolver(context),
-            NullLogger<OrderMappingService>.Instance);
+            NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc);
         var assembler = new TableBillAssembler(context, mapping, NullLogger<TableBillAssembler>.Instance);
         var reader = new TableServiceSessionReader(context, assembler);
         var handler = new GetTableServiceSessionPaymentOperationQueryHandler(context, reader, mapping);
@@ -1329,14 +1330,14 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var mapping = new OrderMappingService(
             context,
             new OrderDisplayCurrencyResolver(context),
-            NullLogger<OrderMappingService>.Instance);
+            NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc);
         return new TableBillAssembler(context, mapping, NullLogger<TableBillAssembler>.Instance);
     }
 
     private static TableServiceSessionReader SessionReader(ApplicationDbContext context)
     {
         var mapping = new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-            NullLogger<OrderMappingService>.Instance);
+            NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc);
         return new TableServiceSessionReader(context,
             new TableBillAssembler(context, mapping, NullLogger<TableBillAssembler>.Instance));
     }
@@ -1357,7 +1358,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var assembler = new TableBillAssembler(
             context,
             new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-                NullLogger<OrderMappingService>.Instance),
+                NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc),
             NullLogger<TableBillAssembler>.Instance);
         var reader = new TableServiceSessionReader(context, assembler);
         var handler = new AddTableServiceSessionPaymentCommandHandler(
@@ -1386,7 +1387,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var assembler = new TableBillAssembler(
             context,
             new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-                NullLogger<OrderMappingService>.Instance),
+                NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc),
             NullLogger<TableBillAssembler>.Instance);
         var reader = new TableServiceSessionReader(context, assembler);
         var writer = new Mock<ITableServiceSessionPaymentWriter>();
@@ -1421,7 +1422,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var assembler = new TableBillAssembler(
             context,
             new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-                NullLogger<OrderMappingService>.Instance),
+                NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc),
             NullLogger<TableBillAssembler>.Instance);
         var reader = new TableServiceSessionReader(context, assembler);
         return await new CloseTableServiceSessionCommandHandler(
@@ -1721,7 +1722,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     {
         var mapping = new OrderMappingService(
             context, new OrderDisplayCurrencyResolver(context),
-            NullLogger<OrderMappingService>.Instance);
+            NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc);
         var assembler = new TableBillAssembler(
             context, mapping, NullLogger<TableBillAssembler>.Instance);
         var current = new Mock<ICurrentUserService>();
@@ -1739,7 +1740,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     {
         var mapping = new OrderMappingService(
             context, new OrderDisplayCurrencyResolver(context),
-            NullLogger<OrderMappingService>.Instance);
+            NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc);
         var assembler = new TableBillAssembler(
             context, mapping, NullLogger<TableBillAssembler>.Instance);
         var current = new Mock<ICurrentUserService>();

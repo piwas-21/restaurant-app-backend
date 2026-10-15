@@ -106,10 +106,20 @@ public sealed class OrderConfirmationFlowTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
         body.Data!.Status.Should().Be(expectedStatus.ToString());
+        body.Data.EffectivePreparationMinutes.Should().Be(preparationMinutes,
+            "the authorized cashier value overrides the frozen catalogue estimate, including zero");
+        if (expectedStatus == OrderStatus.Confirmed)
+        {
+            body.Data.ExpectedReadyAt.Should().NotBeNull();
+        }
+        else
+        {
+            body.Data.ExpectedReadyAt.Should().BeNull("pending approval has no active countdown");
+        }
     }
 
     [Fact]
-    public async Task Confirm_now_uses_the_configured_default_preparation_time()
+    public async Task Explicit_zero_override_confirms_with_an_immediate_ready_time()
     {
         var (orderId, _, _) = await PlaceTakeawayOrder();
         AuthenticateAsAdmin();
@@ -123,19 +133,29 @@ public sealed class OrderConfirmationFlowTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
         body.Data!.Status.Should().Be(OrderStatus.Confirmed.ToString());
-        body.Data!.EstimatedDeliveryTime.Should().BeOnOrAfter(beforeApproval.AddMinutes(20));
-        body.Data!.EstimatedDeliveryTime.Should().BeBefore(DateTime.UtcNow.AddMinutes(20).AddSeconds(10));
+        body.Data.EffectivePreparationMinutes.Should().Be(0,
+            "a numeric zero is an explicit immediate-ready override, not an omitted value");
+        body.Data.ExpectedReadyAt.Should().NotBeNull();
+        body.Data.ExpectedReadyAt!.Value.Should()
+            .BeOnOrAfter(beforeApproval)
+            .And.BeOnOrBefore(DateTime.UtcNow.AddSeconds(10));
+        body.Data.EstimatedDeliveryTime.Should().Be(body.Data.ExpectedReadyAt);
     }
 
     [Fact]
-    public async Task Approval_endpoint_rejects_an_omitted_preparation_time()
+    public async Task Approval_without_an_override_uses_the_frozen_product_estimate()
     {
         var (orderId, _, _) = await PlaceTakeawayOrder();
         AuthenticateAsAdmin();
 
         var response = await Client.PostAsJsonAsync($"/api/orders/{orderId}/approve", new { });
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+        body.Data!.EffectivePreparationMinutes.Should().Be(20,
+            "the product snapshot is known, so the configured workflow fallback must not replace it");
+        body.Data.Status.Should().Be(OrderStatus.PendingApproval.ToString());
+        body.Data.ExpectedReadyAt.Should().BeNull("long preparation remains pending approval");
     }
 
     [Fact]

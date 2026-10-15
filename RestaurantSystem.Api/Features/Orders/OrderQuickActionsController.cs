@@ -127,6 +127,7 @@ public class OrderQuickActionsController : ControllerBase
                 OrderId = order.Id,
                 NewStatus = newStatus,
                 EstimatedPreparationMinutes = minutes,
+                TrustedPreparationOverride = true,
                 Notes = statusNote,
             });
 

@@ -52,6 +52,54 @@ public sealed class CashierOrderGroupsTests(DatabaseFixture databaseFixture) : I
     }
 
     [Fact]
+    public async Task Current_day_group_filter_keeps_prior_day_visit_balance_in_full_membership()
+    {
+        const string priorOrderNumber = "202602010001";
+        const string currentOrderNumber = "202602020001";
+        var priorDate = new DateOnly(2026, 2, 1);
+        var currentDate = new DateOnly(2026, 2, 2);
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var session = new TableServiceSession
+        {
+            Id = Guid.NewGuid(),
+            TableNumber = 799,
+            Currency = "CHF",
+            OpenedAt = new DateTime(2026, 2, 1, 11, 0, 0, DateTimeKind.Utc),
+            CreatedBy = nameof(CashierOrderGroupsTests)
+        };
+        context.TableServiceSessions.Add(session);
+        var priorOrder = NewOrder(priorOrderNumber, session, 0);
+        priorOrder.OrderDate = new DateTime(2026, 2, 1, 12, 0, 0, DateTimeKind.Utc);
+        priorOrder.CreatedAt = priorOrder.OrderDate;
+        priorOrder.Status = OrderStatus.Completed;
+        priorOrder.Total = 10m;
+        priorOrder.TotalPaid = 0m;
+        priorOrder.RemainingAmount = 10m;
+        var currentOrder = NewOrder(currentOrderNumber, session, 1);
+        currentOrder.OrderDate = new DateTime(2026, 2, 2, 12, 0, 0, DateTimeKind.Utc);
+        currentOrder.CreatedAt = currentOrder.OrderDate;
+        currentOrder.Total = 5m;
+        currentOrder.TotalPaid = 0m;
+        currentOrder.RemainingAmount = 5m;
+        context.Orders.AddRange(priorOrder, currentOrder);
+        await context.SaveChangesAsync();
+
+        var result = await Read(
+            $"scope=Operational&tenantDay={currentDate:yyyy-MM-dd}&search={currentOrderNumber}&pageSize=10");
+
+        result.Items.Should().ContainSingle();
+        var visit = result.Items.Single();
+        visit.ServiceSessionId.Should().Be(session.Id);
+        visit.Orders.Select(order => order.OrderNumber)
+            .Should().Equal(priorOrderNumber, currentOrderNumber);
+        visit.Orders.Single(order => order.OrderNumber == priorOrderNumber).BusinessDate.Should().Be(priorDate);
+        visit.Orders.Single(order => order.OrderNumber == priorOrderNumber).RemainingAmount.Should().Be(10m);
+        visit.Orders.Sum(order => order.RemainingAmount).Should().Be(15m,
+            "the date filter chooses which visit is visible, not which unpaid rounds contribute to its balance");
+    }
+
+    [Fact]
     public async Task Closed_visit_children_keep_original_order_identity_and_are_separate_rows()
     {
         var result = await Read("search=GRP-CLOSED&pageSize=10");

@@ -195,7 +195,11 @@ internal static class KitchenBoardOrderStream
                 completed?.CreatedAt,
                 canComplete,
                 routes,
-                MapItems(order.Items, request.Logger));
+                MapItems(order.Items, request.Logger))
+            {
+                DailyOrderNumber = order.DailyOrderNumber,
+                BusinessDate = order.BusinessDate
+            };
         }).ToList();
     }
 

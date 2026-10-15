@@ -20,6 +20,7 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
     private readonly ISettlementNotifier _notifier;
     private readonly ICurrentUserService _currentUser;
     private readonly ILogger<CheckoutSettlementWriter> _logger;
+    private readonly IOrderPreparationService _preparation;
 
     public CheckoutSettlementWriter(
         ApplicationDbContext context,
@@ -27,7 +28,8 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
         IOrderFidelityCoordinator fidelity,
         ISettlementNotifier notifier,
         ICurrentUserService currentUser,
-        ILogger<CheckoutSettlementWriter> logger)
+        ILogger<CheckoutSettlementWriter> logger,
+        IOrderPreparationService preparation)
     {
         _context = context;
         _paymentBuilder = paymentBuilder;
@@ -35,6 +37,7 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
         _notifier = notifier;
         _currentUser = currentUser;
         _logger = logger;
+        _preparation = preparation;
     }
 
     /// <inheritdoc />
@@ -118,7 +121,7 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
                     order, session, paymentIntentId, amountReceivedMinor, auditId, now);
                 _paymentBuilder.UpdatePaymentSummary(order);
 
-                confirmed = ConfirmIfDeferred(order);
+                confirmed = await ConfirmIfDeferredAsync(order, cancellationToken);
 
                 account?.RecordAccountChange();
                 await _context.SaveChangesAsync(cancellationToken);
@@ -185,15 +188,19 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
     /// transition the lifecycle forbids.
     /// </para>
     /// </remarks>
-    private bool ConfirmIfDeferred(Order order)
+    private async Task<bool> ConfirmIfDeferredAsync(Order order, CancellationToken cancellationToken)
     {
-        if (!order.IsKitchenReleased || order.Type != OrderType.DineIn || !order.TableNumber.HasValue ||
+        if (!order.IsKitchenReleased || order.ExternalReference is not null
+            || order.Type != OrderType.DineIn || !order.TableNumber.HasValue ||
             !OrderStatusTransitions.IsValid(order.Status, OrderStatus.Confirmed))
         {
             return false;
         }
 
         var now = DateTime.UtcNow;
+        var preparationMinutes = await _preparation.ApplyAcceptedAsync(
+            order, null, now, cancellationToken);
+        order.EstimatedDeliveryTime = now.AddMinutes(preparationMinutes);
         var auditId = _currentUser.GetAuditIdentifier();
 
         order.StatusHistory.Add(new OrderStatusHistory

@@ -39,7 +39,7 @@ public class OrderFactory : IOrderFactory
         // Non-null only when a staff member was warned and allowed through anyway (§9.6).
         var channelOverride = await _channelGuard.EnsureOrderableAsync(command.Items, command.Type, cancellationToken);
 
-        var orderNumber = await _orderNumbers.GenerateAsync(cancellationToken);
+        var allocation = await _orderNumbers.GenerateAsync(cancellationToken);
         var auditId = _currentUserService.GetAuditIdentifier();
         var now = DateTime.UtcNow;
         // Holds Dine-in at Pending so an unpaid order never reaches the kitchen feed.
@@ -47,7 +47,9 @@ public class OrderFactory : IOrderFactory
         var order = new Order
         {
             Id = Guid.NewGuid(),
-            OrderNumber = orderNumber,
+            OrderNumber = allocation.OrderNumber,
+            BusinessDate = allocation.BusinessDate,
+            DailyOrderNumber = allocation.DailyOrderNumber,
             // Minted for every order, not just the ones that trigger an admin email: which
             // orders get mailed is a runtime decision made later and elsewhere, and an order
             // that reaches the template without a token would render dead links.

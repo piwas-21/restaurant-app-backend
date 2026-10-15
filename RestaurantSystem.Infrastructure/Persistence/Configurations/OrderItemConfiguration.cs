@@ -8,7 +8,9 @@ public class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
 {
     public void Configure(EntityTypeBuilder<OrderItem> builder)
     {
-        builder.ToTable("OrderItems");
+        builder.ToTable("OrderItems", table => table.HasCheckConstraint(
+            "ck_order_items_preparation_snapshot_nonnegative",
+            "preparation_time_minutes_snapshot IS NULL OR preparation_time_minutes_snapshot >= 0"));
 
         builder.Property(i => i.ProductName)
             .IsRequired()

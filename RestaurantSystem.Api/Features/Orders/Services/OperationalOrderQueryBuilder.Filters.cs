@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
@@ -11,6 +12,8 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 
 internal static partial class OperationalOrderQueryBuilder
 {
+    private const int FullOrderReferenceMinimumLength = 8;
+
     private static IQueryable<Order> CreateBaseQuery(ApplicationDbContext context) =>
         context.Orders
             .IncludeOrderLineGraph()
@@ -80,14 +83,30 @@ internal static partial class OperationalOrderQueryBuilder
     private static IQueryable<Order> ApplySearchFilter(
         IQueryable<Order> orders, GetOrdersQuery query)
     {
-        if (string.IsNullOrEmpty(query.Search))
+        var rawSearch = query.Search?.Trim();
+        if (string.IsNullOrEmpty(rawSearch))
         {
             return orders;
         }
 
-        var search = query.Search.ToLower();
+        var search = rawSearch.ToLowerInvariant();
+        var isExplicitDailyNumber = search.StartsWith('#');
+        var numericSearch = isExplicitDailyNumber ? search[1..].Trim() : search;
+        var hasDailyNumber = long.TryParse(
+                numericSearch, NumberStyles.None, CultureInfo.InvariantCulture, out var dailyNumber)
+            && dailyNumber > 0
+            && (isExplicitDailyNumber || numericSearch.Length < FullOrderReferenceMinimumLength);
+        if (isExplicitDailyNumber && hasDailyNumber)
+        {
+            return orders.Where(order => order.DailyOrderNumber == dailyNumber);
+        }
+
+        // Short cashier numbers must not substring-match the date prefix in OrderNumber.
         return orders.Where(order =>
-            order.OrderNumber.ToLower().Contains(search)
+            (hasDailyNumber && order.DailyOrderNumber == dailyNumber)
+            || (hasDailyNumber
+                ? order.OrderNumber == search
+                : order.OrderNumber.ToLower().Contains(search))
             || (order.ExternalReference != null && order.ExternalReference.ExternalDisplayId.ToLower().Contains(search))
             || (order.CustomerName != null && order.CustomerName.ToLower().Contains(search))
             || (order.CustomerEmail != null && order.CustomerEmail.ToLower().Contains(search))

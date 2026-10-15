@@ -43,6 +43,8 @@ internal sealed class ServerTaskProjector : IServerTaskProjector
         {
             OrderId = order.Id,
             OrderNumber = order.OrderNumber,
+            DailyOrderNumber = order.DailyOrderNumber,
+            BusinessDate = order.BusinessDate,
             OrderType = order.Type,
             Status = order.Status,
             Bucket = bucket,

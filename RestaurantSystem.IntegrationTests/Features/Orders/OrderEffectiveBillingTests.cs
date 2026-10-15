@@ -1,3 +1,4 @@
+using RestaurantSystem.IntegrationTests.Common;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -40,7 +41,7 @@ public sealed class OrderEffectiveBillingTests
         using var context = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql("Host=localhost;Database=unused_billing_model;Username=test;Password=test").Options);
         var mapper = new OrderMappingService(context, Mock.Of<IOrderDisplayCurrencyResolver>(),
-            NullLogger<OrderMappingService>.Instance);
+            NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc);
         var detail = mapper.MapToOrderDto(source);
         var summary = mapper.MapToOrderSummaryDto(source);
 

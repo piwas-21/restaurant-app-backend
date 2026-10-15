@@ -220,7 +220,11 @@ internal static class KitchenBoardCorrectionStream
                 && route.DeviceId is null,
             !target.HasValue ? "Unrouted" : route?.Status.ToString() ?? "Unrouted",
             note.CreatedAt,
-            changes);
+            changes)
+        {
+            DailyOrderNumber = order.DailyOrderNumber,
+            BusinessDate = order.BusinessDate
+        };
     }
 
     private static List<KitchenBoardChangeDto> MapChanges(string? json) =>

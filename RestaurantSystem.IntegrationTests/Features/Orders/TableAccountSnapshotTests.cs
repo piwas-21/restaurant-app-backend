@@ -1,3 +1,4 @@
+using RestaurantSystem.IntegrationTests.Common;
 using System.Data.Common;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +58,7 @@ public sealed class TableAccountSnapshotTests(DatabaseFixture fixture) : Integra
         await using var context = DatabaseFixture.CreateContext(gate);
         var assembler = new TableBillAssembler(context,
             new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-                NullLogger<OrderMappingService>.Instance), NullLogger<TableBillAssembler>.Instance);
+                NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc), NullLogger<TableBillAssembler>.Instance);
         var reader = new TableServiceSessionReader(context, assembler);
         var read = ReadBillAsync();
         await gate.Arrived.Task.WaitAsync(TimeSpan.FromSeconds(5));

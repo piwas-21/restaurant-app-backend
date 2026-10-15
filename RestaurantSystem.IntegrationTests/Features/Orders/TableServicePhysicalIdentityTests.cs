@@ -1,3 +1,4 @@
+using RestaurantSystem.IntegrationTests.Common;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -105,7 +106,7 @@ public sealed class TableServicePhysicalIdentityTests(DatabaseFixture fixture) :
     private static TableServiceSessionReader SessionReader(ApplicationDbContext context)
     {
         var mapping = new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-            NullLogger<OrderMappingService>.Instance);
+            NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc);
         var assembler = new TableBillAssembler(context, mapping, NullLogger<TableBillAssembler>.Instance);
         return new TableServiceSessionReader(context, assembler);
     }

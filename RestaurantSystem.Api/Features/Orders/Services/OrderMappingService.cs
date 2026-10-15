@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -10,15 +11,18 @@ public partial class OrderMappingService : IOrderMappingService
     private readonly ApplicationDbContext _context;
     private readonly IOrderDisplayCurrencyResolver _currencyResolver;
     private readonly ILogger<OrderMappingService> _logger;
+    private readonly ITenantClock _clock;
 
     public OrderMappingService(
         ApplicationDbContext context,
         IOrderDisplayCurrencyResolver currencyResolver,
-        ILogger<OrderMappingService> logger)
+        ILogger<OrderMappingService> logger,
+        ITenantClock clock)
     {
         _context = context;
         _currencyResolver = currencyResolver;
         _logger = logger;
+        _clock = clock;
     }
 
     public OrderDto MapToOrderDto(Order order)
@@ -44,6 +48,11 @@ public partial class OrderMappingService : IOrderMappingService
         {
             Id = order.Id,
             OrderNumber = order.OrderNumber,
+            BusinessDate = order.BusinessDate,
+            DailyOrderNumber = order.DailyOrderNumber,
+            EffectivePreparationMinutes = order.EffectivePreparationMinutes,
+            ExpectedReadyAt = order.ExpectedReadyAt,
+            BusinessTimeZoneId = _clock.TimeZone.Id,
             ExternalOrder = ExternalOrderProjection.Map(order),
             GuestStatusToken = order.GuestStatusToken,
             UserId = order.UserId,

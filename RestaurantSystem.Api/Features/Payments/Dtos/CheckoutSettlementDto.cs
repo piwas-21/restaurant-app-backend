@@ -3,7 +3,8 @@ using RestaurantSystem.Domain.Entities;
 namespace RestaurantSystem.Api.Features.Payments.Dtos;
 
 /// <summary>
-/// What settling a checkout session tells the caller. Three fields and no more, because the
+/// What settling a checkout session tells the caller. Only the order identity and resulting state,
+/// because the
 /// endpoint that will return it (S9's <c>checkout-status</c>) is ANONYMOUS — a diner coming back
 /// from Stripe has no account — so anything here is readable by anyone holding a session id.
 /// </summary>
@@ -14,6 +15,8 @@ namespace RestaurantSystem.Api.Features.Payments.Dtos;
 public record CheckoutSettlementDto
 {
     public required string OrderNumber { get; init; }
+    public required long DailyOrderNumber { get; init; }
+    public required DateOnly BusinessDate { get; init; }
 
     /// <summary>The ORDER's aggregate payment state, not the tender's — <c>Pending</c> until settled.</summary>
     public required string PaymentStatus { get; init; }
@@ -31,6 +34,8 @@ public record CheckoutSettlementDto
         return new CheckoutSettlementDto
         {
             OrderNumber = order.OrderNumber,
+            DailyOrderNumber = order.DailyOrderNumber,
+            BusinessDate = order.BusinessDate,
             // Enum NAMES, matching how every other status crosses this wire
             // (StringEnumConverterFactory) and what the frontend's unions are written against.
             PaymentStatus = order.PaymentStatus.ToString(),

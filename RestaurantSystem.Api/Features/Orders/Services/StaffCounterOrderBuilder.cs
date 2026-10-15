@@ -27,6 +27,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
     private readonly IOrderPaymentBuilder _payments;
     private readonly IOrderFidelityCoordinator _fidelity;
     private readonly ITableIdentityResolver _tables;
+    private readonly IOrderPreparationService _preparation;
 
     [SuppressMessage("Maintainability", "S107:Methods should not have too many parameters",
         Justification = "These DI-only collaborators are the existing order construction pipeline; a parameter object or service locator would conceal required pricing and fidelity dependencies.")]
@@ -36,7 +37,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
         IOrderItemFactory itemFactory, IStaffCounterOrderPricing serverPricing,
         IOrderPricingService pricing,
         IOrderPaymentBuilder payments, IOrderFidelityCoordinator fidelity,
-        ITableIdentityResolver tables)
+        ITableIdentityResolver tables, IOrderPreparationService preparation)
     {
         _context = context;
         _currentUser = currentUser;
@@ -48,6 +49,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
         _payments = payments;
         _fidelity = fidelity;
         _tables = tables;
+        _preparation = preparation;
     }
 
     public async Task<StaffCounterOrderBuild> BuildAsync(
@@ -97,6 +99,14 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
 
         var initialStatus = order.Status;
         ApplyReleaseState(order, releaseToKitchen, draft);
+        if (order.Status == OrderStatus.Confirmed && order.IsKitchenReleased)
+        {
+            await _preparation.ApplyAcceptedAsync(order, null, draft.Now, cancellationToken);
+        }
+        else
+        {
+            await _preparation.ApplyPendingApprovalAsync(order, null, cancellationToken);
+        }
         order.Version = 1;
         order.StatusHistory.Add(new OrderStatusHistory
         {

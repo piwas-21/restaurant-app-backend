@@ -54,6 +54,7 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
             return new OrderPermittedActionDto
             {
                 Action = action.ToString(),
+                TargetStatus = OrderActionTargetStatusResolver.Resolve(action, order)?.ToString(),
                 Allowed = false,
                 ReasonCode = OrderActionReasonCodes.DeliveryChannelManaged,
                 RequiresReason = requiresReason,
@@ -64,6 +65,7 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
             return new OrderPermittedActionDto
             {
                 Action = action.ToString(),
+                TargetStatus = OrderActionTargetStatusResolver.Resolve(action, order)?.ToString(),
                 Allowed = false,
                 ReasonCode = OrderActionReasonCodes.DeliveryChannelManaged
             };
@@ -89,6 +91,7 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
         return new OrderPermittedActionDto
         {
             Action = action.ToString(),
+            TargetStatus = OrderActionTargetStatusResolver.Resolve(action, order)?.ToString(),
             Allowed = allowed,
             ReasonCode = allowed ? null : reasonCode,
             RequiresReason = requiresReason

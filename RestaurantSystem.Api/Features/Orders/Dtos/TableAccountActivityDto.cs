@@ -6,6 +6,8 @@ public record TableAccountActivityDto
     public Guid Id { get; init; }
     public Guid OrderId { get; init; }
     public string OrderNumber { get; init; } = string.Empty;
+    public long DailyOrderNumber { get; init; }
+    public DateOnly BusinessDate { get; init; }
     public string Kind { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
     public DateTime OccurredAt { get; init; }

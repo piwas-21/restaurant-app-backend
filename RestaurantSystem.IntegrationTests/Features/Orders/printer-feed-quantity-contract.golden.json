@@ -255,7 +255,12 @@
       }
     ],
     "payments": [],
-    "statusHistory": []
+    "statusHistory": [],
+    "businessDate": "2026-09-01",
+    "dailyOrderNumber": 1,
+    "effectivePreparationMinutes": null,
+    "expectedReadyAt": null,
+    "businessTimeZoneId": "Europe/Zurich"
   },
   "projectionVersion": 2,
   "v2Order": {
@@ -514,7 +519,12 @@
       }
     ],
     "payments": [],
-    "statusHistory": []
+    "statusHistory": [],
+    "businessDate": "2026-09-01",
+    "dailyOrderNumber": 1,
+    "effectivePreparationMinutes": null,
+    "expectedReadyAt": null,
+    "businessTimeZoneId": "Europe/Zurich"
   },
   "v2Update": {
     "jobId": "60000000-0000-0000-0000-000000000001",

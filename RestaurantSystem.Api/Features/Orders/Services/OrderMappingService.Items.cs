@@ -12,6 +12,8 @@ public partial class OrderMappingService
         {
             Id = order.Id,
             OrderNumber = order.OrderNumber,
+            BusinessDate = order.BusinessDate,
+            DailyOrderNumber = order.DailyOrderNumber,
             CustomerName = order.CustomerName,
             Type = order.Type.ToString(),
             Status = order.Status.ToString(),

@@ -504,9 +504,12 @@ public sealed class OrderAmendmentIntegrationTests(DatabaseFixture fixture) : In
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await using var transaction = await context.Database.BeginTransactionAsync();
-            interveningNumber = await scope.ServiceProvider.GetRequiredService<IOrderNumberGenerator>().GenerateAsync();
+            var allocation = await scope.ServiceProvider.GetRequiredService<IOrderNumberGenerator>().GenerateAsync();
+            interveningNumber = allocation.OrderNumber;
             var intervening = NewSourceOrder();
             intervening.OrderNumber = interveningNumber;
+            intervening.BusinessDate = allocation.BusinessDate;
+            intervening.DailyOrderNumber = allocation.DailyOrderNumber;
             context.Orders.Add(intervening);
             await context.SaveChangesAsync();
             await transaction.CommitAsync();

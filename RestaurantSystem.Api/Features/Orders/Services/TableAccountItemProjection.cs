@@ -10,6 +10,8 @@ internal static class TableAccountItemProjection
         {
             OrderId = order.Id,
             OrderNumber = order.OrderNumber,
+            DailyOrderNumber = order.DailyOrderNumber,
+            BusinessDate = order.BusinessDate,
             OrderItemId = item.Id,
             ItemSnapshot = item,
             UnitCount = Math.Max(0, item.Quantity)

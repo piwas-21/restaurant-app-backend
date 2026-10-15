@@ -122,11 +122,14 @@ public sealed class TableGuestAccountReader : ITableGuestAccountReader
             order.Id, order.OrderNumber, order.Status, order.PaymentStatus, order.OrderDate,
             order.Total, order.TotalPaid, order.RemainingAmount)
         {
+            DailyOrderNumber = order.DailyOrderNumber,
+            BusinessDate = order.BusinessDate,
             PayableTotal = order.PayableTotal,
             BillingCreditAmount = order.BillingCreditAmount
         }).ToArray();
         var items = bill.AccountItems.Select(line => new TableGuestAccountLineDto(
-            line.OrderId, line.OrderNumber, line.UnitCount, ProjectItem(line.ItemSnapshot, 0, []))).ToArray();
+            line.OrderId, line.OrderNumber, line.DailyOrderNumber, line.BusinessDate,
+            line.UnitCount, ProjectItem(line.ItemSnapshot, 0, []))).ToArray();
 
         return new TableGuestAccountDto(
             bill.ServiceSessionId.Value, bill.TableLabel, bill.Currency, bill.AccountRevision.Value,

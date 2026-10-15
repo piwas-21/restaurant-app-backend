@@ -37,6 +37,8 @@ public record TableOccupantDto
 {
     public string? CustomerName { get; set; }
     public string? OrderNumber { get; set; }
+    public long DailyOrderNumber { get; set; }
+    public DateOnly BusinessDate { get; set; }
     public DateTime OrderDate { get; set; }
     public bool IsLoggedInUser { get; set; }
 }

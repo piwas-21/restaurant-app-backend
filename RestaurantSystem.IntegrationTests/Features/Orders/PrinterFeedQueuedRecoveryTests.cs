@@ -176,6 +176,13 @@ public abstract class PrinterFeedRecoveryTestBase : IntegrationTestBase
             $"UPDATE orders SET updated_at=NULL WHERE id={orderId}");
     }
 
+    protected async Task SetOrderStatusAsync(Guid orderId, OrderStatus status)
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE orders SET status={status.ToString()} WHERE id={orderId}");
+    }
+
     protected sealed record RouteSeed(
         DevicePrintTarget Target,
         bool IsRequired,
@@ -292,6 +299,31 @@ public sealed class PrinterFeedQueuedRecoveryTests : PrinterFeedRecoveryTestBase
 
         OrderNumbers(await FetchFeedAsync(deviceId, Now.AddMinutes(-5))).Should()
             .NotContain(order.OrderNumber);
+    }
+
+    [Fact]
+    public async Task Cashier_receipt_stays_queued_if_order_becomes_ready_before_first_printer_poll()
+    {
+        var cashierDevice = "ready-receipt-cashier-" + Guid.NewGuid().ToString("N");
+        var kitchenDevice = "ready-receipt-kitchen-" + Guid.NewGuid().ToString("N");
+        await RegisterReadyDeviceAsync(cashierDevice);
+        await RegisterReadyDeviceAsync(kitchenDevice);
+        var order = await SeedOrderAsync("READY-BEFORE-POLL", Now,
+            new RouteSeed(DevicePrintTarget.Cashier, false, DevicePrintStatus.Queued, cashierDevice),
+            new RouteSeed(DevicePrintTarget.General, true, DevicePrintStatus.Queued, kitchenDevice));
+        await SetOrderStatusAsync(order.Id, OrderStatus.Ready);
+
+        var cashierFeed = await FetchFeedAsync(cashierDevice, Now.AddMinutes(-5));
+        OrderNumbers(cashierFeed).Should().Contain(order.OrderNumber);
+        var printedOrder = Items(cashierFeed)
+            .Single(item => item!["orderNumber"]!.GetValue<string>() == order.OrderNumber)!;
+        printedOrder["routingStates"]!.AsArray()
+            .Select(route => route!["target"]!.GetValue<string>())
+            .Should().Equal(new[] { nameof(DevicePrintTarget.Cashier) },
+                "lifecycle advancement may preserve an outstanding receipt but must not revive kitchen work");
+
+        var kitchenFeed = await FetchFeedAsync(kitchenDevice, Now.AddMinutes(-5));
+        OrderNumbers(kitchenFeed).Should().NotContain(order.OrderNumber);
     }
 
     [Fact]

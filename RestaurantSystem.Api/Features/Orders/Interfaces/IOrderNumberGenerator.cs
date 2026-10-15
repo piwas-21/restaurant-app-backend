@@ -15,5 +15,8 @@ public interface IOrderNumberGenerator
     /// <exception cref="InvalidOperationException">
     /// The context has no active transaction, so the allocation could not be guarded.
     /// </exception>
-    Task<string> GenerateAsync(CancellationToken cancellationToken = default);
+    Task<OrderNumberAllocation> GenerateAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>Human-facing tenant-day number plus its stable numeric/day components.</summary>
+public sealed record OrderNumberAllocation(string OrderNumber, DateOnly BusinessDate, long DailyOrderNumber);

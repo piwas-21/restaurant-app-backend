@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -147,7 +148,8 @@ public sealed class OrderBillingCreditMigrationTests : IAsyncLifetime
             await using var afterRefusal = _fixture.CreateContext();
             (await afterRefusal.OrderBillingCredits.CountAsync()).Should().Be(1,
                 "a refused rollback must retain the append-only money evidence");
-            (await ReadOrderAsync(afterRefusal, eligible.Order.Id)).BillingCreditAmount.Should().Be(10m);
+            (await ReadOrderBillingCreditAmountAsync(eligible.Order.Id)).Should().Be(10m,
+                "the refusal must preserve the frozen order charge summary");
         }
         finally
         {
@@ -178,25 +180,7 @@ public sealed class OrderBillingCreditMigrationTests : IAsyncLifetime
             await using var verify = _fixture.CreateContext();
             (await verify.TableServiceSessions.AsNoTracking().Where(value => value.Id == visit.Id)
                 .Select(value => value.BillingAllocationVersion).SingleAsync()).Should().Be(1);
-            var unchanged = await verify.Orders.IgnoreAutoIncludes().AsNoTracking()
-                .Where(value => value.Id == order.Id).Select(value => new Order
-                {
-                    Id = value.Id,
-                    Total = value.Total,
-                    Tip = value.Tip,
-                    CreatedBy = value.CreatedBy,
-                    DeliveryFee = value.DeliveryFee,
-                    TotalPaid = value.TotalPaid,
-                    Items = value.Items.Select(item => new OrderItem
-                    {
-                        Id = item.Id,
-                        OrderId = item.OrderId,
-                        CreatedBy = item.CreatedBy,
-                        ParentOrderItemId = item.ParentOrderItemId,
-                        Quantity = item.Quantity,
-                        ItemTotal = item.ItemTotal
-                    }).ToList()
-                }).SingleAsync();
+            var unchanged = await ReadChargeEvidenceAsync(verify, order.Id);
             unchanged.TotalPaid.Should().Be(0m);
             (await verify.OrderPayments.CountAsync(value => value.OrderId == order.Id)).Should().Be(0);
             var charges = FrozenOrderChargeMath.Read(unchanged, new AccountMoney("CHF"));
@@ -261,9 +245,16 @@ public sealed class OrderBillingCreditMigrationTests : IAsyncLifetime
             (await verify.TableServiceSessions.AsNoTracking()
                 .Where(value => value.Id == visit.Id)
                 .Select(value => value.BillingAllocationVersion).SingleAsync()).Should().Be(1);
-            var orderWithTender = await verify.Orders.IgnoreAutoIncludes().SingleAsync(value => value.Id == orderId);
-            orderWithTender.TotalPaid.Should().Be(1m);
-            orderWithTender.RemainingAmount.Should().Be(0m);
+            await verify.Database.OpenConnectionAsync();
+            var connection = (NpgsqlConnection)verify.Database.GetDbConnection();
+            await using var chargeCommand = new NpgsqlCommand(
+                "SELECT total_paid, remaining_amount FROM orders WHERE id = @id", connection);
+            chargeCommand.Parameters.AddWithValue("id", orderId);
+            await using var chargeReader = await chargeCommand.ExecuteReaderAsync();
+            (await chargeReader.ReadAsync()).Should().BeTrue();
+            chargeReader.GetDecimal(0).Should().Be(1m);
+            chargeReader.GetDecimal(1).Should().Be(0m);
+            await chargeReader.CloseAsync();
             (await verify.OrderPayments.CountAsync(value => value.OrderId == orderId)).Should().Be(1);
         }
         finally
@@ -478,6 +469,60 @@ public sealed class OrderBillingCreditMigrationTests : IAsyncLifetime
     {
         await using var context = _fixture.CreateContext();
         await context.Database.MigrateAsync();
+        await new OrderDailyIdentityInitializer(
+            context, new FixedTenantClock("Europe/Zurich"),
+            NullLogger<OrderDailyIdentityInitializer>.Instance).InitializeAsync();
+    }
+
+    private async Task<decimal> ReadOrderBillingCreditAmountAsync(Guid orderId)
+    {
+        await using var connection = new NpgsqlConnection(_fixture.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT billing_credit_amount FROM orders WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", orderId);
+        return (decimal)(await command.ExecuteScalarAsync())!;
+    }
+
+    private static async Task<Order> ReadChargeEvidenceAsync(ApplicationDbContext context, Guid orderId)
+    {
+        await context.Database.OpenConnectionAsync();
+        var connection = (NpgsqlConnection)context.Database.GetDbConnection();
+        await using var orderCommand = new NpgsqlCommand(
+            "SELECT total, tip, delivery_fee, total_paid FROM orders WHERE id = @id", connection);
+        orderCommand.Parameters.AddWithValue("id", orderId);
+        await using var orderReader = await orderCommand.ExecuteReaderAsync();
+        (await orderReader.ReadAsync()).Should().BeTrue();
+        var order = new Order
+        {
+            Id = orderId,
+            CreatedBy = "migration-test",
+            Total = orderReader.GetDecimal(0),
+            Tip = orderReader.GetDecimal(1),
+            DeliveryFee = orderReader.GetDecimal(2),
+            TotalPaid = orderReader.GetDecimal(3)
+        };
+        await orderReader.CloseAsync();
+
+        await using var itemCommand = new NpgsqlCommand(
+            "SELECT id, order_id, parent_order_item_id, quantity, item_total FROM \"OrderItems\" WHERE order_id = @id",
+            connection);
+        itemCommand.Parameters.AddWithValue("id", orderId);
+        await using var itemReader = await itemCommand.ExecuteReaderAsync();
+        while (await itemReader.ReadAsync())
+        {
+            order.Items.Add(new OrderItem
+            {
+                Id = itemReader.GetGuid(0),
+                CreatedBy = "migration-test",
+                OrderId = itemReader.GetGuid(1),
+                ParentOrderItemId = itemReader.IsDBNull(2) ? null : itemReader.GetGuid(2),
+                Quantity = itemReader.GetInt32(3),
+                ItemTotal = itemReader.GetDecimal(4)
+            });
+        }
+
+        return order;
     }
 
     private async Task<bool> RawRelationMissingAsync(string relation)

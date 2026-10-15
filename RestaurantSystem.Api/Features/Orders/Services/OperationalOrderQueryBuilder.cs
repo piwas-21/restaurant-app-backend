@@ -78,19 +78,13 @@ internal static partial class OperationalOrderQueryBuilder
         ITenantClock clock,
         ILogger logger)
     {
-        if (query.Scope == OrderListScope.Operational)
-        {
-            logger.LogInformation("Filtered orders by operational queue scope; date bounds ignored");
-            return orders;
-        }
-
         if (query.TenantDay.HasValue)
         {
-            var (startUtc, endUtc) = clock.TenantDayWindowUtc(query.TenantDay.Value);
-            logger.LogInformation(
-                "Filtered orders by tenant day {TenantDay} ({ZoneId}, [{StartUtc:o}, {EndUtc:o}))",
-                query.TenantDay.Value, clock.TimeZone.Id, startUtc, endUtc);
-            return orders.Where(order => order.OrderDate >= startUtc && order.OrderDate < endUtc);
+            if (query.TenantStartDay.HasValue || query.TenantEndDay.HasValue)
+                throw new BadRequestException("Use either tenantDay or a tenant day range, not both.");
+
+            logger.LogInformation("Filtered orders by stored tenant business date {TenantDay}", query.TenantDay.Value);
+            return orders.Where(order => order.BusinessDate == query.TenantDay.Value);
         }
 
         if (query.TenantStartDay.HasValue || query.TenantEndDay.HasValue)
@@ -100,18 +94,17 @@ internal static partial class OperationalOrderQueryBuilder
             {
                 throw new BadRequestException("A valid tenant day range requires an ordered start and end day.");
             }
-            if (query.TenantDay.HasValue)
-            {
-                throw new BadRequestException("Use either tenantDay or a tenant day range, not both.");
-            }
-
-            var (startUtc, _) = clock.TenantDayWindowUtc(query.TenantStartDay.Value);
-            var (_, endUtc) = clock.TenantDayWindowUtc(query.TenantEndDay.Value);
             logger.LogInformation(
-                "Filtered orders by tenant day range {StartDay}..{EndDay} ({ZoneId}, [{StartUtc:o}, {EndUtc:o}))",
-                query.TenantStartDay.Value, query.TenantEndDay.Value,
-                clock.TimeZone.Id, startUtc, endUtc);
-            return orders.Where(order => order.OrderDate >= startUtc && order.OrderDate < endUtc);
+                "Filtered orders by stored tenant business-date range {StartDay}..{EndDay}",
+                query.TenantStartDay.Value, query.TenantEndDay.Value);
+            return orders.Where(order => order.BusinessDate >= query.TenantStartDay.Value
+                && order.BusinessDate <= query.TenantEndDay.Value);
+        }
+
+        if (query.Scope == OrderListScope.Operational)
+        {
+            logger.LogInformation("Filtered orders by operational queue scope; date bounds ignored");
+            return orders;
         }
 
         var startDate = QueryInstant.AsUtc(query.StartDate);
