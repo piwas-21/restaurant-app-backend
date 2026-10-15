@@ -135,6 +135,8 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
             .Include(o => o.DeliveryAddress)
             .Where(o => !o.IsDeleted)
             .Where(o => o.IsKitchenReleased)
+            // Queued cashier receipts must wait for the restaurant's preparation-time decision too.
+            .Where(o => o.Status != OrderStatus.Pending && o.Status != OrderStatus.PendingApproval)
             .AsNoTracking()
             .AsSplitQuery()
             .AsQueryable();
