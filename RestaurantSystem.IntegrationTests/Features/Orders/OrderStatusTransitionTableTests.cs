@@ -95,6 +95,17 @@ public class OrderStatusTransitionTableTests
         IsValid(OrderStatus.OutForDelivery, OrderStatus.Completed).Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(OrderStatus.Confirmed, true)]
+    [InlineData(OrderStatus.Preparing, true)]
+    [InlineData(OrderStatus.Pending, false)]
+    [InlineData(OrderStatus.PendingApproval, false)]
+    [InlineData(OrderStatus.Cancelled, false)]
+    public void QuickReady_RequiresAnAcceptedLiveOrder(OrderStatus from, bool allowed)
+    {
+        IsValid(from, OrderStatus.Ready).Should().Be(allowed);
+    }
+
     private static bool IsValid(OrderStatus from, OrderStatus to)
         => OrderStatusTransitions.IsValid(from, to);
 }
