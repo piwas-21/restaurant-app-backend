@@ -26,6 +26,22 @@ public static class TestDataSeeder
             await SeedTestUsersAsync(context);
         }
 
+        // Unrelated order tests must not depend on the wall clock or a venue schedule. Tests
+        // exercising availability replace these explicit all-hours channel configurations.
+        if (!await context.OrderTypeConfigurations.AnyAsync())
+        {
+            context.OrderTypeConfigurations.AddRange(Enum.GetValues<OrderType>().Select(type =>
+                new OrderTypeConfiguration
+                {
+                    OrderType = type,
+                    IsEnabled = true,
+                    EnforceOpeningHours = false,
+                    DisplayOrder = (int)type,
+                    CreatedBy = "seed"
+                }));
+            await context.SaveChangesAsync();
+        }
+
         // Check if catalog data already exists; if so, skip the rest.
         if (await context.Products.AnyAsync())
         {

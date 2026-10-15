@@ -147,9 +147,16 @@ file-length, `dotnet build` warnings-as-errors, sharded integration tests + merg
 TruffleHog, Trivy fs, license compliance, OSV-Scanner),
 [.github/workflows/security-audit.yml](.github/workflows/security-audit.yml) (weekly full-tree OSV + Trivy fs +
 NuGet vulnerability audit + license compliance), [.pre-commit-config.yaml](.pre-commit-config.yaml) (the same
-format / file-length / build gates locally) and SonarCloud automatic analysis (quality gate enforced by the
+format / file-length / build gates locally) and SonarCloud automatic analysis (populated passing PR quality gate
+and zero open PR issues enforced by the
 workspace merge gate). Cross-repo gate status lives in the workspace
 [DEV-PHASES-PLAN.md](../docs/plans/DEV-PHASES-PLAN.md) §2 — that table is authoritative.
+
+Integration shard retries overwrite the matching result artifact so the aggregate uses the replacement discovery
+counts and coverage report. Rerun the failed shard with the partition, uniqueness and coverage guards intact.
+For a legacy run with duplicate names, preserve both artifact ZIPs, digests and metadata, verify the obsolete copy
+belongs to the failed attempt, remove only that incomplete copy, then rerun the aggregate against the successful
+replacement. Never alter discovery counts, test reports or coverage floors to make a retry pass.
 
 **Planned but never built** (carried over from the retired GitLab-era hardening plan, still open):
 

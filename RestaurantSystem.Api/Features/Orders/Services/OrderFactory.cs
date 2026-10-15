@@ -13,23 +13,28 @@ public class OrderFactory : IOrderFactory
     private readonly IOrderChannelGuard _channelGuard;
     private readonly IOrderNumberGenerator _orderNumbers;
     private readonly IOrderAddressFactory _addressFactory;
+    private readonly IOrderAvailabilityGuard _availability;
 
     public OrderFactory(
         ICurrentUserService currentUserService,
         IOrderChannelGuard channelGuard,
         IOrderNumberGenerator orderNumbers,
-        IOrderAddressFactory addressFactory)
+        IOrderAddressFactory addressFactory,
+        IOrderAvailabilityGuard availability)
     {
         _currentUserService = currentUserService;
         _channelGuard = channelGuard;
         _orderNumbers = orderNumbers;
         _addressFactory = addressFactory;
+        _availability = availability;
     }
 
     public async Task<OrderDraft> CreateAsync(
         CreateOrderCommand command, Guid? userId, string language, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+
+        await _availability.EnsureAvailableAsync(command.Type, cancellationToken);
 
         // Non-null only when a staff member was warned and allowed through anyway (§9.6).
         var channelOverride = await _channelGuard.EnsureOrderableAsync(command.Items, command.Type, cancellationToken);
