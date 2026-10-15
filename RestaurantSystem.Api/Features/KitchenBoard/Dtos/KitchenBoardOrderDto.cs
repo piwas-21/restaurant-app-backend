@@ -15,6 +15,10 @@ public sealed record KitchenBoardOrderDto(
     DateTime? CompletedAt,
     bool CanComplete,
     IReadOnlyList<KitchenBoardRouteDto> RequiredKitchenRoutes,
-    IReadOnlyList<KitchenBoardItemDto> Items);
+    IReadOnlyList<KitchenBoardItemDto> Items)
+{
+    public long DailyOrderNumber { get; init; }
+    public DateOnly BusinessDate { get; init; }
+}
 
 public sealed record KitchenBoardRouteDto(string Target, string Status);

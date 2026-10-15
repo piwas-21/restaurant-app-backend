@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -53,16 +54,30 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
             await using (var migrate = _fixture.CreateContext())
             {
                 await migrate.Database.MigrateAsync();
+                await new OrderDailyIdentityInitializer(
+                    migrate, AllocationClock, NullLogger<OrderDailyIdentityInitializer>.Instance)
+                    .InitializeAsync();
 
                 var backfilled = await migrate.OrderNumberSequences.SingleAsync(row => row.Day == day);
                 backfilled.LastSequence.Should().Be(8,
                     "the backfill must include canonical order numbers on soft-deleted rows");
 
-                // This insert models an older app instance that still allocates from orders.
-                // The database trigger keeps the durable watermark in sync after backfill.
-                migrate.Orders.Add(CreateOrder(legacyInsertId, $"{prefix}0009", isDeleted: false));
-                migrate.Orders.Add(CreateOrder(invalidDateId, "202613990001", isDeleted: false));
-                migrate.Orders.Add(CreateOrder(legacyTextId, $"LEGACY-{legacyTextId:N}"[..16], isDeleted: false));
+                // This raw SQL insert models an older app instance that does not know the new
+                // NOT NULL columns. The trigger must derive their values and maintain the
+                // sequence watermark before the next version allocates.
+                await HistoricalOrderSeed.InsertAsync(migrate, legacyInsertId, $"{prefix}0009",
+                    AllocationInstant.UtcDateTime, nameof(OrderNumberSequenceMigrationTests));
+                var legacyIdentity = await migrate.Orders.AsNoTracking()
+                    .SingleAsync(order => order.Id == legacyInsertId);
+                legacyIdentity.BusinessDate.Should().Be(day);
+                legacyIdentity.DailyOrderNumber.Should().Be(9);
+
+                // Invalid and noncanonical values remain accepted as historical text, but their
+                // fallback tenant-local days are isolated from the canonical sequence above.
+                migrate.Orders.Add(CreateOrder(invalidDateId, "202613990001", isDeleted: false,
+                    AllocationInstant.UtcDateTime.AddDays(1)));
+                migrate.Orders.Add(CreateOrder(legacyTextId, $"LEGACY-{legacyTextId:N}"[..16], isDeleted: false,
+                    AllocationInstant.UtcDateTime.AddDays(2)));
                 await migrate.SaveChangesAsync();
 
                 (await migrate.OrderNumberSequences.AsNoTracking().SingleAsync(row => row.Day == day))
@@ -84,8 +99,8 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
                 await using var transaction = await migrate.Database.BeginTransactionAsync();
                 var nextNumber = await new OrderNumberGenerator(migrate, AllocationClock)
                     .GenerateAsync();
-                nextNumber.Should().Be($"{prefix}0010");
-                migrate.Orders.Add(CreateOrder(allocatedOrderId, nextNumber, isDeleted: false));
+                nextNumber.OrderNumber.Should().Be($"{prefix}0010");
+                migrate.Orders.Add(CreateOrder(allocatedOrderId, nextNumber.OrderNumber, isDeleted: false));
                 await migrate.SaveChangesAsync();
                 await transaction.CommitAsync();
 
@@ -135,22 +150,23 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
         }
     }
 
-    private static Order CreateOrder(Guid id, string orderNumber, bool isDeleted) => new()
-    {
-        Id = id,
-        OrderNumber = orderNumber,
-        Type = OrderType.Takeaway,
-        Status = OrderStatus.Pending,
-        PaymentStatus = PaymentStatus.Pending,
-        SubTotal = 0m,
-        Total = 0m,
-        TotalPaid = 0m,
-        RemainingAmount = 0m,
-        OrderDate = AllocationInstant.UtcDateTime,
-        CreatedAt = AllocationInstant.UtcDateTime,
-        CreatedBy = nameof(OrderNumberSequenceMigrationTests),
-        IsDeleted = isDeleted,
-        DeletedAt = isDeleted ? AllocationInstant.UtcDateTime : null,
-        DeletedBy = isDeleted ? nameof(OrderNumberSequenceMigrationTests) : null,
-    };
+    private static Order CreateOrder(
+        Guid id, string orderNumber, bool isDeleted, DateTime? orderDate = null) => new()
+        {
+            Id = id,
+            OrderNumber = orderNumber,
+            Type = OrderType.Takeaway,
+            Status = OrderStatus.Pending,
+            PaymentStatus = PaymentStatus.Pending,
+            SubTotal = 0m,
+            Total = 0m,
+            TotalPaid = 0m,
+            RemainingAmount = 0m,
+            OrderDate = orderDate ?? AllocationInstant.UtcDateTime,
+            CreatedAt = orderDate ?? AllocationInstant.UtcDateTime,
+            CreatedBy = nameof(OrderNumberSequenceMigrationTests),
+            IsDeleted = isDeleted,
+            DeletedAt = isDeleted ? AllocationInstant.UtcDateTime : null,
+            DeletedBy = isDeleted ? nameof(OrderNumberSequenceMigrationTests) : null,
+        };
 }

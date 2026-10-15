@@ -14,7 +14,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
 
-public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, ApiResponse<OrderDto>>
+public partial class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, ApiResponse<OrderDto>>
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
@@ -30,6 +30,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderPermittedActionsService _permittedActionsService;
     private readonly IOrderFactory _orderFactory;
     private readonly IPreferredLanguageCapture _languages;
+    private readonly IOrderPreparationService _preparation;
     private readonly ITableGuestRoundOperationStore? _guestRounds;
     private readonly ITenantFeatures? _features;
 
@@ -47,6 +48,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderPermittedActionsService permittedActionsService,
         IOrderFactory orderFactory,
         IPreferredLanguageCapture languages,
+        IOrderPreparationService preparation,
         ILogger<CreateOrderCommandHandler> logger,
         ITableGuestRoundOperationStore? guestRounds = null,
         ITenantFeatures? features = null)
@@ -55,6 +57,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _currentUserService = currentUserService;
         _orderFactory = orderFactory;
         _languages = languages;
+        _preparation = preparation;
         _mappingService = mappingService;
         _itemFactory = itemFactory;
         _pricingService = pricingService;
@@ -139,6 +142,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             _paymentBuilder.AddPayments(order, command.Payments);
             _paymentBuilder.UpdatePaymentSummary(order);
 
+            await _preparation.ApplyForNewOrderAsync(order, now, cancellationToken);
+
             if (guestSession is not null && guestParticipant is not null)
             {
                 await _routing.EnsureRoutesAsync(order, cancellationToken);
@@ -171,23 +176,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             await transaction.CommitAsync(cancellationToken);
 
-            var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
-            orderDto.PermittedActions = _permittedActionsService.GetPermittedActions(order);
-
-            await _notifications.NotifyOrderCreatedAsync(orderDto);
-            await _notifications.NotifyFocusOrderUpdateAsync(orderDto);
-            await _tableReservation.ReserveForDineInAsync(order, cancellationToken);
-
-            // Online orders receive confirmation mail only after Stripe settles them.
-            if (!paysOnline)
-            {
-                await _notifications.SendNewOrderMailAsync(order, orderDto, cancellationToken);
-            }
-
-            _logger.LogInformation("Order {OrderNumber} created successfully by user {UserId}",
-                order.OrderNumber, _currentUserService.UserId);
-
-            return ApiResponse<OrderDto>.SuccessWithData(orderDto, "Order created successfully");
+            return await CompletePostCreationAsync(order, paysOnline, cancellationToken);
         }
         catch (Exception ex)
         {

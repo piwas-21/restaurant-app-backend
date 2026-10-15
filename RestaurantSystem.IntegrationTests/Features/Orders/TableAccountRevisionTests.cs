@@ -1,3 +1,4 @@
+using RestaurantSystem.IntegrationTests.Common;
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -308,6 +309,6 @@ public sealed class TableAccountRevisionTests : IntegrationTestBase
     private static TableBillAssembler CreateAssembler(ApplicationDbContext context) => new(
         context,
         new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-            NullLogger<OrderMappingService>.Instance),
+            NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc),
         NullLogger<TableBillAssembler>.Instance);
 }

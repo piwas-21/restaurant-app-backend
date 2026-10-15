@@ -19,4 +19,8 @@ public sealed record KitchenBoardCorrectionDto(
     bool CanComplete,
     string? RouteStatus,
     DateTime CreatedAt,
-    IReadOnlyList<KitchenBoardChangeDto> Changes);
+    IReadOnlyList<KitchenBoardChangeDto> Changes)
+{
+    public long DailyOrderNumber { get; init; }
+    public DateOnly BusinessDate { get; init; }
+}

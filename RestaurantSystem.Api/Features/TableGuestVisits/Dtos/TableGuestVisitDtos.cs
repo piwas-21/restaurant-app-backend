@@ -12,7 +12,11 @@ public sealed partial record TableGuestOrderDto(
     DateTime OrderDate,
     decimal Total,
     decimal TotalPaid,
-    decimal RemainingAmount);
+    decimal RemainingAmount)
+{
+    public long DailyOrderNumber { get; init; }
+    public DateOnly BusinessDate { get; init; }
+}
 
 public sealed record TableGuestIngredientDto(
     string Name,
@@ -33,6 +37,8 @@ public sealed record TableGuestItemDto(
 public sealed record TableGuestAccountLineDto(
     Guid OrderId,
     string OrderNumber,
+    long DailyOrderNumber,
+    DateOnly BusinessDate,
     int UnitCount,
     TableGuestItemDto Item);
 

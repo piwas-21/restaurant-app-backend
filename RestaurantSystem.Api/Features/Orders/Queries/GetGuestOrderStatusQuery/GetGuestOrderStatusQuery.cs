@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Services;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Constants;
@@ -29,13 +30,16 @@ public class GetGuestOrderStatusQueryHandler : IQueryHandler<GetGuestOrderStatus
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetGuestOrderStatusQueryHandler> _logger;
+    private readonly ITenantClock _clock;
 
     public GetGuestOrderStatusQueryHandler(
         ApplicationDbContext context,
-        ILogger<GetGuestOrderStatusQueryHandler> logger)
+        ILogger<GetGuestOrderStatusQueryHandler> logger,
+        ITenantClock clock)
     {
         _context = context;
         _logger = logger;
+        _clock = clock;
     }
 
     public async Task<GuestOrderStatusDto?> Handle(
@@ -61,6 +65,10 @@ public class GetGuestOrderStatusQueryHandler : IQueryHandler<GetGuestOrderStatus
                 o.Status,
                 o.OrderDate,
                 o.EstimatedDeliveryTime,
+                o.BusinessDate,
+                o.DailyOrderNumber,
+                o.EffectivePreparationMinutes,
+                o.ExpectedReadyAt,
                 o.GuestStatusToken
             })
             .FirstOrDefaultAsync(cancellationToken);
@@ -96,6 +104,13 @@ public class GetGuestOrderStatusQueryHandler : IQueryHandler<GetGuestOrderStatus
             match.EstimatedDeliveryTime,
             confirmationFlow,
             reviewWindowMinutes,
-            reviewDeadlineUtc);
+            reviewDeadlineUtc)
+        {
+            BusinessDate = match.BusinessDate,
+            DailyOrderNumber = match.DailyOrderNumber,
+            EffectivePreparationMinutes = match.EffectivePreparationMinutes,
+            ExpectedReadyAt = match.ExpectedReadyAt,
+            BusinessTimeZoneId = _clock.TimeZone.Id
+        };
     }
 }

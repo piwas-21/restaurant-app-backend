@@ -78,6 +78,9 @@ public partial class OrderItemFactory
         // Menu lines keep Menus.BasePrice; product customization pricing cannot replace it.
         var unitPrice = menu.BasePrice;
         var customization = ResolveCustomizationPrice(itemDto, pricesAreTrusted);
+        var preparationTimes = menu.MenuItems
+            .Select(menuItem => menuItem.Product.PreparationTimeMinutes)
+            .ToList();
         return new OrderItem
         {
             Id = Guid.NewGuid(),
@@ -87,6 +90,7 @@ public partial class OrderItemFactory
             ProductName = menu.Name,
             VariationName = null,
             Quantity = itemDto.Quantity,
+            PreparationTimeMinutesSnapshot = preparationTimes.Count == 0 ? null : preparationTimes.Max(),
             UnitPrice = unitPrice,
             ItemTotal = (unitPrice * itemDto.Quantity) + customization,
             SpecialInstructions = itemDto.SpecialInstructions,

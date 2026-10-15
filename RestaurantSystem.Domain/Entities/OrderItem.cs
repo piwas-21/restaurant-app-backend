@@ -32,6 +32,8 @@ public class OrderItem : Entity
     public string ProductName { get; set; } = null!; // Snapshot at order time
     public string? VariationName { get; set; } // Snapshot at order time
     public int Quantity { get; set; }
+    /// <summary>Product preparation time frozen when this order line was created.</summary>
+    public int? PreparationTimeMinutesSnapshot { get; set; }
     public decimal UnitPrice { get; set; } // Price at order time
     public decimal ItemTotal { get; set; }
     public string? SpecialInstructions { get; set; }

@@ -63,7 +63,7 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
         if (query.ProjectionVersion == 2)
             PrinterFeedV2Projection.Apply(orderDtos, orders);
 
-        _logger.LogInformation("Printer feed returning {Count} confirmed orders for {Device}",
+        _logger.LogInformation("Printer feed returning {Count} eligible orders for {Device}",
             orderDtos.Count, deviceId ?? "legacy");
 
         return orderDtos;
@@ -127,24 +127,36 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
     {
         // Explicit !IsDeleted mirrors the original inline code; the global query filter would
         // also handle this but the read intent stays unambiguous when grepping delete-aware paths.
-        var ordersQuery = _context.Orders
+        var releasedOrders = _context.Orders
             // Covers both product-backed and menu-backed line-resolution paths.
             .IncludeOrderLineGraph()
             .Include(o => o.Payments)
             .Include(o => o.StatusHistory)
             .Include(o => o.DeliveryAddress)
-            .Where(o => !o.IsDeleted && o.Status == OrderStatus.Confirmed)
+            .Where(o => !o.IsDeleted)
             .Where(o => o.IsKitchenReleased)
-            .WithoutCompletedInitialBoardWork(_context)
             .AsNoTracking()
             .AsSplitQuery()
             .AsQueryable();
 
         if (routing.DeviceId is not null)
         {
+            var eligibleWork = releasedOrders.Where(order =>
+                (order.Status == OrderStatus.Confirmed
+                    && !_context.KitchenBoardWorkCompletions.Any(work =>
+                        work.OrderId == order.Id
+                        && work.WorkItemId == order.Id
+                        && work.Kind == KitchenBoardWorkKind.InitialOrder))
+                || (order.Status != OrderStatus.Cancelled
+                    && order.Status != OrderStatus.Refunded
+                    && order.RoutingStates.Any(state => state.Target == DevicePrintTarget.Cashier
+                    && state.DeviceId == routing.DeviceId
+                    && state.Status == DevicePrintStatus.Queued)));
+
             // Device-aware clients receive legacy/unrouted orders plus only Queued route jobs
-            // assigned to this device. Missing X-Device-Id keeps the legacy projection.
-            return ordersQuery
+            // assigned to this device. A receipt remains available after a cashier advances
+            // lifecycle status, but a kitchen route is never revived by that exception.
+            return eligibleWork
                 .Include(o => o.RoutingStates.Where(state =>
                     state.DeviceId == routing.DeviceId && state.Status == DevicePrintStatus.Queued))
                 .Where(o => !o.RoutingStates.Any()
@@ -152,9 +164,12 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
                         && state.Status == DevicePrintStatus.Queued));
         }
 
+        var legacyConfirmedOrders = releasedOrders
+            .Where(order => order.Status == OrderStatus.Confirmed)
+            .WithoutCompletedInitialBoardWork(_context);
         return routing.RoutingActivated
-            ? ordersQuery.Where(o => !o.RoutingStates.Any())
-            : ordersQuery;
+            ? legacyConfirmedOrders.Where(o => !o.RoutingStates.Any())
+            : legacyConfirmedOrders;
     }
 
     private static IQueryable<Order> ApplyLanguageIncludes(

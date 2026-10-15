@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Text.Json.Serialization;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
@@ -24,6 +25,10 @@ public record UpdateOrderStatusCommand : ICommand<ApiResponse<OrderDto>>
     /// <summary>Optional detail version; old clients may omit it.</summary>
     public int? ExpectedVersion { get; set; }
     public int? EstimatedPreparationMinutes { get; set; }
+
+    /// <summary>Set only by the token-validated operator email-link handler.</summary>
+    [JsonIgnore]
+    internal bool TrustedPreparationOverride { get; init; }
 }
 
 public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatusCommand, ApiResponse<OrderDto>>
@@ -36,6 +41,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
     private readonly IOrderNotificationService _notifications;
     private readonly OrderWorkflowSettings _workflow;
     private readonly IOrderStatusTransitionPolicy? _transitionPolicy;
+    private readonly IOrderPreparationService _preparation;
 
     public UpdateOrderStatusCommandHandler(
           ApplicationDbContext context,
@@ -44,6 +50,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
           IOrderResponseProjector responses,
           IOrderNotificationService notifications,
           ILogger<UpdateOrderStatusCommandHandler> logger,
+          IOrderPreparationService preparation,
           IOrderStatusTransitionPolicy? transitionPolicy = null)
     {
         _context = context;
@@ -54,6 +61,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
         _logger = logger;
         _workflow = transitionPolicy?.Workflow ?? new OrderWorkflowSettings();
         _transitionPolicy = transitionPolicy;
+        _preparation = preparation;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(UpdateOrderStatusCommand command, CancellationToken cancellationToken)
@@ -106,7 +114,8 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
         order.UpdatedAt = DateTime.UtcNow;
         order.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
-        var notificationPreparationMinutes = ApplyStatusChange(order, command);
+        var notificationPreparationMinutes = await ApplyStatusChangeAsync(
+            order, command, cancellationToken);
         accountMutation.RecordAccountChange();
 
         try

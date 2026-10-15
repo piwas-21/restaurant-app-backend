@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
@@ -18,8 +19,7 @@ public sealed record ApproveOrderCommand : ICommand<ApiResponse<OrderDto>>
     [JsonIgnore]
     public Guid OrderId { get; set; }
 
-    [JsonRequired]
-    public int PreparationMinutes { get; set; }
+    public int? PreparationMinutes { get; set; }
     public string? Notes { get; set; }
     public int? ExpectedVersion { get; set; }
 }
@@ -29,14 +29,17 @@ public sealed class ApproveOrderCommandHandler : ICommandHandler<ApproveOrderCom
     private readonly CustomMediator _mediator;
     private readonly OrderWorkflowSettings _workflow;
     private readonly ApplicationDbContext _context;
+    private readonly IOrderPreparationService _preparation;
 
     public ApproveOrderCommandHandler(
         CustomMediator mediator,
         ApplicationDbContext context,
+        IOrderPreparationService preparation,
         IOptions<OrderWorkflowSettings>? workflow = null)
     {
         _mediator = mediator;
         _context = context;
+        _preparation = preparation;
         _workflow = workflow?.Value ?? new OrderWorkflowSettings();
     }
 
@@ -44,28 +47,25 @@ public sealed class ApproveOrderCommandHandler : ICommandHandler<ApproveOrderCom
         ApproveOrderCommand command,
         CancellationToken cancellationToken)
     {
-        var orderType = await _context.Orders
-            .AsNoTracking()
-            .Where(order => order.Id == command.OrderId)
-            .Select(order => (OrderType?)order.Type)
-            .SingleOrDefaultAsync(cancellationToken);
+        var order = await _context.Orders
+            .Include(candidate => candidate.Items)
+            .FirstOrDefaultAsync(candidate => candidate.Id == command.OrderId && !candidate.IsDeleted,
+                cancellationToken);
+        if (order is null)
+            return ApiResponse<OrderDto>.Failure("Order not found");
 
-        var confirmationFlow = orderType.HasValue
-            ? await _context.OrderTypeConfigurations
+        var confirmationFlow = await _context.OrderTypeConfigurations
                 .AsNoTracking()
-                .Where(configuration => configuration.OrderType == orderType.Value)
+                .Where(configuration => configuration.OrderType == order.Type)
                 .Select(configuration => configuration.ConfirmationFlow)
-                .SingleOrDefaultAsync(cancellationToken)
-            : null;
+                .SingleOrDefaultAsync(cancellationToken);
 
         // In the reviewed hand-off the restaurant is the decision maker. Its chosen preparation
         // time is a promise sent to the guest, never a second approval request sent back to them.
         // The direct flow retains the historical long-delay consent branch for compatibility.
-        var preparationMinutes = command.PreparationMinutes == 0
-            ? _workflow.ConfirmedPreparationMinutes
-            : command.PreparationMinutes;
+        var preparationMinutes = await _preparation.ResolveEffectiveMinutesAsync(
+            order, command.PreparationMinutes, cancellationToken);
         var finalStatus = confirmationFlow == OrderConfirmationFlows.Acknowledge
-            || command.PreparationMinutes == 0
             || preparationMinutes <= _workflow.DelayApprovalThresholdMinutes
                 ? OrderStatus.Confirmed
                 : OrderStatus.PendingApproval;
@@ -74,7 +74,7 @@ public sealed class ApproveOrderCommandHandler : ICommandHandler<ApproveOrderCom
         {
             OrderId = command.OrderId,
             NewStatus = finalStatus,
-            EstimatedPreparationMinutes = preparationMinutes,
+            EstimatedPreparationMinutes = command.PreparationMinutes,
             Notes = command.Notes,
             ExpectedVersion = command.ExpectedVersion
         }, cancellationToken);

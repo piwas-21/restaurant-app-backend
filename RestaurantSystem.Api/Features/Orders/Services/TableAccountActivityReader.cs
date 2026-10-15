@@ -17,11 +17,13 @@ internal static class TableAccountActivityReader
         var rows = await context.Database.SqlQuery<TableAccountActivityRow>($"""
             WITH events AS (
                 SELECT o.id AS "Id", o.service_session_id AS "SessionId", o.id AS "OrderId",
-                    o.order_number AS "OrderNumber", o.order_date AS "OccurredAt",
+                    o.order_number AS "OrderNumber", o.daily_order_number AS "DailyOrderNumber",
+                    o.business_date AS "BusinessDate", o.order_date AS "OccurredAt",
                     'OrderPlaced' AS "Kind", o.status AS "Status"
                 FROM orders o WHERE NOT o.is_deleted AND o.service_session_id = ANY ({ids})
                 UNION ALL
-                SELECT h.id, o.service_session_id, o.id, o.order_number, h.changed_at,
+                SELECT h.id, o.service_session_id, o.id, o.order_number, o.daily_order_number,
+                    o.business_date, h.changed_at,
                     'StatusChanged', h.to_status
                 FROM "OrderStatusHistory" h JOIN orders o ON o.id = h.order_id
                 WHERE NOT o.is_deleted AND o.service_session_id = ANY ({ids})
@@ -30,7 +32,8 @@ internal static class TableAccountActivityReader
                     PARTITION BY "SessionId" ORDER BY "OccurredAt" DESC, "Id") AS position
                 FROM events
             )
-            SELECT "Id", "SessionId", "OrderId", "OrderNumber", "OccurredAt", "Kind", "Status"
+            SELECT "Id", "SessionId", "OrderId", "OrderNumber", "DailyOrderNumber",
+                "BusinessDate", "OccurredAt", "Kind", "Status"
             FROM ranked WHERE position <= {pageSize + 1}
             ORDER BY "SessionId", "OccurredAt" DESC, "Id"
             """).ToListAsync(cancellationToken);
@@ -40,6 +43,8 @@ internal static class TableAccountActivityReader
                 Id = row.Id,
                 OrderId = row.OrderId,
                 OrderNumber = row.OrderNumber,
+                DailyOrderNumber = row.DailyOrderNumber,
+                BusinessDate = row.BusinessDate,
                 Kind = row.Kind,
                 Status = row.Status,
                 OccurredAt = row.OccurredAt
@@ -55,6 +60,8 @@ internal sealed class TableAccountActivityRow
     public Guid SessionId { get; set; }
     public Guid OrderId { get; set; }
     public string OrderNumber { get; set; } = string.Empty;
+    public long DailyOrderNumber { get; set; }
+    public DateOnly BusinessDate { get; set; }
     public DateTime OccurredAt { get; set; }
     public string Kind { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;

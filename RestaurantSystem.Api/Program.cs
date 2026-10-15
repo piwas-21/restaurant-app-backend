@@ -775,6 +775,8 @@ builder.Services.AddScoped<IBasketChannelService, BasketChannelService>();
 builder.Services.AddScoped<IOrderChannelGuard, OrderChannelGuard>();
 builder.Services.AddScoped<IOrderAvailabilityGuard, OrderAvailabilityGuard>();
 builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
+builder.Services.AddScoped<IOrderPreparationService, OrderPreparationService>();
+builder.Services.AddScoped<IOrderDailyIdentityInitializer, OrderDailyIdentityInitializer>();
 builder.Services.AddScoped<IAnonymousBasketMerger, AnonymousBasketMerger>();
 builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();
 builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
@@ -973,6 +975,11 @@ app.MapControllers();
 // Run migrations in all environments
 await app.Services.EnsureDatabaseCreatedAsync();
 await app.Services.MigrateApplicationDatabaseAsync();
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    await scope.ServiceProvider.GetRequiredService<IOrderDailyIdentityInitializer>()
+        .InitializeAsync();
+}
 
 app.Run();
 

@@ -22,18 +22,21 @@ public class ApproveDelayCommandHandler : ICommandHandler<ApproveDelayCommand, A
     private readonly IOrderMappingService _mappingService;
     private readonly ILogger<ApproveDelayCommandHandler> _logger;
     private readonly IOrderPermittedActionsService? _permittedActionsService;
+    private readonly IOrderPreparationService _preparation;
 
     public ApproveDelayCommandHandler(
         ApplicationDbContext context,
         IOrderEventService orderEventService,
         IOrderMappingService mappingService,
         ILogger<ApproveDelayCommandHandler> logger,
+        IOrderPreparationService preparation,
         IOrderPermittedActionsService? permittedActionsService = null)
     {
         _context = context;
         _orderEventService = orderEventService;
         _mappingService = mappingService;
         _logger = logger;
+        _preparation = preparation;
         _permittedActionsService = permittedActionsService;
     }
 
@@ -99,25 +102,10 @@ public class ApproveDelayCommandHandler : ICommandHandler<ApproveDelayCommand, A
         order.UpdatedAt = DateTime.UtcNow;
         order.UpdatedBy = "Customer";
 
-        // Set estimated delivery time based on preparation minutes if available, or default
-        // Note: EstimatedPreparationMinutes isn't persisted on the order directly, but we might have set EstimatedDeliveryTime previously?
-        // Actually, when we set PendingCustomerApproval, we didn't set EstimatedDeliveryTime.
-        // We should probably have stored the proposed time somewhere or just default to a value.
-        // For now, let's assume standard 30 mins or check if we can retrieve it.
-        // Ideally, we should have stored the proposed delay in the order or a separate table.
-        // Given the constraints, let's set a default or try to infer.
-        // Wait, in UpdateOrderStatusCommandHandler, we didn't set EstimatedDeliveryTime for PendingCustomerApproval.
-        // We only sent it in the email.
-        // This is a gap. We should probably store it in Notes or a new field.
-        // For simplicity, let's assume 30 mins or update it to a standard value.
-        // Or better, let's check if we can pass the minutes in the approval link?
-        // The approval link is just /approve-delay.
-        // Let's just set it to 30 mins for now as a fallback.
-
-        if (!order.EstimatedDeliveryTime.HasValue)
-        {
-            order.EstimatedDeliveryTime = DateTime.UtcNow.AddMinutes(30);
-        }
+        var acceptedAt = DateTime.UtcNow;
+        var preparationMinutes = await _preparation.ApplyAcceptedAsync(
+            order, null, acceptedAt, cancellationToken);
+        order.EstimatedDeliveryTime = acceptedAt.AddMinutes(preparationMinutes);
 
         try
         {

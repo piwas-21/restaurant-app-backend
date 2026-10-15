@@ -1,3 +1,4 @@
+using RestaurantSystem.IntegrationTests.Common;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -174,7 +175,7 @@ public sealed class TableServicePaymentHandoffTests : IAsyncLifetime
             new OrderPaymentReplayResolver(context),
             NullLogger<OrderPaymentApplicator>.Instance);
         var mapping = new OrderMappingService(
-            context, new OrderDisplayCurrencyResolver(context), NullLogger<OrderMappingService>.Instance);
+            context, new OrderDisplayCurrencyResolver(context), NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc);
         var result = await new AddPaymentToOrderCommandHandler(context, applicator, mapping, user).Handle(
             new AddPaymentToOrderCommand
             {
@@ -404,7 +405,7 @@ public sealed class TableServicePaymentHandoffTests : IAsyncLifetime
         var assembler = new TableBillAssembler(
             context,
             new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-                NullLogger<OrderMappingService>.Instance),
+                NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc),
             NullLogger<TableBillAssembler>.Instance);
         var handler = new AddTableBillPaymentCommandHandler(
             context,
@@ -427,7 +428,7 @@ public sealed class TableServicePaymentHandoffTests : IAsyncLifetime
         new(context, new TableBillAssembler(
             context,
             new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-                NullLogger<OrderMappingService>.Instance),
+                NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc),
             NullLogger<TableBillAssembler>.Instance));
 
     private static ICurrentUserService User(UserRole role)

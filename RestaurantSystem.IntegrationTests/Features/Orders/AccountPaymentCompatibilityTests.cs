@@ -187,7 +187,9 @@ public sealed class AccountPaymentCompatibilityTests(DatabaseFixture fixture) : 
         var user = new Mock<ICurrentUserService>().Object;
         var writer = new CheckoutSettlementWriter(context, new OrderPaymentBuilder(user),
             new Mock<IOrderFidelityCoordinator>().Object, new Mock<ISettlementNotifier>().Object,
-            user, NullLogger<CheckoutSettlementWriter>.Instance);
+            user, NullLogger<CheckoutSettlementWriter>.Instance,
+            new OrderPreparationService(context, Microsoft.Extensions.Options.Options.Create(
+                new RestaurantSystem.Api.Settings.OrderWorkflowSettings())));
         await writer.SettleAsync(checkout, "pi_test", 1, CancellationToken.None);
         await writer.SettleAsync(checkout, "pi_test", 1, CancellationToken.None);
         await using var read = DatabaseFixture.CreateContext();

@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.DeliveryChannels.Dtos;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Domain.Common;
@@ -16,7 +17,8 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.DeliveryChannels.Services;
 
 public sealed class ExternalOrderImporter(ApplicationDbContext context, IOptions<DeliveryChannelSettings> options,
-    ICurrentUserService currentUser, IOrderNumberGenerator orderNumbers) : IExternalOrderImporter
+    ICurrentUserService currentUser, IOrderNumberGenerator orderNumbers,
+    IOrderPreparationService preparation) : IExternalOrderImporter
 {
     public async Task<ExternalOrderImportDto> ImportAsync(ExternalOrderRequest request, CancellationToken cancellationToken)
     {
@@ -33,11 +35,21 @@ public sealed class ExternalOrderImporter(ApplicationDbContext context, IOptions
         if (existing is not null)
             return await Replay(existing, fingerprint, cancellationToken);
 
-        await ValidateProducts(request, cancellationToken);
+        var products = await ValidateProducts(request, cancellationToken);
 
         var audit = currentUser.GetAuditIdentifier();
         var order = ExternalOrderBuilder.Build(request, binding.IsSandbox, fingerprint, audit);
-        order.OrderNumber = await orderNumbers.GenerateAsync(cancellationToken);
+        var number = await orderNumbers.GenerateAsync(cancellationToken);
+        order.OrderNumber = number.OrderNumber;
+        order.BusinessDate = number.BusinessDate;
+        order.DailyOrderNumber = number.DailyOrderNumber;
+        foreach (var item in order.Items)
+        {
+            if (item.ProductId.HasValue && products.TryGetValue(item.ProductId.Value, out var product))
+                item.PreparationTimeMinutesSnapshot = product.PreparationTimeMinutes;
+        }
+        order.EffectivePreparationMinutes = await preparation.ResolveEffectiveMinutesAsync(
+            order, null, cancellationToken);
         context.Orders.Add(order);
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -73,7 +85,8 @@ public sealed class ExternalOrderImporter(ApplicationDbContext context, IOptions
         return new ExternalOrderImportDto(persisted.Id, persisted.OrderNumber, true);
     }
 
-    private async Task ValidateProducts(ExternalOrderRequest request, CancellationToken cancellationToken)
+    private async Task<Dictionary<Guid, Product>> ValidateProducts(
+        ExternalOrderRequest request, CancellationToken cancellationToken)
     {
         var productIds = request.Items.Select(item => item.ProductId).Distinct().ToArray();
         var products = await context.Products.Include(product => product.Variations)
@@ -84,6 +97,8 @@ public sealed class ExternalOrderImporter(ApplicationDbContext context, IOptions
             .Where(product => productIds.Contains(product.Id)).ToDictionaryAsync(product => product.Id, cancellationToken);
         foreach (var item in request.Items)
             ValidateProduct(item, products.GetValueOrDefault(item.ProductId));
+
+        return products;
 
     }
 

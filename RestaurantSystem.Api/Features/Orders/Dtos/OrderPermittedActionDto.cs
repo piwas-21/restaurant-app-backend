@@ -4,6 +4,7 @@ namespace RestaurantSystem.Api.Features.Orders.Dtos;
 public record OrderPermittedActionDto
 {
     public string Action { get; init; } = string.Empty;
+    public string? TargetStatus { get; init; }
     public bool Allowed { get; init; }
     public string? ReasonCode { get; init; }
     public bool RequiresReason { get; init; }

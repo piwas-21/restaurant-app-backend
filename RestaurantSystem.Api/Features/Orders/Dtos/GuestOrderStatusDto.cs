@@ -15,4 +15,11 @@ public sealed record GuestOrderStatusDto(
     DateTime? EstimatedDeliveryTime,
     string ConfirmationFlow,
     int ReviewWindowMinutes,
-    DateTime? ReviewDeadlineUtc);
+    DateTime? ReviewDeadlineUtc)
+{
+    public DateOnly BusinessDate { get; init; }
+    public long DailyOrderNumber { get; init; }
+    public int? EffectivePreparationMinutes { get; init; }
+    public DateTime? ExpectedReadyAt { get; init; }
+    public string BusinessTimeZoneId { get; init; } = string.Empty;
+}

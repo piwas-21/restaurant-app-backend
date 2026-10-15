@@ -7,7 +7,9 @@ public sealed class ApproveOrderCommandValidator : AbstractValidator<ApproveOrde
     public ApproveOrderCommandValidator()
     {
         RuleFor(command => command.OrderId).NotEmpty();
-        RuleFor(command => command.PreparationMinutes).InclusiveBetween(0, 600);
+        RuleFor(command => command.PreparationMinutes)
+            .InclusiveBetween(0, 600)
+            .When(command => command.PreparationMinutes.HasValue);
         RuleFor(command => command.ExpectedVersion).GreaterThan(0).When(command => command.ExpectedVersion.HasValue);
     }
 }

@@ -4,6 +4,8 @@ public partial record OrderSummaryDto
 {
     public Guid Id { get; set; }
     public string OrderNumber { get; set; } = null!;
+    public DateOnly BusinessDate { get; set; }
+    public long DailyOrderNumber { get; set; }
     public string? CustomerName { get; set; }
     public string Type { get; set; } = null!;
     public string Status { get; set; } = null!;

@@ -19,6 +19,8 @@ public sealed record ServerServiceTaskDto
 {
     public Guid OrderId { get; init; }
     public string OrderNumber { get; init; } = string.Empty;
+    public long DailyOrderNumber { get; init; }
+    public DateOnly BusinessDate { get; init; }
     public OrderType OrderType { get; init; }
     public OrderStatus Status { get; init; }
     public string Bucket { get; init; } = string.Empty;
