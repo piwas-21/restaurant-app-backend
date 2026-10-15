@@ -17,6 +17,8 @@ public record TableBillAccountItemDto
 {
     public Guid OrderId { get; init; }
     public string OrderNumber { get; init; } = string.Empty;
+    public long DailyOrderNumber { get; init; }
+    public DateOnly BusinessDate { get; init; }
     public Guid OrderItemId { get; init; }
     public OrderItemDto ItemSnapshot { get; init; } = new();
     /// <summary>Stable unit ordinals are 1 through UnitCount; they are not eagerly expanded.</summary>

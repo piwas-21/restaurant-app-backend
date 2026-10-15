@@ -27,6 +27,16 @@ public partial class UpdateOrderStatusCommandHandler
                 ErrorCodes.OrderVersionConflict);
         }
 
+        if (command.EstimatedPreparationMinutes.HasValue
+            && !_currentUserService.IsAdmin
+            && _currentUserService.Role != UserRole.Cashier
+            && !command.TrustedPreparationOverride)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "Only a cashier or admin may set an order preparation-time override.",
+                ErrorCodes.CashierRequired);
+        }
+
         if (!order.IsKitchenReleased)
         {
             return ApiResponse<OrderDto>.FailureWithCode(
@@ -60,15 +70,18 @@ public partial class UpdateOrderStatusCommandHandler
         CreatedBy = _currentUserService.GetAuditIdentifier()
     };
 
-    private int? ApplyStatusChange(Order order, UpdateOrderStatusCommand command)
+    private async Task<int?> ApplyStatusChangeAsync(
+        Order order, UpdateOrderStatusCommand command, CancellationToken cancellationToken)
     {
         // Marketplace pickup/delivery timing belongs to the provider; local preparation adds no guessed ETA.
         if (order.ExternalReference is not null) return null;
         switch (command.NewStatus)
         {
             case OrderStatus.Confirmed:
-                var prepMinutes = command.EstimatedPreparationMinutes ?? _workflow.ConfirmedPreparationMinutes;
-                order.EstimatedDeliveryTime = DateTime.UtcNow.AddMinutes(prepMinutes);
+                var acceptedAt = DateTime.UtcNow;
+                var prepMinutes = await _preparation.ApplyAcceptedAsync(
+                    order, command.EstimatedPreparationMinutes, acceptedAt, cancellationToken);
+                order.EstimatedDeliveryTime = acceptedAt.AddMinutes(prepMinutes);
                 return prepMinutes;
 
             case OrderStatus.Completed:
@@ -83,7 +96,8 @@ public partial class UpdateOrderStatusCommandHandler
                 break;
 
             case OrderStatus.PendingApproval:
-                return command.EstimatedPreparationMinutes ?? _workflow.ConfirmedPreparationMinutes;
+                return await _preparation.ApplyPendingApprovalAsync(
+                    order, command.EstimatedPreparationMinutes, cancellationToken);
         }
 
         return null;

@@ -58,7 +58,7 @@ public class OrderNumberGenerator : IOrderNumberGenerator
         _clock = clock;
     }
 
-    public async Task<string> GenerateAsync(CancellationToken cancellationToken = default)
+    public async Task<OrderNumberAllocation> GenerateAsync(CancellationToken cancellationToken = default)
     {
         // The day a human reads off the number, so it is the tenant's day (backend #372) — on UTC
         // the number rolled over at 02:00 local. Uniqueness and the advisory lock below are
@@ -69,7 +69,10 @@ public class OrderNumberGenerator : IOrderNumberGenerator
 
         var nextSequence = await ReserveNextSequenceAsync(date, cancellationToken);
 
-        return string.Create(CultureInfo.InvariantCulture, $"{date}{nextSequence:D4}");
+        return new OrderNumberAllocation(
+            string.Create(CultureInfo.InvariantCulture, $"{date}{nextSequence:D4}"),
+            DateOnly.ParseExact(date, "yyyyMMdd", CultureInfo.InvariantCulture),
+            nextSequence);
     }
 
     private async Task<long> ReserveNextSequenceAsync(string date, CancellationToken cancellationToken)

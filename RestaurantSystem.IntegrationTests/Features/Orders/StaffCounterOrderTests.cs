@@ -237,6 +237,13 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
     [Fact]
     public async Task Create_uses_catalogue_price_and_holds_unpaid_order()
     {
+        await using (var preparationContext = DatabaseFixture.CreateContext())
+        {
+            var product = await preparationContext.Products.SingleAsync(candidate => candidate.Id == _productId);
+            product.PreparationTimeMinutes = 0;
+            await preparationContext.SaveChangesAsync();
+        }
+
         AuthenticateAsAdmin();
         var response = await PostAsJsonAsync("/api/staff/orders", CreateBody(Guid.NewGuid(), false));
         var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
@@ -247,11 +254,19 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         body.Data.IsKitchenReleased.Should().BeFalse();
         body.Data.Version.Should().Be(1);
         body.Data.UserId.Should().BeNull();
+        body.Data.EffectivePreparationMinutes.Should().Be(0,
+            "a held order exposes its known product estimate before kitchen release");
+        body.Data.ExpectedReadyAt.Should().BeNull("the countdown starts on kitchen release");
 
         await using var context = DatabaseFixture.CreateContext();
         (await context.Orders.CountAsync()).Should().Be(1);
         (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
         (await context.Orders.Select(order => order.IsKitchenReleased).SingleAsync()).Should().BeFalse();
+        var heldOrder = await context.Orders.Include(order => order.Items).SingleAsync();
+        heldOrder.EffectivePreparationMinutes.Should().Be(0);
+        heldOrder.ExpectedReadyAt.Should().BeNull();
+        heldOrder.Items.Should().ContainSingle()
+            .Which.PreparationTimeMinutesSnapshot.Should().Be(0);
         (await context.OrderBillingSnapshots.AsNoTracking().CountAsync()).Should().Be(1);
     }
 
@@ -433,6 +448,8 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         var sessionId = Guid.NewGuid();
         await using (var context = DatabaseFixture.CreateContext())
         {
+            var product = await context.Products.SingleAsync(candidate => candidate.Id == _productId);
+            product.PreparationTimeMinutes = 14;
             context.Tables.Add(new Table
             {
                 Id = Guid.NewGuid(),
@@ -469,6 +486,27 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
 
         acceptedBody.Success.Should().BeTrue(acceptedBody.Message);
         acceptedBody.Data!.ServiceSessionId.Should().Be(sessionId);
+        acceptedBody.Data.Status.Should().Be(nameof(OrderStatus.Confirmed));
+        acceptedBody.Data.EffectivePreparationMinutes.Should().Be(14);
+        acceptedBody.Data.ExpectedReadyAt.Should().BeNull(
+            "a table-assigned order may be Confirmed while staff still holds it from the kitchen");
+
+        var releaseStartedAt = DateTime.UtcNow;
+        var release = await PostAsJsonAsync($"/api/staff/orders/{acceptedBody.Data.Id}/release", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            expectedVersion = acceptedBody.Data.Version
+        });
+        var releaseFinishedAt = DateTime.UtcNow;
+        var releaseBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(release))!;
+        release.StatusCode.Should().Be(HttpStatusCode.OK);
+        releaseBody.Success.Should().BeTrue(releaseBody.Message);
+        releaseBody.Data!.IsKitchenReleased.Should().BeTrue();
+        releaseBody.Data.ExpectedReadyAt.Should().NotBeNull();
+        releaseBody.Data.ExpectedReadyAt!.Value.Should()
+            .BeOnOrAfter(releaseStartedAt.AddMinutes(14))
+            .And.BeOnOrBefore(releaseFinishedAt.AddMinutes(14),
+                "the countdown starts with the actual release, not order creation");
 
         var rejected = await PostAsJsonAsync("/api/staff/orders", new
         {
@@ -485,7 +523,8 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         await using var verification = DatabaseFixture.CreateContext();
         (await verification.Orders.CountAsync()).Should().Be(1);
         (await verification.Orders.SingleAsync()).ServiceSessionId.Should().Be(sessionId);
-        (await verification.StaffOrderOperations.CountAsync()).Should().Be(1);
+        (await verification.StaffOrderOperations.CountAsync()).Should().Be(2,
+            "the successful release is persisted as a second idempotent staff operation");
     }
 
     [Fact]

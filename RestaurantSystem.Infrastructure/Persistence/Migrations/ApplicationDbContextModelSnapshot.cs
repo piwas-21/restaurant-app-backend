@@ -4947,6 +4947,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(0m)
                         .HasColumnName("billing_credit_amount");
 
+                    b.Property<DateOnly>("BusinessDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("date")
+                        .HasColumnName("business_date");
+
                     b.Property<string>("CancellationReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -4986,6 +4991,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("customer_phone");
 
+                    b.Property<long>("DailyOrderNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("daily_order_number");
+
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
@@ -5006,9 +5016,17 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("decimal(5,2)")
                         .HasColumnName("discount_percentage");
 
+                    b.Property<int?>("EffectivePreparationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("effective_preparation_minutes");
+
                     b.Property<DateTime?>("EstimatedDeliveryTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("estimated_delivery_time");
+
+                    b.Property<DateTime?>("ExpectedReadyAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expected_ready_at");
 
                     b.Property<decimal>("FidelityPointsDiscount")
                         .HasColumnType("numeric")
@@ -5091,6 +5109,15 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("preferred_language");
+
+                    b.Property<DateTime?>("PriorDayReviewDismissedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("prior_day_review_dismissed_at");
+
+                    b.Property<string>("PriorDayReviewDismissedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("prior_day_review_dismissed_by");
 
                     b.Property<string>("PromoCode")
                         .HasMaxLength(50)
@@ -5181,6 +5208,9 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_orders");
 
+                    b.HasIndex("BusinessDate")
+                        .HasDatabaseName("ix_orders_business_date");
+
                     b.HasIndex("CustomerDiscountRuleId")
                         .HasDatabaseName("ix_orders_customer_discount_rule_id");
 
@@ -5204,6 +5234,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_orders_user_id");
+
+                    b.HasIndex("BusinessDate", "DailyOrderNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_orders_business_date_daily_order_number")
+                        .HasFilter("\"business_date\" IS NOT NULL AND \"daily_order_number\" IS NOT NULL");
 
                     b.HasIndex("UserId", "OrderDate");
 
@@ -7263,6 +7298,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("parent_order_item_id");
 
+                    b.Property<int?>("PreparationTimeMinutesSnapshot")
+                        .HasColumnType("integer")
+                        .HasColumnName("preparation_time_minutes_snapshot");
+
                     b.Property<string>("PresentationLabel")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
@@ -7344,7 +7383,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProductVariationId")
                         .HasDatabaseName("ix_order_items_product_variation_id");
 
-                    b.ToTable("OrderItems", (string)null);
+                    b.ToTable("OrderItems", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_items_preparation_snapshot_nonnegative", "preparation_time_minutes_snapshot IS NULL OR preparation_time_minutes_snapshot >= 0");
+                        });
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderItemIngredient", b =>

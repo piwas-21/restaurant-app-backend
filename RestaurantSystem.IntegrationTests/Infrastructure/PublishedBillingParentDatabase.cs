@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
@@ -87,5 +90,11 @@ internal sealed class PublishedBillingParentDatabase : IAsyncDisposable
     {
         await using var context = CreateContext();
         await context.Database.MigrateAsync(target);
+        if (target is null)
+        {
+            await new OrderDailyIdentityInitializer(
+                context, new FixedTenantClock("Europe/Zurich"),
+                NullLogger<OrderDailyIdentityInitializer>.Instance).InitializeAsync();
+        }
     }
 }

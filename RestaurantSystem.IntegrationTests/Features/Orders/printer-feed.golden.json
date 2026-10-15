@@ -160,7 +160,12 @@
           }
         ],
         "payments": [],
-        "statusHistory": []
+        "statusHistory": [],
+        "businessDate": "2026-01-02",
+        "dailyOrderNumber": 1,
+        "effectivePreparationMinutes": null,
+        "expectedReadyAt": null,
+        "businessTimeZoneId": "Europe/Zurich"
       },
       {
         "id": "__volatile__",
@@ -291,7 +296,12 @@
             "changedAt": "__volatile__",
             "changedBy": "test"
           }
-        ]
+        ],
+        "businessDate": "2026-01-01",
+        "dailyOrderNumber": 1,
+        "effectivePreparationMinutes": null,
+        "expectedReadyAt": null,
+        "businessTimeZoneId": "Europe/Zurich"
       }
     ],
     "totalCount": "__volatile__",

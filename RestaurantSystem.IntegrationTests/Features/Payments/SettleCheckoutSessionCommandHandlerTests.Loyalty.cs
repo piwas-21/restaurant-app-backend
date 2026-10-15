@@ -41,7 +41,9 @@ public partial class SettleCheckoutSessionCommandHandlerTests
         var current = CurrentUser();
         var writer = new CheckoutSettlementWriter(context, new OrderPaymentBuilder(current), fidelity.Object,
             new Mock<RestaurantSystem.Api.Features.Payments.Interfaces.ISettlementNotifier>().Object,
-            current, NullLogger<CheckoutSettlementWriter>.Instance);
+            current, NullLogger<CheckoutSettlementWriter>.Instance,
+            new OrderPreparationService(context, Microsoft.Extensions.Options.Options.Create(
+                new RestaurantSystem.Api.Settings.OrderWorkflowSettings())));
         await writer.SettleAsync(checkout, "pi_loyalty_failure", 4250, CancellationToken.None);
         sawSqlError.Should().BeTrue();
         outsideTransaction.Should().BeTrue();

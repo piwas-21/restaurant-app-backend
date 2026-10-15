@@ -342,7 +342,9 @@ public partial class CheckoutExpirySweepTests : IAsyncLifetime
                 new Mock<IOrderFidelityCoordinator>().Object,
                 new Mock<ISettlementNotifier>().Object,
                 currentUser,
-                NullLogger<CheckoutSettlementWriter>.Instance),
+                NullLogger<CheckoutSettlementWriter>.Instance,
+                new OrderPreparationService(context, Microsoft.Extensions.Options.Options.Create(
+                    new RestaurantSystem.Api.Settings.OrderWorkflowSettings()))),
             new CheckoutSessionRetirement(context, currentUser, NullLogger<CheckoutSessionRetirement>.Instance),
             NullLogger<SettleCheckoutSessionCommandHandler>.Instance);
 

@@ -18,5 +18,9 @@ public class UpdateOrderStatusCommandValidator : AbstractValidator<UpdateOrderSt
         RuleFor(x => x.NewStatus)
             .IsInEnum()
             .WithMessage("Invalid order status");
+
+        RuleFor(x => x.EstimatedPreparationMinutes)
+            .InclusiveBetween(0, 600)
+            .When(x => x.EstimatedPreparationMinutes.HasValue);
     }
 }

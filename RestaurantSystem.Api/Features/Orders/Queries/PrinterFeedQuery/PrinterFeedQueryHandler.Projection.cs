@@ -24,6 +24,13 @@ public partial class PrinterFeedQueryHandler
         // The guest status token is a read-only screen secret. It has no business on printer wire.
         var orderDtos = orders.Select(order =>
         {
+            if (order.Status != OrderStatus.Confirmed)
+            {
+                order.RoutingStates = order.RoutingStates
+                    .Where(state => state.Target == DevicePrintTarget.Cashier)
+                    .ToList();
+            }
+
             var dto = _mappingService.MapToOrderDto(order);
             dto.GuestStatusToken = null;
             if (supplements.TryGetValue(order.Id, out var amendment))

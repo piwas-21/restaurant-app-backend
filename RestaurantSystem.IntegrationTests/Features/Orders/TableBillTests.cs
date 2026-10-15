@@ -236,7 +236,8 @@ public class TableBillTests : IAsyncLifetime
             new RestaurantSystem.Api.Features.Orders.Services.OrderMappingService(
                 ctx,
                 new RestaurantSystem.Api.Features.Orders.Services.OrderDisplayCurrencyResolver(ctx),
-                NullLogger<RestaurantSystem.Api.Features.Orders.Services.OrderMappingService>.Instance),
+                NullLogger<RestaurantSystem.Api.Features.Orders.Services.OrderMappingService>.Instance,
+                TestTenantClock.Utc),
             NullLogger<TableBillAssembler>.Instance);
     }
 

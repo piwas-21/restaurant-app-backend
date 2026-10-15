@@ -32,3 +32,8 @@ internal sealed class FixedTenantClock : ITenantClock
         TimeZoneInfo.ConvertTime(
             new DateTimeOffset(DateTime.SpecifyKind(instant, DateTimeKind.Utc)), TimeZone);
 }
+
+internal static class TestTenantClock
+{
+    public static ITenantClock Utc { get; } = new FixedTenantClock("UTC");
+}

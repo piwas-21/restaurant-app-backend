@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.IntegrationTests.Infrastructure;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.IntegrationTests.Common;
@@ -45,7 +46,6 @@ public static class TestOrderSeeder
             CreatedBy = "TestOrderSeeder",
         };
 
-        context.Orders.Add(order);
-        await context.SaveChangesAsync();
+        await LegacyEntityFixture.InsertAsync(context, order);
     }
 }

@@ -1,3 +1,4 @@
+using RestaurantSystem.IntegrationTests.Common;
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -249,7 +250,8 @@ public sealed class TableAccountRevisionTests : IntegrationTestBase
         side.Kind.Should().Be(OrderItemKind.SideItem);
         side.SideItems.Should().ContainSingle().Which.Id.Should().Be(nestedId);
         typeof(TableBillAccountItemDto).GetProperties().Select(property => property.Name)
-            .Should().BeEquivalentTo("OrderId", "OrderNumber", "OrderItemId", "ItemSnapshot", "UnitCount");
+            .Should().BeEquivalentTo("OrderId", "OrderNumber", "DailyOrderNumber", "BusinessDate",
+                "OrderItemId", "ItemSnapshot", "UnitCount");
     }
 
     [Fact]
@@ -308,6 +310,6 @@ public sealed class TableAccountRevisionTests : IntegrationTestBase
     private static TableBillAssembler CreateAssembler(ApplicationDbContext context) => new(
         context,
         new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
-            NullLogger<OrderMappingService>.Instance),
+            NullLogger<OrderMappingService>.Instance, TestTenantClock.Utc),
         NullLogger<TableBillAssembler>.Instance);
 }

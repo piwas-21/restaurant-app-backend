@@ -14,8 +14,21 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .IsRequired()
             .HasMaxLength(20);
 
+        builder.Property(o => o.BusinessDate).ValueGeneratedOnAdd();
+        builder.Property(o => o.DailyOrderNumber).ValueGeneratedOnAdd();
+
         builder.HasIndex(o => o.OrderNumber)
             .IsUnique();
+
+        builder.HasIndex(o => new { o.BusinessDate, o.DailyOrderNumber })
+            .IsUnique()
+            .HasDatabaseName("ix_orders_business_date_daily_order_number")
+            .HasFilter("\"business_date\" IS NOT NULL AND \"daily_order_number\" IS NOT NULL");
+        builder.HasIndex(o => o.BusinessDate)
+            .HasDatabaseName("ix_orders_business_date");
+
+        builder.Property(o => o.PriorDayReviewDismissedBy)
+            .HasMaxLength(100);
 
         // 32 random bytes, base64url-encoded => 43 chars. Capped well above that so a future
         // widening is a config change rather than a data migration.

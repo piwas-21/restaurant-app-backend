@@ -638,7 +638,9 @@ public partial class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
             (fidelity ?? new Mock<IOrderFidelityCoordinator>()).Object,
             (notifier ?? new Mock<ISettlementNotifier>()).Object,
             currentUser,
-            NullLogger<CheckoutSettlementWriter>.Instance);
+            NullLogger<CheckoutSettlementWriter>.Instance,
+            new OrderPreparationService(ctx, Microsoft.Extensions.Options.Options.Create(
+                new RestaurantSystem.Api.Settings.OrderWorkflowSettings())));
     }
 
     /// <summary>

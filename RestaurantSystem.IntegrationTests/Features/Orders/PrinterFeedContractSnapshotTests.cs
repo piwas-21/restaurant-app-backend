@@ -59,6 +59,8 @@ public class PrinterFeedContractSnapshotTests : IntegrationTestBase
 
     private const string BundleOrderNumber = "PF238-A-BUNDLE";
     private const string DeliveryOrderNumber = "PF238-B-DELIVERY";
+    private const string BusinessTimeZoneId = "Europe/Zurich";
+    private static readonly DateTime BundleOrderDate = new(2026, 1, 2, 12, 0, 0, DateTimeKind.Utc);
 
     private static bool IsSnapshotOrder(JsonNode? order) =>
         order?["orderNumber"]?.GetValue<string>() is BundleOrderNumber or DeliveryOrderNumber;
@@ -117,6 +119,11 @@ public class PrinterFeedContractSnapshotTests : IntegrationTestBase
         var feed = JsonNode.Parse(await FetchRawFeedAsync())!;
         var order = feed["data"]!["items"]!.AsArray()
             .Single(o => o!["orderNumber"]!.GetValue<string>() == BundleOrderNumber)!;
+        AssertDailyMetadata(order, BundleOrderNumber, "2026-01-02", expectedDailyNumber: 1);
+
+        var deliveryOrder = feed["data"]!["items"]!.AsArray()
+            .Single(o => o!["orderNumber"]!.GetValue<string>() == DeliveryOrderNumber)!;
+        AssertDailyMetadata(deliveryOrder, DeliveryOrderNumber, "2026-01-01", expectedDailyNumber: 1);
 
         var items = order["items"]!.AsArray();
         items.Should().ContainSingle("`items` is ROOT-ONLY: a component must never also appear at top level");
@@ -167,6 +174,20 @@ public class PrinterFeedContractSnapshotTests : IntegrationTestBase
         var response = await Client.GetAsync("/api/orders/printer-feed");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
+    }
+
+    private static void AssertDailyMetadata(
+        JsonNode? order, string expectedOrderNumber, string expectedBusinessDate, long expectedDailyNumber)
+    {
+        order!["orderNumber"]!.GetValue<string>().Should().Be(expectedOrderNumber,
+            "the existing order reference remains unchanged while daily identity is additive");
+        order["businessDate"]!.GetValue<string>().Should().Be(expectedBusinessDate);
+        order["dailyOrderNumber"]!.GetValue<long>().Should().Be(expectedDailyNumber);
+        order["businessTimeZoneId"]!.GetValue<string>().Should().Be(BusinessTimeZoneId);
+        order["effectivePreparationMinutes"].Should().BeNull(
+            "the manually seeded legacy fixture has no frozen preparation estimate");
+        order["expectedReadyAt"].Should().BeNull(
+            "the manually seeded fixture has no accepted preparation timestamp");
     }
 
     /// <summary>
@@ -301,8 +322,8 @@ public class PrinterFeedContractSnapshotTests : IntegrationTestBase
             PaymentStatus = PaymentStatus.Pending,
             SubTotal = 24.00m,
             Total = 24.00m,
-            OrderDate = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow,
+            OrderDate = BundleOrderDate,
+            CreatedAt = BundleOrderDate,
             CreatedBy = "test",
         };
 

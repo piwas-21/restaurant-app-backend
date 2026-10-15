@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -86,7 +87,8 @@ public class OrderNumberAllocationTests : IntegrationTestBase
         await transactionA.CommitAsync();
 
         var numberB = await allocateB;
-        numberB.Should().NotBe(numberA, "the second checkout must not reuse a committed order number");
+        numberB.OrderNumber.Should().NotBe(numberA.OrderNumber,
+            "the second checkout must not reuse a committed order number");
 
         AddOrder(contextB, numberB);
         var saveB = async () => await contextB.SaveChangesAsync();
@@ -131,7 +133,7 @@ public class OrderNumberAllocationTests : IntegrationTestBase
             AddOrder(context, number);
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
-            allocated.Add(number);
+            allocated.Add(number.OrderNumber);
         }
 
         allocated.Should().Equal($"{Today}0001", $"{Today}0002", $"{Today}0003");
@@ -154,7 +156,7 @@ public class OrderNumberAllocationTests : IntegrationTestBase
         await context.SaveChangesAsync();
 
         var nextNumber = await new OrderNumberGenerator(context, UtcClock).GenerateAsync();
-        nextNumber.Should().Be($"{today}0004",
+        nextNumber.OrderNumber.Should().Be($"{today}0004",
             "a soft-deleted order still occupies the unique order-number index");
 
         AddOrder(context, nextNumber);
@@ -165,7 +167,7 @@ public class OrderNumberAllocationTests : IntegrationTestBase
             .Where(order => order.OrderNumber.StartsWith(today))
             .Select(order => order.OrderNumber)
             .ToListAsync();
-        stored.Should().Contain($"{today}0003").And.Contain(nextNumber);
+        stored.Should().Contain($"{today}0003").And.Contain(nextNumber.OrderNumber);
         stored.Should().OnlyHaveUniqueItems();
     }
 
@@ -175,7 +177,7 @@ public class OrderNumberAllocationTests : IntegrationTestBase
     /// Waits until <paramref name="allocation"/> is parked on today's allocation lock. Returns false
     /// if it answers instead — which is the bug — and rethrows if it faulted.
     /// </summary>
-    private async Task<bool> WaitUntilBlockedOnTodaysLockAsync(Task<string> allocation)
+    private async Task<bool> WaitUntilBlockedOnTodaysLockAsync(Task<OrderNumberAllocation> allocation)
     {
         await using var observer = DatabaseFixture.CreateContext();
         var dayKey = int.Parse(Today, CultureInfo.InvariantCulture);
@@ -220,13 +222,26 @@ public class OrderNumberAllocationTests : IntegrationTestBase
                   AND objsubid = 2 AND objid::bigint = {dayKey}")
             .SingleAsync();
 
+    private static void AddOrder(ApplicationDbContext context, OrderNumberAllocation allocation) =>
+        AddOrder(context, allocation.OrderNumber, allocation.BusinessDate, allocation.DailyOrderNumber);
+
     private static void AddOrder(ApplicationDbContext context, string orderNumber)
+    {
+        var day = DateOnly.ParseExact(orderNumber[..8], "yyyyMMdd", CultureInfo.InvariantCulture);
+        var suffix = long.Parse(orderNumber[8..], CultureInfo.InvariantCulture);
+        AddOrder(context, orderNumber, day, suffix);
+    }
+
+    private static void AddOrder(
+        ApplicationDbContext context, string orderNumber, DateOnly businessDate, long dailyOrderNumber)
     {
         var now = DateTime.UtcNow;
         context.Orders.Add(new Order
         {
             Id = Guid.NewGuid(),
             OrderNumber = orderNumber,
+            BusinessDate = businessDate,
+            DailyOrderNumber = dailyOrderNumber,
             Type = OrderType.Takeaway,
             Status = OrderStatus.Pending,
             PaymentStatus = PaymentStatus.Pending,
@@ -266,7 +281,8 @@ public class OrderNumberAllocationTests : IntegrationTestBase
 
         var number = await new OrderNumberGenerator(context, clock).GenerateAsync();
 
-        number.Should().StartWith(tenantDay);
+        number.OrderNumber.Should().StartWith(tenantDay);
+        number.BusinessDate.ToString("yyyyMMdd", CultureInfo.InvariantCulture).Should().Be(tenantDay);
         await transaction.RollbackAsync();
     }
 }

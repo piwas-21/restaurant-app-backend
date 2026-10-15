@@ -38,6 +38,7 @@ public partial class OrderItemFactory
             ProductName = product.Name,
             VariationName = variationName,
             Quantity = itemDto.Quantity,
+            PreparationTimeMinutesSnapshot = product.PreparationTimeMinutes,
             UnitPrice = unitPrice,
             ItemTotal = itemTotal,
             SpecialInstructions = itemDto.SpecialInstructions,
