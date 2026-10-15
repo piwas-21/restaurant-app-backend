@@ -50,8 +50,7 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
           IOrderResponseProjector responses,
           IOrderNotificationService notifications,
           ILogger<UpdateOrderStatusCommandHandler> logger,
-          IOrderPreparationService preparation,
-          IOrderStatusTransitionPolicy? transitionPolicy = null)
+          IOrderStatusUpdateServices statusUpdateServices)
     {
         _context = context;
         _currentUserService = currentUserService;
@@ -59,9 +58,9 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
         _responses = responses;
         _notifications = notifications;
         _logger = logger;
-        _workflow = transitionPolicy?.Workflow ?? new OrderWorkflowSettings();
-        _transitionPolicy = transitionPolicy;
-        _preparation = preparation;
+        _workflow = statusUpdateServices.TransitionPolicy?.Workflow ?? new OrderWorkflowSettings();
+        _transitionPolicy = statusUpdateServices.TransitionPolicy;
+        _preparation = statusUpdateServices.Preparation;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(UpdateOrderStatusCommand command, CancellationToken cancellationToken)

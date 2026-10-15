@@ -196,9 +196,12 @@ public sealed class AccountPaymentCancellationTests(DatabaseFixture fixture) : I
                 var projector = new Mock<IOrderResponseProjector>();
                 projector.Setup(value => value.ProjectAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync(new OrderDto());
+                var statusUpdateServices = new Mock<IOrderStatusUpdateServices>();
+                statusUpdateServices.SetupGet(value => value.Preparation)
+                    .Returns(new Mock<IOrderPreparationService>().Object);
                 var status = new UpdateOrderStatusCommandHandler(context, current.Object, events, projector.Object,
                     new Mock<IOrderNotificationService>().Object, NullLogger<UpdateOrderStatusCommandHandler>.Instance,
-                    new Mock<IOrderPreparationService>().Object);
+                    statusUpdateServices.Object);
                 (await status.Handle(new UpdateOrderStatusCommand
                 { OrderId = orderId, NewStatus = OrderStatus.Cancelled }, CancellationToken.None)).Success.Should().BeTrue();
                 break;

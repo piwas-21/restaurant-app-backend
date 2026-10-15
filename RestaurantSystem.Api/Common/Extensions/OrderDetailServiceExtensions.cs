@@ -16,6 +16,7 @@ public static class OrderDetailServiceExtensions
             .ValidateOnStart();
         services.AddScoped<IRetainedCustomerDataScrubber, RetainedCustomerDataScrubber>();
         services.AddScoped<IOrderStatusTransitionPolicy, OrderStatusTransitionPolicy>();
+        services.AddScoped<IOrderStatusUpdateServices, OrderStatusUpdateServices>();
         services.AddScoped<IOrderPermittedActionsService, OrderPermittedActionsService>();
         services.AddScoped<IOrderResponseProjector, OrderResponseProjector>();
         return services;

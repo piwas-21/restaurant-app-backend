@@ -172,17 +172,19 @@ public class GetOrdersTenantDayTests : IntegrationTestBase
 
         foreach (var (number, instant) in orders)
         {
+            var orderInstant = Utc(instant);
             seed.Orders.Add(new Order
             {
                 Id = Guid.NewGuid(),
                 OrderNumber = number,
+                BusinessDate = DateOnly.FromDateTime(_clock.ToTenantTime(orderInstant).DateTime),
                 Type = OrderType.Takeaway,
                 Status = OrderStatus.Completed,
                 PaymentStatus = PaymentStatus.Completed,
                 SubTotal = 10m,
                 Total = 10m,
-                OrderDate = Utc(instant),
-                CreatedAt = Utc(instant),
+                OrderDate = orderInstant,
+                CreatedAt = orderInstant,
                 CreatedBy = nameof(GetOrdersTenantDayTests),
                 IsDeleted = false,
             });

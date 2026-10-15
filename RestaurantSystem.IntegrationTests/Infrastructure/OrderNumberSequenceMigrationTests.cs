@@ -13,8 +13,8 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
 {
     private const string MigrationBeforeSequence = "20260927174440" + "_AddOptionSetMaterializationJobs";
-    private static readonly DateTimeOffset AllocationInstant = new(2000, 1, 1, 12, 0, 0, TimeSpan.Zero);
-    private static readonly FixedTenantClock AllocationClock = new("UTC", AllocationInstant);
+    private static readonly DateTimeOffset AllocationInstant = new(2000, 1, 1, 3, 30, 0, TimeSpan.Zero);
+    private static readonly FixedTenantClock AllocationClock = new("America/Los_Angeles", AllocationInstant);
 
     private readonly DatabaseFixture _fixture;
 
@@ -31,10 +31,12 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
     [Fact]
     public async Task Migration_backfills_deleted_numbers_and_trigger_tracks_legacy_inserts()
     {
-        var day = DateOnly.FromDateTime(AllocationInstant.UtcDateTime);
+        var day = DateOnly.FromDateTime(AllocationClock.ToTenantTime(AllocationInstant.UtcDateTime).DateTime);
         var prefix = day.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
         var activeOrderId = Guid.NewGuid();
         var deletedOrderId = Guid.NewGuid();
+        var validTenantDayOrderId = Guid.NewGuid();
+        var malformedTenantDayOrderId = Guid.NewGuid();
         var legacyInsertId = Guid.NewGuid();
         var invalidDateId = Guid.NewGuid();
         var legacyTextId = Guid.NewGuid();
@@ -49,6 +51,11 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
                     AllocationInstant.UtcDateTime, nameof(OrderNumberSequenceMigrationTests));
                 await HistoricalOrderSeed.InsertAsync(setup, deletedOrderId, $"{prefix}0008",
                     AllocationInstant.UtcDateTime, nameof(OrderNumberSequenceMigrationTests), deleted: true);
+                await HistoricalOrderSeed.InsertAsync(setup, validTenantDayOrderId, $"{prefix}0011",
+                    AllocationInstant.UtcDateTime.AddHours(4), nameof(OrderNumberSequenceMigrationTests));
+                await HistoricalOrderSeed.InsertAsync(setup, malformedTenantDayOrderId,
+                    $"BCR-{malformedTenantDayOrderId:N}"[..20], AllocationInstant.UtcDateTime,
+                    nameof(OrderNumberSequenceMigrationTests));
             }
 
             await using (var migrate = _fixture.CreateContext())
@@ -58,19 +65,33 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
                     migrate, AllocationClock, NullLogger<OrderDailyIdentityInitializer>.Instance)
                     .InitializeAsync();
 
+                var malformedIdentity = await migrate.Orders.AsNoTracking()
+                    .SingleAsync(order => order.Id == malformedTenantDayOrderId);
+                malformedIdentity.BusinessDate.Should().Be(day,
+                    "malformed legacy references must fall back to the tenant-local order date");
+                malformedIdentity.DailyOrderNumber.Should().BeGreaterThan(11,
+                    "fallback allocation must stay beyond every valid parsed daily identity");
+
+                var dayIdentities = await migrate.Orders.IgnoreQueryFilters().AsNoTracking()
+                    .Where(order => order.BusinessDate == day)
+                    .Select(order => order.DailyOrderNumber)
+                    .ToListAsync();
+                dayIdentities.Should().OnlyHaveUniqueItems();
+                dayIdentities.Should().Contain(3).And.Contain(8).And.Contain(11);
                 var backfilled = await migrate.OrderNumberSequences.SingleAsync(row => row.Day == day);
-                backfilled.LastSequence.Should().Be(8,
-                    "the backfill must include canonical order numbers on soft-deleted rows");
+                backfilled.LastSequence.Should().Be(dayIdentities.Max(),
+                    "the startup backfill must include soft-deleted, valid, and fallback identities in its watermark");
 
                 // This raw SQL insert models an older app instance that does not know the new
                 // NOT NULL columns. The trigger must derive their values and maintain the
                 // sequence watermark before the next version allocates.
-                await HistoricalOrderSeed.InsertAsync(migrate, legacyInsertId, $"{prefix}0009",
+                var legacySequence = backfilled.LastSequence + 1;
+                await HistoricalOrderSeed.InsertAsync(migrate, legacyInsertId, $"{prefix}{legacySequence:D4}",
                     AllocationInstant.UtcDateTime, nameof(OrderNumberSequenceMigrationTests));
                 var legacyIdentity = await migrate.Orders.AsNoTracking()
                     .SingleAsync(order => order.Id == legacyInsertId);
                 legacyIdentity.BusinessDate.Should().Be(day);
-                legacyIdentity.DailyOrderNumber.Should().Be(9);
+                legacyIdentity.DailyOrderNumber.Should().Be(legacySequence);
 
                 // Invalid and noncanonical values remain accepted as historical text, but their
                 // fallback tenant-local days are isolated from the canonical sequence above.
@@ -81,8 +102,8 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
                 await migrate.SaveChangesAsync();
 
                 (await migrate.OrderNumberSequences.AsNoTracking().SingleAsync(row => row.Day == day))
-                    .LastSequence.Should().Be(9,
-                        "valid legacy inserts advance the watermark while noncanonical values are ignored");
+                    .LastSequence.Should().Be(legacySequence,
+                        "valid legacy inserts advance the watermark while noncanonical references stay on their assigned local days");
 
                 const string invalidDate = "202613990001";
                 var parsedInvalidDate = await migrate.Database
@@ -99,13 +120,14 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
                 await using var transaction = await migrate.Database.BeginTransactionAsync();
                 var nextNumber = await new OrderNumberGenerator(migrate, AllocationClock)
                     .GenerateAsync();
-                nextNumber.OrderNumber.Should().Be($"{prefix}0010");
+                var nextSequence = legacySequence + 1;
+                nextNumber.OrderNumber.Should().Be($"{prefix}{nextSequence:D4}");
                 migrate.Orders.Add(CreateOrder(allocatedOrderId, nextNumber.OrderNumber, isDeleted: false));
                 await migrate.SaveChangesAsync();
                 await transaction.CommitAsync();
 
                 (await migrate.OrderNumberSequences.AsNoTracking().SingleAsync(row => row.Day == day))
-                    .LastSequence.Should().Be(10);
+                    .LastSequence.Should().Be(nextSequence);
             }
         }
         finally
@@ -117,6 +139,10 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
             await cleanup.Database.ExecuteSqlInterpolatedAsync(
                 $"DELETE FROM order_changes WHERE order_id = {deletedOrderId}");
             await cleanup.Database.ExecuteSqlInterpolatedAsync(
+                $"DELETE FROM order_changes WHERE order_id = {validTenantDayOrderId}");
+            await cleanup.Database.ExecuteSqlInterpolatedAsync(
+                $"DELETE FROM order_changes WHERE order_id = {malformedTenantDayOrderId}");
+            await cleanup.Database.ExecuteSqlInterpolatedAsync(
                 $"DELETE FROM order_changes WHERE order_id = {legacyInsertId}");
             await cleanup.Database.ExecuteSqlInterpolatedAsync(
                 $"DELETE FROM order_changes WHERE order_id = {invalidDateId}");
@@ -124,8 +150,17 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
                 $"DELETE FROM order_changes WHERE order_id = {legacyTextId}");
             await cleanup.Database.ExecuteSqlInterpolatedAsync(
                 $"DELETE FROM order_changes WHERE order_id = {allocatedOrderId}");
-            await cleanup.Database.ExecuteSqlInterpolatedAsync(
-                $"DELETE FROM order_number_sequences WHERE day = {day}");
+            var sequenceDays = new[]
+            {
+                day,
+                DateOnly.FromDateTime(AllocationClock.ToTenantTime(
+                    AllocationInstant.UtcDateTime.AddDays(1)).DateTime),
+                DateOnly.FromDateTime(AllocationClock.ToTenantTime(
+                    AllocationInstant.UtcDateTime.AddDays(2)).DateTime)
+            };
+            foreach (var sequenceDay in sequenceDays)
+                await cleanup.Database.ExecuteSqlInterpolatedAsync(
+                    $"DELETE FROM order_number_sequences WHERE day = {sequenceDay}");
 
             await cleanup.Database.ExecuteSqlRawAsync("ALTER TABLE orders DISABLE TRIGGER orders_queue_sequence;");
             try
@@ -134,6 +169,10 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
                     $"DELETE FROM orders WHERE id = {activeOrderId}");
                 await cleanup.Database.ExecuteSqlInterpolatedAsync(
                     $"DELETE FROM orders WHERE id = {deletedOrderId}");
+                await cleanup.Database.ExecuteSqlInterpolatedAsync(
+                    $"DELETE FROM orders WHERE id = {validTenantDayOrderId}");
+                await cleanup.Database.ExecuteSqlInterpolatedAsync(
+                    $"DELETE FROM orders WHERE id = {malformedTenantDayOrderId}");
                 await cleanup.Database.ExecuteSqlInterpolatedAsync(
                     $"DELETE FROM orders WHERE id = {legacyInsertId}");
                 await cleanup.Database.ExecuteSqlInterpolatedAsync(
@@ -150,11 +189,14 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
         }
     }
 
-    private static Order CreateOrder(
-        Guid id, string orderNumber, bool isDeleted, DateTime? orderDate = null) => new()
+    private static Order CreateOrder(Guid id, string orderNumber, bool isDeleted, DateTime? orderDate = null)
+    {
+        var orderInstant = orderDate ?? AllocationInstant.UtcDateTime;
+        return new Order
         {
             Id = id,
             OrderNumber = orderNumber,
+            BusinessDate = DateOnly.FromDateTime(AllocationClock.ToTenantTime(orderInstant).DateTime),
             Type = OrderType.Takeaway,
             Status = OrderStatus.Pending,
             PaymentStatus = PaymentStatus.Pending,
@@ -162,11 +204,12 @@ public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
             Total = 0m,
             TotalPaid = 0m,
             RemainingAmount = 0m,
-            OrderDate = orderDate ?? AllocationInstant.UtcDateTime,
-            CreatedAt = orderDate ?? AllocationInstant.UtcDateTime,
+            OrderDate = orderInstant,
+            CreatedAt = orderInstant,
             CreatedBy = nameof(OrderNumberSequenceMigrationTests),
             IsDeleted = isDeleted,
-            DeletedAt = isDeleted ? AllocationInstant.UtcDateTime : null,
+            DeletedAt = isDeleted ? orderInstant : null,
             DeletedBy = isDeleted ? nameof(OrderNumberSequenceMigrationTests) : null,
         };
+    }
 }

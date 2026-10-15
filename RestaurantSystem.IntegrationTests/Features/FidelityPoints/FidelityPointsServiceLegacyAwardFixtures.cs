@@ -21,13 +21,7 @@ public partial class FidelityPointsServiceTests
             await TestUserSeeder.SeedUserAsync(context, userId);
 
         var orderId = Guid.NewGuid();
-        await TestOrderSeeder.SeedOrderAsync(context, orderId, userId);
-        var order = await context.Orders.SingleAsync(value => value.Id == orderId);
-        order.Status = OrderStatus.Completed;
-        order.PaymentStatus = PaymentStatus.Completed;
-        order.SubTotal = orderTotal;
-        order.Total = orderTotal;
-        order.FidelityPointsEarned = candidatePoints;
+        var now = DateTime.UtcNow;
         var item = new OrderItem
         {
             Id = Guid.NewGuid(),
@@ -36,10 +30,27 @@ public partial class FidelityPointsServiceTests
             Quantity = quantity,
             UnitPrice = orderTotal / quantity,
             ItemTotal = orderTotal,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = now,
             CreatedBy = "PreLoyaltyMigrationFixture"
         };
-        await context.SaveChangesAsync();
+        var order = new Order
+        {
+            Id = orderId,
+            OrderNumber = $"TEST-{orderId:N}"[..16],
+            UserId = userId,
+            Type = OrderType.Takeaway,
+            Status = OrderStatus.Completed,
+            PaymentStatus = PaymentStatus.Completed,
+            SubTotal = orderTotal,
+            Total = orderTotal,
+            RemainingAmount = orderTotal,
+            FidelityPointsEarned = candidatePoints,
+            OrderDate = now,
+            CreatedAt = now,
+            CreatedBy = "PreLoyaltyMigrationFixture",
+            Items = [item]
+        };
+        await LegacyEntityFixture.InsertAsync(context, order);
         await LegacyEntityFixture.InsertAsync(
             context,
             item,
@@ -51,9 +62,8 @@ public partial class FidelityPointsServiceTests
             "presentation_label",
             "presentation_order",
             "quantity_basis",
-            "suggested_side_item_id");
-        order.Items.Add(item);
-        context.Entry(item).State = EntityState.Unchanged;
+            "suggested_side_item_id",
+            "preparation_time_minutes_snapshot");
 
         var rule = new OrderBillingEarningRuleEvidence(Guid.NewGuid(), "Historical loyalty rule", 0m,
             null, candidatePoints, 1);

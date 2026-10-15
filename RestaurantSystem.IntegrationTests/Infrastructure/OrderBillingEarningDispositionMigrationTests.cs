@@ -1,9 +1,11 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.IntegrationTests.Common;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
 
@@ -77,8 +79,9 @@ public sealed class OrderBillingEarningDispositionMigrationTests(DatabaseFixture
             var orders = new[] { positive, evaluatedZero, unknown };
             var items = orders.SelectMany(order => order.Items).ToArray();
             foreach (var order in orders) order.Items.Clear();
-            context.Orders.AddRange(orders);
             await context.SaveChangesAsync();
+            foreach (var order in orders)
+                await LegacyEntityFixture.InsertAsync(context, order);
             foreach (var item in items)
                 await LegacyEntityFixture.InsertAsync(context, item, "section_id", "composition_role",
                     "configuration_scope", "menu_section_item_id", "parent_component_order_item_id",
@@ -88,13 +91,12 @@ public sealed class OrderBillingEarningDispositionMigrationTests(DatabaseFixture
             await LegacyOrderBillingSnapshotFixture.InsertAsync(context, positiveBuilt.Header);
             await LegacyOrderBillingSnapshotFixture.InsertAsync(context, zeroBuilt.Header);
             await LegacyOrderBillingSnapshotFixture.InsertAsync(context, unknownBuilt.Header);
-            context.OrderBillingSnapshotUnits.AddRange(positiveBuilt.Units);
-            context.OrderBillingSnapshotUnits.AddRange(zeroBuilt.Units);
-            context.OrderBillingSnapshotUnits.AddRange(unknownBuilt.Units);
-            context.OrderBillingSnapshotOwnerLinks.AddRange(positiveBuilt.OwnerLinks);
-            context.OrderBillingSnapshotOwnerLinks.AddRange(zeroBuilt.OwnerLinks);
+            foreach (var unit in positiveBuilt.Units.Concat(zeroBuilt.Units).Concat(unknownBuilt.Units))
+                await LegacyEntityFixture.InsertAsync(context, unit);
+            foreach (var ownerLink in positiveBuilt.OwnerLinks.Concat(zeroBuilt.OwnerLinks))
+                await LegacyEntityFixture.InsertAsync(context, ownerLink);
 
-            context.FidelityPointsTransactions.Add(new FidelityPointsTransaction
+            await LegacyEntityFixture.InsertAsync(context, new FidelityPointsTransaction
             {
                 Id = positiveTransactionId,
                 UserId = userId,
@@ -109,19 +111,19 @@ public sealed class OrderBillingEarningDispositionMigrationTests(DatabaseFixture
                 OrderBillingAwardOutcome.Awarded, 80, 80, positiveTransactionId, now);
             var zeroWitness = NewWitness(zeroBuilt.Header, zeroBuilt.OwnerLinks.Single(),
                 OrderBillingAwardOutcome.EvaluatedZero, 0, 0, null, now);
-            context.OrderBillingAwardWitnesses.AddRange(positiveWitness, zeroWitness);
-            context.OrderBillingAwardUnitCoverages.AddRange(positiveBuilt.Units.Select(unit =>
-                new OrderBillingAwardUnitCoverage
-                {
-                    Id = Guid.NewGuid(),
-                    OrderId = positive.Id,
-                    SnapshotUnitId = unit.Id,
-                    AwardWitnessId = positiveWitness.Id,
-                    EligibleEarnedPoints = unit.EarnedPoints,
-                    CreatedAt = now,
-                    CreatedBy = "OrderBillingAwardBoundary"
-                }));
-            await context.SaveChangesAsync();
+            await LegacyEntityFixture.InsertAsync(context, positiveWitness);
+            await LegacyEntityFixture.InsertAsync(context, zeroWitness);
+            foreach (var coverage in positiveBuilt.Units.Select(unit => new OrderBillingAwardUnitCoverage
+            {
+                Id = Guid.NewGuid(),
+                OrderId = positive.Id,
+                SnapshotUnitId = unit.Id,
+                AwardWitnessId = positiveWitness.Id,
+                EligibleEarnedPoints = unit.EarnedPoints,
+                CreatedAt = now,
+                CreatedBy = "OrderBillingAwardBoundary"
+            }))
+                await LegacyEntityFixture.InsertAsync(context, coverage);
             await evidenceTransaction.CommitAsync();
         }
 
@@ -214,8 +216,11 @@ public sealed class OrderBillingEarningDispositionMigrationTests(DatabaseFixture
         {
             payload += " - 'section_id' - 'composition_role' - 'configuration_scope' - 'menu_section_item_id'"
                 + " - 'parent_component_order_item_id' - 'presentation_label' - 'presentation_order'"
-                + " - 'quantity_basis' - 'suggested_side_item_id'";
+                + " - 'quantity_basis' - 'suggested_side_item_id' - 'preparation_time_minutes_snapshot'";
         }
+        if (tableName == "orders")
+            payload += " - ARRAY['last_change_sequence', 'business_date', 'daily_order_number', 'effective_preparation_minutes',"
+                + " 'expected_ready_at', 'prior_day_review_dismissed_at', 'prior_day_review_dismissed_by']";
         var sql = $"SELECT COALESCE(jsonb_agg(payload ORDER BY payload ->> 'id')::text, '[]') "
             + $"FROM (SELECT {payload} AS payload FROM {tableName} AS row) AS rows";
         await using var connection = new NpgsqlConnection(fixture.ConnectionString);
@@ -228,6 +233,12 @@ public sealed class OrderBillingEarningDispositionMigrationTests(DatabaseFixture
     {
         await using var context = fixture.CreateContext();
         await context.Database.MigrateAsync(target);
+        if (target is null)
+        {
+            await new OrderDailyIdentityInitializer(
+                context, new FixedTenantClock("Europe/Zurich"),
+                NullLogger<OrderDailyIdentityInitializer>.Instance).InitializeAsync();
+        }
     }
 
     private sealed record LegacySnapshotIds(Guid Positive, Guid Zero, Guid Unknown);

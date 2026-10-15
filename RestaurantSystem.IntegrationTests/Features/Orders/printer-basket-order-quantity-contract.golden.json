@@ -36,66 +36,77 @@
     "permittedActions": [
       {
         "action": "Accept",
+        "targetStatus": "Confirmed",
         "allowed": false,
         "reasonCode": "StaffRequired",
         "requiresReason": false
       },
       {
         "action": "StartPreparing",
+        "targetStatus": "Preparing",
         "allowed": false,
         "reasonCode": "StaffRequired",
         "requiresReason": false
       },
       {
         "action": "MarkReady",
+        "targetStatus": "Ready",
         "allowed": false,
         "reasonCode": "StaffRequired",
         "requiresReason": false
       },
       {
         "action": "HandOver",
+        "targetStatus": null,
         "allowed": false,
         "reasonCode": "InvalidStatusTransition",
         "requiresReason": false
       },
       {
         "action": "CollectPayment",
+        "targetStatus": null,
         "allowed": false,
         "reasonCode": "CashierRequired",
         "requiresReason": false
       },
       {
         "action": "AddOperationalNote",
+        "targetStatus": null,
         "allowed": false,
         "reasonCode": "AdminOrCashierRequired",
         "requiresReason": false
       },
       {
         "action": "PrintKitchen",
+        "targetStatus": null,
         "allowed": false,
         "reasonCode": "StaffRequired",
         "requiresReason": false
       },
       {
         "action": "PrintReceipt",
+        "targetStatus": null,
         "allowed": false,
         "reasonCode": "StaffRequired",
         "requiresReason": false
       },
       {
         "action": "RefundPayment",
+        "targetStatus": null,
         "allowed": false,
         "reasonCode": "AdminRequired",
         "requiresReason": true
       },
       {
         "action": "CancelOrder",
+        "targetStatus": null,
         "allowed": false,
         "reasonCode": "StaffRequired",
         "requiresReason": true
       },
       {
         "action": "MarkUrgent",
+        "targetStatus": null,
         "allowed": false,
         "reasonCode": "StaffRequired",
         "requiresReason": true
@@ -733,7 +744,12 @@
         "changedAt": "2026-10-10T12:00:00Z",
         "changedBy": "00000000-0000-0000-0000-000000000002"
       }
-    ]
+    ],
+    "businessDate": "2026-10-10",
+    "dailyOrderNumber": 1,
+    "effectivePreparationMinutes": 18,
+    "expectedReadyAt": null,
+    "businessTimeZoneId": "Europe/Zurich"
   },
   "v1PrinterOrder": {
     "id": "00000000-0000-0000-0000-000000000001",
@@ -1400,7 +1416,12 @@
         "changedAt": "2026-10-10T12:00:00Z",
         "changedBy": "00000000-0000-0000-0000-000000000002"
       }
-    ]
+    ],
+    "businessDate": "2026-10-10",
+    "dailyOrderNumber": 1,
+    "effectivePreparationMinutes": 18,
+    "expectedReadyAt": null,
+    "businessTimeZoneId": "Europe/Zurich"
   },
   "projectionVersion": 2,
   "v2PrinterOrder": {
@@ -2068,7 +2089,12 @@
         "changedAt": "2026-10-10T12:00:00Z",
         "changedBy": "00000000-0000-0000-0000-000000000002"
       }
-    ]
+    ],
+    "businessDate": "2026-10-10",
+    "dailyOrderNumber": 1,
+    "effectivePreparationMinutes": 18,
+    "expectedReadyAt": null,
+    "businessTimeZoneId": "Europe/Zurich"
   },
   "v2Update": {
     "jobId": "00000000-0000-0000-0000-000000000025",

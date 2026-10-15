@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -6,6 +7,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderFromBasketCommand;
@@ -14,6 +16,8 @@ using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
@@ -25,6 +29,8 @@ public sealed class PrinterFeedQuantityContractTests : IntegrationTestBase
     private const string GoldenFileName = "printer-feed-quantity-contract.golden.json";
     private const string BasketGoldenFileName = "printer-basket-order-quantity-contract.golden.json";
     private static readonly DateTime FixtureTime = new(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc);
+    private static readonly ITenantClock BusinessClock = new FixedTenantClock(
+        "Europe/Zurich", new DateTimeOffset(2026, 10, 10, 12, 0, 0, TimeSpan.Zero));
     private static readonly Guid OrderId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid ComboProductId = Guid.Parse("10000000-0000-0000-0000-000000000011");
     private static readonly Guid TacoProductId = Guid.Parse("10000000-0000-0000-0000-000000000012");
@@ -60,6 +66,12 @@ public sealed class PrinterFeedQuantityContractTests : IntegrationTestBase
     };
 
     public PrinterFeedQuantityContractTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }
+
+    protected override void ConfigureTestServices(IServiceCollection services)
+    {
+        services.RemoveAll<ITenantClock>();
+        services.AddSingleton(BusinessClock);
+    }
 
     [Theory]
     [InlineData(0)]
@@ -120,6 +132,10 @@ public sealed class PrinterFeedQuantityContractTests : IntegrationTestBase
         var v2 = await FetchFeedAsync(projectionVersion: 2);
         var normalOrder = FindOrder(v1, OrderNumber);
         var projectedOrder = FindOrder(v2, OrderNumber);
+        AssertDailyMetadata(normalOrder, "2026-09-01", expectedDailyNumber: 1,
+            expectedPreparationMinutes: null, expectedReadyAt: null);
+        AssertDailyMetadata(projectedOrder, "2026-09-01", expectedDailyNumber: 1,
+            expectedPreparationMinutes: null, expectedReadyAt: null);
 
         v1["data"]!.AsObject().Should().NotContainKey("projectionVersion");
         v2["data"]!["projectionVersion"]!.GetValue<int>().Should().Be(2);
@@ -207,6 +223,7 @@ public sealed class PrinterFeedQuantityContractTests : IntegrationTestBase
         var createResult = createResponseJson.Deserialize<ApiResponse<OrderDto>>(SerializerOptions);
         createResult!.Success.Should().BeTrue();
         var normalOrder = createResult.Data!;
+        AssertGeneratedOrderMetadata(normalOrder);
         normalOrder.Items.Should().HaveCount(3);
 
         foreach (var quantity in new[] { 1, 2, 3 })
@@ -306,6 +323,10 @@ public sealed class PrinterFeedQuantityContractTests : IntegrationTestBase
         var v2 = await FetchFeedAsync(projectionVersion: 2);
         var actualV1 = FindOrder(v1, normalOrder.OrderNumber);
         var actualV2 = FindOrder(v2, normalOrder.OrderNumber);
+        AssertDailyMetadata(actualV1, normalOrder.BusinessDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            normalOrder.DailyOrderNumber, normalOrder.EffectivePreparationMinutes, normalOrder.ExpectedReadyAt);
+        AssertDailyMetadata(actualV2, normalOrder.BusinessDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            normalOrder.DailyOrderNumber, normalOrder.EffectivePreparationMinutes, normalOrder.ExpectedReadyAt);
         var update = v2["data"]!["updates"]!.AsArray()
             .Single(row => row!["jobId"]!.GetValue<Guid>() == BasketCorrectionJobId)!;
         var actual = NormalizeBasketOrder(createResponseJson["data"]!, actualV1, v2, update);
@@ -445,13 +466,13 @@ public sealed class PrinterFeedQuantityContractTests : IntegrationTestBase
         await base.SeedTestData();
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext>();
-        var combo = NewProduct(ComboProductId, "Menu Deal", ProductType.Menu);
-        var tacoProduct = NewProduct(TacoProductId, "Taco", ProductType.MainItem);
-        var beef = NewProduct(MeatProductId, "Beef", ProductType.AddOn);
-        var steakProduct = NewProduct(SteakProductId, "Steak", ProductType.AddOn);
-        var side1 = NewProduct(SideProduct1Id, "Side One", ProductType.AddOn);
-        var side2 = NewProduct(SideProduct2Id, "Side Two", ProductType.AddOn);
-        var side3 = NewProduct(SideProduct3Id, "Side Three", ProductType.Beverage);
+        var combo = NewProduct(ComboProductId, "Menu Deal", ProductType.Menu, preparationTimeMinutes: 4);
+        var tacoProduct = NewProduct(TacoProductId, "Taco", ProductType.MainItem, preparationTimeMinutes: 7);
+        var beef = NewProduct(MeatProductId, "Beef", ProductType.AddOn, preparationTimeMinutes: 18);
+        var steakProduct = NewProduct(SteakProductId, "Steak", ProductType.AddOn, preparationTimeMinutes: 12);
+        var side1 = NewProduct(SideProduct1Id, "Side One", ProductType.AddOn, preparationTimeMinutes: 3);
+        var side2 = NewProduct(SideProduct2Id, "Side Two", ProductType.AddOn, preparationTimeMinutes: 5);
+        var side3 = NewProduct(SideProduct3Id, "Side Three", ProductType.Beverage, preparationTimeMinutes: 6);
         tacoProduct.DetailedIngredients.Add(new ProductIngredient
         {
             Id = IngredientId,
@@ -856,11 +877,12 @@ public sealed class PrinterFeedQuantityContractTests : IntegrationTestBase
         IngredientId, ExtraIngredientId,
     ];
 
-    private static Product NewProduct(Guid id, string name, ProductType type) => new()
+    private static Product NewProduct(Guid id, string name, ProductType type, int preparationTimeMinutes) => new()
     {
         Id = id,
         Name = name,
         BasePrice = 10m,
+        PreparationTimeMinutes = preparationTimeMinutes,
         IsActive = true,
         IsAvailable = true,
         Type = type,
@@ -1081,6 +1103,39 @@ public sealed class PrinterFeedQuantityContractTests : IntegrationTestBase
         };
 
     private static bool UpdateMode => Environment.GetEnvironmentVariable("UPDATE_CONTRACT_SNAPSHOTS") == "1";
+
+    private static void AssertGeneratedOrderMetadata(OrderDto order)
+    {
+        order.BusinessDate.Should().Be(new DateOnly(2026, 10, 10));
+        order.DailyOrderNumber.Should().Be(1);
+        order.BusinessTimeZoneId.Should().Be("Europe/Zurich");
+        var expectedOrderNumber = order.BusinessDate.ToString("yyyyMMdd", CultureInfo.InvariantCulture)
+            + order.DailyOrderNumber.ToString("D4", CultureInfo.InvariantCulture);
+        order.OrderNumber.Should().Be(expectedOrderNumber);
+        order.EffectivePreparationMinutes.Should().Be(18,
+            "the frozen root and component snapshots resolve to the maximum product preparation time");
+        order.ExpectedReadyAt.Should().BeNull(
+            "the Takeaway basket order remains pending cashier acceptance at checkout");
+    }
+
+    private static void AssertDailyMetadata(
+        JsonNode? order, string expectedBusinessDate, long expectedDailyNumber,
+        int? expectedPreparationMinutes, DateTime? expectedReadyAt)
+    {
+        order!["businessDate"]!.GetValue<string>().Should().Be(expectedBusinessDate);
+        order["dailyOrderNumber"]!.GetValue<long>().Should().Be(expectedDailyNumber);
+        order["businessTimeZoneId"]!.GetValue<string>().Should().Be("Europe/Zurich");
+
+        if (expectedPreparationMinutes.HasValue)
+            order["effectivePreparationMinutes"]!.GetValue<int>().Should().Be(expectedPreparationMinutes.Value);
+        else
+            order["effectivePreparationMinutes"].Should().BeNull();
+
+        if (expectedReadyAt.HasValue)
+            order["expectedReadyAt"]!.GetValue<DateTime>().Should().Be(expectedReadyAt.Value);
+        else
+            order["expectedReadyAt"].Should().BeNull();
+    }
 
     private static string SourceGoldenPath([CallerFilePath] string sourceFile = "") =>
         Path.Combine(Path.GetDirectoryName(sourceFile)!, GoldenFileName);
