@@ -78,7 +78,12 @@ public sealed class PrinterFeedApprovalTests(DatabaseFixture databaseFixture)
         var feed = await FetchFeedAsync(deviceId, Now.AddMinutes(-5));
         var receipt = Items(feed).Single(value => value!["orderNumber"]!.GetValue<string>() == order.OrderNumber)!;
         receipt["effectivePreparationMinutes"]!.GetValue<int>().Should().Be(7);
-        receipt["expectedReadyAt"]!.GetValue<DateTime>().Should().Be(accepted.ExpectedReadyAt!.Value);
+        // The feed must contain the persisted timestamp, at PostgreSQL's microsecond precision.
+        await using var verify = DatabaseFixture.CreateContext();
+        var savedReadyAt = await verify.Orders.AsNoTracking().Where(value => value.Id == order.Id)
+            .Select(value => value.ExpectedReadyAt).SingleAsync();
+        savedReadyAt.Should().NotBeNull();
+        receipt["expectedReadyAt"]!.GetValue<DateTime>().Should().Be(savedReadyAt!.Value);
         Route(feed, order.OrderNumber, DevicePrintTarget.Cashier)["jobId"]!.GetValue<Guid>()
             .Should().Be(order.Routes[0].JobId);
     }
