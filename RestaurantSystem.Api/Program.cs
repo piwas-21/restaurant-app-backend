@@ -773,6 +773,7 @@ builder.Services.AddScoped<IBasketItemFactory, BasketItemFactory>();
 builder.Services.AddScoped<IBasketRepository, BasketRepository>();
 builder.Services.AddScoped<IBasketChannelService, BasketChannelService>();
 builder.Services.AddScoped<IOrderChannelGuard, OrderChannelGuard>();
+builder.Services.AddScoped<IOrderAvailabilityGuard, OrderAvailabilityGuard>();
 builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
 builder.Services.AddScoped<IAnonymousBasketMerger, AnonymousBasketMerger>();
 builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();

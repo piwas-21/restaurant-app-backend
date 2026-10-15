@@ -67,14 +67,9 @@ public sealed class GuestRoundKitchenRoutingTests : IntegrationTestBase
             QRCodeGeneratedAt = DateTime.UtcNow,
             CreatedBy = nameof(GuestRoundKitchenRoutingTests),
         });
-        context.OrderTypeConfigurations.Add(new OrderTypeConfiguration
-        {
-            OrderType = OrderType.DineIn,
-            IsEnabled = true,
-            DisplayOrder = (int)OrderType.DineIn,
-            EnforceOpeningHours = false,
-            CreatedBy = nameof(GuestRoundKitchenRoutingTests),
-        });
+        var dineIn = await context.OrderTypeConfigurations.SingleAsync(value => value.OrderType == OrderType.DineIn);
+        dineIn.IsEnabled = true;
+        dineIn.EnforceOpeningHours = false;
         await context.SaveChangesAsync();
     }
 
