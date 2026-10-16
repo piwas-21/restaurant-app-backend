@@ -28,13 +28,6 @@ public static class OrderWriteAuthorizationPolicy
                 ErrorCodes.CashierRequired,
                 "Only a cashier or admin may record an order payment.");
 
-    public static OrderWriteAuthorizationDecision ForCancellation(UserRole? role, Order order) =>
-        role == UserRole.Server && order.IsKitchenReleased
-            ? OrderWriteAuthorizationDecision.Deny(
-                ErrorCodes.KitchenRoleRequired,
-                "A server cannot cancel an order after it has been sent to the kitchen.")
-            : OrderWriteAuthorizationDecision.Allow();
-
     public static OrderWriteAuthorizationDecision ForKitchenPrint(UserRole? role, Order order)
     {
         if (role == UserRole.Server)

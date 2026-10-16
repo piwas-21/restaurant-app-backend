@@ -174,7 +174,7 @@ public sealed class TableGuestAccountReadConcurrencyTests : IAsyncLifetime
         {
             Id = admissionId,
             ServiceSessionId = sessionId,
-            CodeHash = TableGuestCredentialCrypto.HashAdmissionCode("123456789A"),
+            CodeHash = "retired-admission-hash",
             ExpiresAt = FixedNow.UtcDateTime.AddHours(12),
             CreatedAt = FixedNow.UtcDateTime,
             CreatedBy = nameof(TableGuestAccountReadConcurrencyTests),

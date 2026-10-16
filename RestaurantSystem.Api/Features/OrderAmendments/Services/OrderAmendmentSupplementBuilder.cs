@@ -60,6 +60,7 @@ internal sealed class OrderAmendmentSupplementBuilder
             OrderAmendmentRequestFactory.CreateSupplement(source, request),
             request.ReleaseAdditionsToKitchen, cancellationToken,
             requiredAcceptedCurrency: requiredAcceptedCurrency);
+        build.Order.AmendmentRootOrderId = source.AmendmentRootOrderId ?? source.Id;
         if (source.Type == OrderType.Delivery)
         {
             build.Order.DeliveryFee = 0m;

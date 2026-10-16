@@ -8,6 +8,7 @@ using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Infrastructure.Persistence.Migrations;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
@@ -26,17 +27,16 @@ public sealed class CashierOrderGroupsTests(DatabaseFixture databaseFixture) : I
     {
         var first = await Read("search=GRP-&pageSize=1&page=1");
         var second = await Read("search=GRP-&pageSize=1&page=2");
-        var third = await Read("search=GRP-&pageSize=1&page=3");
-        first.TotalCount.Should().Be(3);
-        first.TotalPages.Should().Be(3);
-        var groups = first.Items.Concat(second.Items).Concat(third.Items).ToList();
+        first.TotalCount.Should().Be(2);
+        first.TotalPages.Should().Be(2);
+        var groups = first.Items.Concat(second.Items).ToList();
         groups.Select(group => group.GroupKey).Should().OnlyHaveUniqueItems();
         var visit = groups.Single(group => group.ServiceSessionId == _openSessionId);
         visit.Orders.Should().HaveCount(55);
         visit.Orders.Select(order => order.Id).Should().BeEquivalentTo(_roundIds);
         visit.Orders.Should().BeInAscendingOrder(order => order.OrderDate);
         visit.Orders.Should().OnlyContain(order => order.PermittedActions != null);
-        groups.Where(group => !group.ServiceSessionId.HasValue).Should().HaveCount(2);
+        groups.Should().OnlyContain(group => group.ServiceSessionId.HasValue);
     }
 
     [Fact]
@@ -100,11 +100,11 @@ public sealed class CashierOrderGroupsTests(DatabaseFixture databaseFixture) : I
     }
 
     [Fact]
-    public async Task Closed_visit_children_keep_original_order_identity_and_are_separate_rows()
+    public async Task Closed_visit_children_keep_original_order_identity_in_one_row()
     {
         var result = await Read("search=GRP-CLOSED&pageSize=10");
-        result.TotalCount.Should().Be(2);
-        result.Items.Should().OnlyContain(group => group.ServiceSessionId == null && group.Orders.Count == 1);
+        result.TotalCount.Should().Be(1);
+        result.Items.Should().OnlyContain(group => group.ServiceSessionId == _closedSessionId && group.Orders.Count == 2);
         result.Items.SelectMany(group => group.Orders).Should()
             .OnlyContain(order => order.ServiceSessionId == _closedSessionId);
         result.Items.SelectMany(group => group.Orders).Select(order => order.OrderNumber)
@@ -115,10 +115,77 @@ public sealed class CashierOrderGroupsTests(DatabaseFixture databaseFixture) : I
     public async Task Out_of_range_page_returns_current_last_page_and_stable_ordering()
     {
         var last = await Read("search=GRP-&pageSize=1&page=99");
-        var repeated = await Read("search=GRP-&pageSize=1&page=3");
-        last.Page.Should().Be(3);
+        var repeated = await Read("search=GRP-&pageSize=1&page=2");
+        last.Page.Should().Be(2);
         last.Items.Select(group => group.GroupKey).Should().Equal(repeated.Items.Select(group => group.GroupKey));
     }
+
+    [Theory]
+    [InlineData(OrderType.DineIn)]
+    [InlineData(OrderType.Takeaway)]
+    [InlineData(OrderType.Delivery)]
+    public async Task Historical_supplements_and_nested_updates_backfill_to_one_standalone_row(OrderType type)
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        var session = await context.TableServiceSessions.SingleAsync(value => value.Id == _openSessionId);
+        var original = NewOrder("ANCESTRY-ROOT", session, 80);
+        var supplement = NewOrder("ANCESTRY-SECOND", session, 81);
+        var nested = NewOrder("ANCESTRY-THIRD", session, 82);
+        var unrelated = NewOrder("ANCESTRY-UNRELATED", session, 83);
+        foreach (var order in new[] { original, supplement, nested, unrelated })
+        {
+            order.ServiceSessionId = null;
+            order.Type = type;
+        }
+        context.Orders.AddRange(original, supplement, nested, unrelated);
+        context.OrderAmendments.AddRange(
+            HistoricalAmendment(original.Id, supplement.Id), HistoricalAmendment(supplement.Id, nested.Id));
+        await context.SaveChangesAsync();
+        await context.Database.ExecuteSqlRawAsync(StaffOrderSimplification.BackfillSql);
+        await context.Database.ExecuteSqlRawAsync(StaffOrderSimplification.BackfillSql);
+        var roots = await context.Orders.AsNoTracking().Where(order => order.OrderNumber.StartsWith("ANCESTRY-"))
+            .ToDictionaryAsync(order => order.Id, order => order.AmendmentRootOrderId);
+        roots[original.Id].Should().BeNull();
+        roots[unrelated.Id].Should().BeNull();
+        roots[supplement.Id].Should().Be(original.Id);
+        roots[nested.Id].Should().Be(original.Id);
+        var result = await Read("search=ANCESTRY-THIRD&pageSize=1");
+        result.TotalCount.Should().Be(1);
+        result.Items.Single().Orders.Select(order => order.Id).Should().Equal(original.Id, supplement.Id, nested.Id);
+        result.Items.Single().HasUpdates.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Amendment_without_additions_marks_the_original_row_updated()
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        var session = await context.TableServiceSessions.SingleAsync(value => value.Id == _openSessionId);
+        var source = NewOrder("AMENDED-WITHOUT-DISPATCH", session, 90);
+        source.ServiceSessionId = null;
+        source.Type = OrderType.Takeaway;
+        context.Orders.Add(source);
+        context.OrderAmendments.Add(HistoricalAmendment(source.Id, null));
+        await context.SaveChangesAsync();
+        var result = await Read("search=AMENDED-WITHOUT-DISPATCH");
+        result.Items.Should().ContainSingle();
+        result.Items.Single().HasUpdates.Should().BeTrue();
+        result.Items.Single().Orders.Single().Id.Should().Be(source.Id);
+    }
+
+    private static OrderAmendment HistoricalAmendment(Guid source, Guid? supplement) => new()
+    {
+        SourceOrderId = source,
+        SupplementOrderId = supplement,
+        State = OrderAmendmentState.Committed,
+        ActorUserId = Guid.NewGuid(),
+        ActorRole = "Cashier",
+        PayloadHash = new string('A', 64),
+        RequestJson = "{}",
+        SourceSnapshotJson = "{}",
+        FinancialResolutionJson = "{}",
+        ExpiresAt = Opened,
+        CreatedBy = nameof(CashierOrderGroupsTests),
+    };
 
     [Theory]
     [InlineData("page=0")]

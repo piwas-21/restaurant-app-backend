@@ -73,57 +73,57 @@ public sealed class GuestRoundAvailabilityTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Admission_code_defaults_to_legacy_length_and_shortens_only_when_requested()
+    public async Task Qr_alone_joins_a_ready_table_and_reuses_its_visit_for_another_guest()
     {
-        AuthenticateAsRole(UserRole.Server);
-        var sessionResponse = await PostAsJsonAsync("/api/table-service-sessions", new { tableId = _tableId });
-        sessionResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var session = (await ReadResponseAsync<ApiResponse<TableServiceSessionDto>>(sessionResponse))!.Data!;
-
-        var legacyResponse = await PostAsJsonAsync(
-            $"/api/table-guest-visits/{session.ServiceSessionId}/admission-code", new { });
-        legacyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var legacyCode = (await ReadResponseAsync<ApiResponse<TableGuestAdmissionCodeDto>>(legacyResponse))!.Data!;
-        legacyCode.AdmissionCode.Should().MatchRegex("^[0-9A-HJKMNP-TV-Z]{10}$");
-
         AuthenticateAsAnonymous();
-        var legacyJoinResponse = await PostAsJsonAsync("/api/table-guest-visits/join", new
-        {
-            qrCodeData = _qrCode,
-            admissionCode = legacyCode.AdmissionCode,
-        });
-        legacyJoinResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await ReadResponseAsync<ApiResponse<TableGuestJoinDto>>(legacyJoinResponse))!.Success.Should().BeTrue();
+        var first = await PostAsJsonAsync("/api/table-guest-visits/join", new { qrCodeData = _qrCode });
+        var second = await PostAsJsonAsync("/api/table-guest-visits/join", new { qrCodeData = _qrCode });
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        var firstGuest = (await ReadResponseAsync<ApiResponse<TableGuestJoinDto>>(first))!.Data!;
+        var secondGuest = (await ReadResponseAsync<ApiResponse<TableGuestJoinDto>>(second))!.Data!;
+        firstGuest.ServiceSessionId.Should().Be(secondGuest.ServiceSessionId);
+        firstGuest.ParticipantToken.Should().NotBe(secondGuest.ParticipantToken);
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.TableGuestAdmissions.CountAsync()).Should().Be(0);
+        (await context.TableGuestParticipants.CountAsync()).Should().Be(2);
+    }
 
-        AuthenticateAsRole(UserRole.Server);
-        var shortResponse = await PostAsJsonAsync(
-            $"/api/table-guest-visits/{session.ServiceSessionId}/admission-code?preferShortCode=true", new { });
-        shortResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var shortCode = (await ReadResponseAsync<ApiResponse<TableGuestAdmissionCodeDto>>(shortResponse))!.Data!;
-        shortCode.AdmissionCode.Should().MatchRegex("^[0-9A-HJKMNP-TV-Z]{6}$");
-
+    [Fact]
+    public async Task Concurrent_first_Qr_joins_create_one_visit_for_two_guests()
+    {
         AuthenticateAsAnonymous();
-        var shortJoinResponse = await PostAsJsonAsync("/api/table-guest-visits/join", new
+        var responses = await Task.WhenAll(
+            PostAsJsonAsync("/api/table-guest-visits/join", new { qrCodeData = _qrCode }),
+            PostAsJsonAsync("/api/table-guest-visits/join", new { qrCodeData = _qrCode }));
+        var participants = new List<TableGuestJoinDto>();
+        foreach (var response in responses)
         {
-            qrCodeData = _qrCode,
-            admissionCode = shortCode.AdmissionCode,
-        });
-        shortJoinResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await ReadResponseAsync<ApiResponse<TableGuestJoinDto>>(shortJoinResponse))!.Success.Should().BeTrue();
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            participants.Add((await ReadResponseAsync<ApiResponse<TableGuestJoinDto>>(response))!.Data!);
+        }
+        participants.Select(value => value.ServiceSessionId).Distinct().Should().ContainSingle();
+        participants.Select(value => value.ParticipantToken).Should().OnlyHaveUniqueItems();
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.TableServiceSessions.CountAsync(value => value.TableId == _tableId)).Should().Be(1);
+        (await context.TableGuestParticipants.CountAsync()).Should().Be(2);
+    }
 
+    [Fact]
+    public async Task Qr_cannot_start_a_visit_before_staff_mark_the_table_ready()
+    {
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            var table = await context.Tables.SingleAsync(value => value.Id == _tableId);
+            table.ReadinessState = TableReadinessState.NeedsReset;
+            await context.SaveChangesAsync();
+        }
+        AuthenticateAsAnonymous();
+        var response = await PostAsJsonAsync("/api/table-guest-visits/join", new { qrCodeData = _qrCode });
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         await using var verify = DatabaseFixture.CreateContext();
-        var admissions = await verify.TableGuestAdmissions
-            .Where(value => value.ServiceSessionId == session.ServiceSessionId)
-            .ToListAsync();
-        admissions.Should().HaveCount(2);
-        admissions.Should().ContainSingle(value =>
-            TableGuestCredentialCrypto.VerifyAdmissionCode(legacyCode.AdmissionCode, value.CodeHash)
-            && value.RevokedAt.HasValue);
-        admissions.Should().ContainSingle(value =>
-            TableGuestCredentialCrypto.VerifyAdmissionCode(shortCode.AdmissionCode, value.CodeHash)
-            && !value.RevokedAt.HasValue);
-        admissions.All(value => !value.CodeHash.Contains(legacyCode.AdmissionCode)
-            && !value.CodeHash.Contains(shortCode.AdmissionCode)).Should().BeTrue();
+        (await verify.TableServiceSessions.CountAsync(value => value.TableId == _tableId)).Should().Be(0);
+        (await verify.TableGuestParticipants.CountAsync()).Should().Be(0);
     }
 
     [Theory]
@@ -219,16 +219,10 @@ public sealed class GuestRoundAvailabilityTests : IntegrationTestBase
         sessionEnvelope.Data.Should().NotBeNull(sessionEnvelope.Message);
         var session = sessionEnvelope.Data!;
 
-        var admissionResponse = await PostAsJsonAsync(
-            $"/api/table-guest-visits/{session.ServiceSessionId}/admission-code", new { });
-        admissionResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var admission = (await ReadResponseAsync<ApiResponse<TableGuestAdmissionCodeDto>>(admissionResponse))!.Data!;
-
         AuthenticateAsAnonymous();
         var joinResponse = await PostAsJsonAsync("/api/table-guest-visits/join", new
         {
             qrCodeData = _qrCode,
-            admissionCode = admission.AdmissionCode,
         });
         joinResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var participant = (await ReadResponseAsync<ApiResponse<TableGuestJoinDto>>(joinResponse))!.Data!;

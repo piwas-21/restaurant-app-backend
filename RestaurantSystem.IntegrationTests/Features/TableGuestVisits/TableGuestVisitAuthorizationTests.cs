@@ -31,20 +31,15 @@ public sealed class TableGuestVisitAuthorizationTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task Admission_code_and_participant_are_bound_to_the_exact_table_visit()
+    public async Task Qr_joins_the_exact_table_visit_and_participant_cannot_read_another_visit()
     {
         var first = await SeedVisitAsync("T-01", "qr-exact-first");
         var second = await SeedVisitAsync("T-02", "qr-exact-second");
         await using var context = _fixture.CreateContext();
         var service = AdmissionService(context);
-        var code = await service.CreateCodeAsync(first.SessionId, CancellationToken.None);
-        var rotatedCode = await service.CreateCodeAsync(first.SessionId, CancellationToken.None);
-
         await Assert.ThrowsAsync<NotFoundException>(() => service.JoinAsync(
-            second.QrCode, rotatedCode.AdmissionCode, CancellationToken.None));
-        await Assert.ThrowsAsync<NotFoundException>(() => service.JoinAsync(
-            first.QrCode, code.AdmissionCode, CancellationToken.None));
-        var joined = await service.JoinAsync(first.QrCode, rotatedCode.AdmissionCode, CancellationToken.None);
+            "unknown-qr", CancellationToken.None));
+        var joined = await service.JoinAsync(first.QrCode, CancellationToken.None);
 
         joined.ServiceSessionId.Should().Be(first.SessionId);
         await using var verify = _fixture.CreateContext();
@@ -126,14 +121,12 @@ public sealed class TableGuestVisitAuthorizationTests : IAsyncLifetime
     public async Task Closing_visit_revokes_credentials_before_the_table_is_reused()
     {
         var first = await SeedVisitAsync("T-11", "qr-rotating");
-        string oldAdmissionCode;
         string oldParticipantToken;
         await using (var context = _fixture.CreateContext())
         {
             var service = AdmissionService(context);
-            oldAdmissionCode = (await service.CreateCodeAsync(first.SessionId, CancellationToken.None)).AdmissionCode;
             oldParticipantToken = (await service.JoinAsync(
-                first.QrCode, oldAdmissionCode, CancellationToken.None)).ParticipantToken;
+                first.QrCode, CancellationToken.None)).ParticipantToken;
         }
 
         await using (var context = _fixture.CreateContext())
@@ -196,24 +189,20 @@ public sealed class TableGuestVisitAuthorizationTests : IAsyncLifetime
         (await nextContext.TableServiceSessions.SingleAsync(value => value.Id == nextVisit))
             .Status.Should().Be(TableServiceSessionStatus.Open);
         var serviceForNextVisit = AdmissionService(nextContext);
-        await Assert.ThrowsAsync<NotFoundException>(() => serviceForNextVisit.JoinAsync(
-            first.QrCode, oldAdmissionCode, CancellationToken.None));
         await Assert.ThrowsAsync<NotFoundException>(() => AccountReader(nextContext).ReadAsync(
             nextVisit, oldParticipantToken, CancellationToken.None));
 
-        var newCode = await serviceForNextVisit.CreateCodeAsync(nextVisit, CancellationToken.None);
-        (await serviceForNextVisit.JoinAsync(first.QrCode, newCode.AdmissionCode, CancellationToken.None))
+        (await serviceForNextVisit.JoinAsync(first.QrCode, CancellationToken.None))
             .ServiceSessionId.Should().Be(nextVisit);
 
         await using var verify = _fixture.CreateContext();
         var revoked = await verify.TableGuestParticipants.SingleAsync(
             value => value.ServiceSessionId == first.SessionId);
         revoked.RevokedAt.Should().Be(FixedNow.UtcDateTime);
-        (await verify.TableGuestAdmissions.SingleAsync(
-            value => value.ServiceSessionId == first.SessionId)).RevokedAt.Should().Be(FixedNow.UtcDateTime);
+        (await verify.TableGuestAdmissions.CountAsync()).Should().Be(0);
     }
 
-    private TableGuestAdmissionService AdmissionService(ApplicationDbContext context) =>
+    private TableGuestJoinService AdmissionService(ApplicationDbContext context) =>
         new(context, GuestFeatures(), CurrentUser(), Options.Create(new TableGuestVisitSettings()),
             new FixedTimeProvider(FixedNow));
 

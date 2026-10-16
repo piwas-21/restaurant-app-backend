@@ -38,9 +38,9 @@ public sealed class GetCashierOrderGroupsQueryHandler(
         var matching = OperationalOrderQueryBuilder.Build(context, filters, currentUser, clock, logger);
         var groups = matching.Select(order => new
         {
-            Id = order.ServiceSessionId.HasValue && order.ServiceSession!.Status == TableServiceSessionStatus.Open
-                ? order.ServiceSessionId.Value : order.Id,
-            SessionId = order.ServiceSessionId.HasValue && order.ServiceSession!.Status == TableServiceSessionStatus.Open
+            Id = order.ServiceSessionId.HasValue
+                ? order.ServiceSessionId.Value : order.AmendmentRootOrderId ?? order.Id,
+            SessionId = order.ServiceSessionId.HasValue
                 ? order.ServiceSessionId : null,
             order.OrderDate,
         }).GroupBy(row => new { row.Id, row.SessionId })
@@ -78,25 +78,34 @@ public sealed class GetCashierOrderGroupsQueryHandler(
                     MarketplaceOnly = false
                 }, currentUser, clock, logger)
             .Where(order => standaloneIds.Contains(order.Id)
+                || (order.AmendmentRootOrderId.HasValue && standaloneIds.Contains(order.AmendmentRootOrderId.Value))
                 || (order.ServiceSessionId.HasValue && sessionIds.Contains(order.ServiceSessionId.Value)))
             .OrderBy(order => order.OrderDate).ThenBy(order => order.Id).ToListAsync(cancellationToken);
         var bySession = rows.Where(order => order.ServiceSessionId.HasValue)
             .ToLookup(order => order.ServiceSessionId!.Value);
-        var byId = rows.ToDictionary(order => order.Id);
+        var byRoot = rows.Where(order => !order.ServiceSessionId.HasValue)
+            .ToLookup(order => order.AmendmentRootOrderId ?? order.Id);
         var releasedVisits = await context.TableServiceSessions.AsNoTracking()
             .Where(session => sessionIds.Contains(session.Id))
             .ToDictionaryAsync(session => session.Id, session => session.ReleasedAt, cancellationToken);
         var archivedOrderIds = (await context.TableOccupancyRecoveryDispositions.AsNoTracking()
             .Where(disposition => standaloneIds.Contains(disposition.OrderId) && disposition.WasLegacyUnassigned)
             .Select(disposition => disposition.OrderId).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+        var memberIds = rows.Select(order => order.Id).ToArray();
+        var amendedIds = (await context.OrderAmendments.AsNoTracking()
+            .Where(amendment => amendment.State == OrderAmendmentState.Committed
+                && memberIds.Contains(amendment.SourceOrderId))
+            .Select(amendment => amendment.SourceOrderId).Distinct().ToListAsync(cancellationToken)).ToHashSet();
         var items = page.Select(group =>
         {
             var members = group.SessionId.HasValue
                 ? bySession[group.SessionId.Value].ToList()
-                : new List<Order> { byId[group.Id] };
+                : byRoot[group.Id].ToList();
             return ProjectGroup(group.Id, group.SessionId, members,
                 group.SessionId.HasValue ? releasedVisits[group.SessionId.Value] : null,
-                !group.SessionId.HasValue && archivedOrderIds.Contains(group.Id));
+                !group.SessionId.HasValue && archivedOrderIds.Contains(group.Id))
+                with
+            { HasUpdates = members.Count > 1 || members.Any(order => amendedIds.Contains(order.Id)) };
         }).ToList();
         await snapshot.CommitAsync(cancellationToken);
         return ApiResponse<PagedResult<CashierOrderGroupDto>>.SuccessWithData(

@@ -2,10 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using RestaurantSystem.Api.Common;
-using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Extensions;
 using RestaurantSystem.Api.Common.Models;
-using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.TableGuestVisits.Commands;
 using RestaurantSystem.Api.Features.TableGuestVisits.Dtos;
 using RestaurantSystem.Api.Features.TableGuestVisits.Queries;
@@ -28,19 +26,7 @@ public sealed class TableGuestVisitsController : ControllerBase
     {
         SetNoStore();
         return Ok(await _mediator.SendCommand(
-            new JoinTableGuestVisitCommand(request.QrCodeData, request.AdmissionCode), HttpContext.RequestAborted));
-    }
-
-    [HttpPost("{serviceSessionId:guid}/admission-code")]
-    [RequireTableServiceStaff]
-    [RequireModule(ModuleIds.Server, ModuleIds.Cashier)]
-    public async Task<ActionResult<ApiResponse<TableGuestAdmissionCodeDto>>> CreateAdmissionCode(
-        Guid serviceSessionId,
-        [FromQuery] bool preferShortCode = false)
-    {
-        SetNoStore();
-        return Ok(await _mediator.SendCommand(
-            new CreateTableGuestAdmissionCodeCommand(serviceSessionId, preferShortCode), HttpContext.RequestAborted));
+            new JoinTableGuestVisitCommand(request.QrCodeData), HttpContext.RequestAborted));
     }
 
     [HttpGet("{serviceSessionId:guid}/account")]

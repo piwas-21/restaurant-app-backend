@@ -6,48 +6,7 @@ namespace RestaurantSystem.Api.Features.TableGuestVisits.Services;
 
 public static class TableGuestCredentialCrypto
 {
-    /// <summary>Length of admission codes issued before the shorter-code rollout.</summary>
-    public const int AdmissionCodeLength = 10;
-    public const int CurrentAdmissionCodeLength = 6;
-    public const int AdmissionHashIterations = 210_000;
-    private const int SaltLength = 16;
-    private const int DigestLength = 32;
     private const int ParticipantSecretLength = 32;
-    private const string CrockfordAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-
-    public static (string Code, string Hash) CreateAdmissionCode(bool preferShortCode = false)
-    {
-        var codeLength = preferShortCode ? CurrentAdmissionCodeLength : AdmissionCodeLength;
-        var random = RandomNumberGenerator.GetBytes(codeLength);
-        var code = new string(random.Select(value => CrockfordAlphabet[value & 31]).ToArray());
-        return (code, HashAdmissionCode(code));
-    }
-
-    public static string HashAdmissionCode(string code)
-    {
-        if (!TryNormalizeAdmissionCode(code, out var normalized))
-        {
-            throw new ArgumentException("Admission code is invalid.", nameof(code));
-        }
-
-        var salt = RandomNumberGenerator.GetBytes(SaltLength);
-        var digest = Rfc2898DeriveBytes.Pbkdf2(
-            normalized, salt, AdmissionHashIterations, HashAlgorithmName.SHA256, DigestLength);
-        return $"pbkdf2-sha256${AdmissionHashIterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(digest)}";
-    }
-
-    public static bool VerifyAdmissionCode(string code, string encodedHash)
-    {
-        if (!TryNormalizeAdmissionCode(code, out var normalized)
-            || !TryReadHash(encodedHash, out var salt, out var expected))
-        {
-            return false;
-        }
-
-        var actual = Rfc2898DeriveBytes.Pbkdf2(
-            normalized, salt, AdmissionHashIterations, HashAlgorithmName.SHA256, DigestLength);
-        return CryptographicOperations.FixedTimeEquals(actual, expected);
-    }
 
     public static string CreateParticipantToken() => Base64UrlEncode(RandomNumberGenerator.GetBytes(ParticipantSecretLength));
 
@@ -87,50 +46,6 @@ public static class TableGuestCredentialCrypto
         var payload = string.Create(CultureInfo.InvariantCulture,
             $"table-guest-round-v2\n{sessionId:N}\n{participantId:N}\n{operationId:N}\n{revision}\n{basketSessionHash}\n{expectedBasketFingerprint.ToUpperInvariant()}");
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
-    }
-
-    public static bool TryNormalizeAdmissionCode(string? code, out string normalized)
-    {
-        normalized = string.Empty;
-        if (string.IsNullOrWhiteSpace(code)
-            || code.Length is not (CurrentAdmissionCodeLength or AdmissionCodeLength))
-        {
-            return false;
-        }
-
-        var candidate = code.ToUpperInvariant();
-        if (candidate.Any(character => CrockfordAlphabet.IndexOf(character) < 0))
-        {
-            return false;
-        }
-
-        normalized = candidate;
-        return true;
-    }
-
-    private static bool TryReadHash(string encodedHash, out byte[] salt, out byte[] digest)
-    {
-        salt = [];
-        digest = [];
-        var parts = encodedHash.Split('$');
-        if (parts.Length != 4 || parts[0] != "pbkdf2-sha256"
-            || parts[1] != AdmissionHashIterations.ToString(CultureInfo.InvariantCulture))
-        {
-            return false;
-        }
-
-        try
-        {
-            salt = Convert.FromBase64String(parts[2]);
-            digest = Convert.FromBase64String(parts[3]);
-            return salt.Length == SaltLength && digest.Length == DigestLength;
-        }
-        catch (FormatException)
-        {
-            salt = [];
-            digest = [];
-            return false;
-        }
     }
 
     private static string Base64UrlEncode(byte[] bytes) =>
