@@ -24,10 +24,8 @@ public static class CancellationNotes
     /// <remarks>
     /// The warning is the part the system authors and the part a human must act on, so it is the
     /// part that survives: the staff-typed reason is trimmed around it. <c>Notes</c> is
-    /// <c>varchar(500)</c> and <c>CancelOrderCommandValidator</c> puts <b>no</b> maximum on the
-    /// reason, so a long enough one already threw on save and took the whole cancellation down
-    /// (backend #340) — appending to it unguarded would only have made that likelier, and on the
-    /// exact orders where the note matters most.
+    /// <c>varchar(500)</c> and the optional reason is bounded to 500 characters by validation.
+    /// Appending a refund warning still needs this clamp so the combined audit entry fits.
     /// </remarks>
     public static string Build(string reason, IReadOnlyCollection<OrderPayment> gatewayHeld)
     {

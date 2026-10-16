@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
@@ -18,7 +18,7 @@ public record CancelOrderCommand : ICommand<ApiResponse<OrderDto>>
     public Guid OrderId { get; set; }
     /// <summary>Optional detail version; old clients may omit it.</summary>
     public int? ExpectedVersion { get; set; }
-    public string CancellationReason { get; set; } = null!;
+    public string? CancellationReason { get; set; }
 }
 
 public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, ApiResponse<OrderDto>>
@@ -66,22 +66,11 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
 
         ExternalOrderLocalMutationGuard.RequireLocalOrder(order);
 
-        var authorization = OrderWriteAuthorizationPolicy.ForCancellation(_currentUserService.Role, order);
-        if (!authorization.Allowed)
-        {
-            return ApiResponse<OrderDto>.FailureWithCode(authorization.Message!, authorization.ErrorCode!);
-        }
-
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
         {
             return ApiResponse<OrderDto>.FailureWithCode(
                 "The order changed. Refresh it before cancelling.",
                 ErrorCodes.OrderVersionConflict);
-        }
-
-        if (order.Status == OrderStatus.Completed)
-        {
-            return ApiResponse<OrderDto>.Failure("Cannot cancel a completed order");
         }
 
         if (order.Status == OrderStatus.Cancelled)
@@ -103,7 +92,7 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
             OrderId = order.Id,
             FromStatus = order.Status,
             ToStatus = OrderStatus.Cancelled,
-            Notes = CancellationNotes.Build(command.CancellationReason, gatewayHeld),
+            Notes = CancellationNotes.Build(command.CancellationReason ?? string.Empty, gatewayHeld),
             ChangedAt = DateTime.UtcNow,
             ChangedBy = _currentUserService.GetAuditIdentifier(),
             CreatedAt = DateTime.UtcNow,
@@ -165,7 +154,7 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
             orderDto.PermittedActions = _permittedActionsService.GetPermittedActions(order);
         }
 
-        await SendCancellationEmailAsync(order, command.CancellationReason);
+        await SendCancellationEmailAsync(order, command.CancellationReason ?? string.Empty);
 
         _logger.LogInformation("Order {OrderNumber} cancelled by user {UserId}. Reason: {Reason}",
             order.OrderNumber, _currentUserService.UserId, command.CancellationReason);

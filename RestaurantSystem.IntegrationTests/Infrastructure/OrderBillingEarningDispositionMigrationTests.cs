@@ -220,7 +220,7 @@ public sealed class OrderBillingEarningDispositionMigrationTests(DatabaseFixture
         }
         if (tableName == "orders")
             payload += " - ARRAY['last_change_sequence', 'business_date', 'daily_order_number', 'effective_preparation_minutes',"
-                + " 'expected_ready_at', 'prior_day_review_dismissed_at', 'prior_day_review_dismissed_by']";
+                + " 'expected_ready_at', 'prior_day_review_dismissed_at', 'prior_day_review_dismissed_by', 'amendment_root_order_id']";
         var sql = $"SELECT COALESCE(jsonb_agg(payload ORDER BY payload ->> 'id')::text, '[]') "
             + $"FROM (SELECT {payload} AS payload FROM {tableName} AS row) AS rows";
         await using var connection = new NpgsqlConnection(fixture.ConnectionString);

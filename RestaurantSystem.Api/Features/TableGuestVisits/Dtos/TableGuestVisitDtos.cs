@@ -1,7 +1,5 @@
 namespace RestaurantSystem.Api.Features.TableGuestVisits.Dtos;
 
-public sealed record TableGuestAdmissionCodeDto(string AdmissionCode, DateTime ExpiresAt);
-
 public sealed record TableGuestJoinDto(Guid ServiceSessionId, string ParticipantToken, DateTime ExpiresAt);
 
 public sealed partial record TableGuestOrderDto(

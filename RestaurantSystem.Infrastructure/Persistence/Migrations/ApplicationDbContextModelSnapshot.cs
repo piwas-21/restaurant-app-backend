@@ -4941,6 +4941,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("actual_delivery_time");
 
+                    b.Property<Guid?>("AmendmentRootOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("amendment_root_order_id");
+
                     b.Property<decimal>("BillingCreditAmount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("decimal(10,2)")
@@ -4994,7 +4998,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<long>("DailyOrderNumber")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint")
-                        .HasColumnName("daily_order_number");
+                        .HasColumnName("daily_order_number")
+                        .HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
@@ -5207,6 +5212,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_orders");
+
+                    b.HasIndex("AmendmentRootOrderId");
 
                     b.HasIndex("BusinessDate")
                         .HasDatabaseName("ix_orders_business_date");
@@ -10100,7 +10107,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnName("id")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<Guid>("AdmissionId")
+                    b.Property<Guid?>("AdmissionId")
                         .HasColumnType("uuid")
                         .HasColumnName("admission_id");
 
@@ -12201,6 +12208,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>
                 {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("AmendmentRootOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("RestaurantSystem.Domain.Entities.CustomerDiscountRule", "CustomerDiscountRule")
                         .WithMany()
                         .HasForeignKey("CustomerDiscountRuleId")
@@ -13105,7 +13117,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasForeignKey("AdmissionId", "ServiceSessionId")
                         .HasPrincipalKey("Id", "ServiceSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_table_guest_participants_table_guest_admissions_admission_id");
 
                     b.Navigation("Admission");

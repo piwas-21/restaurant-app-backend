@@ -285,24 +285,48 @@ public sealed class StaffRoundOrderTests : IntegrationTestBase
         (await context.OrderPayments.CountAsync(payment => payment.OrderId == created.Id)).Should().Be(0);
     }
 
-    [Fact]
-    public async Task Server_cannot_cancel_after_kitchen_release()
+    [Theory]
+    [InlineData(UserRole.Server, OrderStatus.Pending)]
+    [InlineData(UserRole.Server, OrderStatus.PendingApproval)]
+    [InlineData(UserRole.Server, OrderStatus.Confirmed)]
+    [InlineData(UserRole.Server, OrderStatus.Preparing)]
+    [InlineData(UserRole.Server, OrderStatus.Ready)]
+    [InlineData(UserRole.Server, OrderStatus.OutForDelivery)]
+    [InlineData(UserRole.Server, OrderStatus.Delivered)]
+    [InlineData(UserRole.Server, OrderStatus.Completed)]
+    [InlineData(UserRole.Server, OrderStatus.Refunded)]
+    [InlineData(UserRole.Cashier, OrderStatus.Pending)]
+    [InlineData(UserRole.Cashier, OrderStatus.PendingApproval)]
+    [InlineData(UserRole.Cashier, OrderStatus.Confirmed)]
+    [InlineData(UserRole.Cashier, OrderStatus.Preparing)]
+    [InlineData(UserRole.Cashier, OrderStatus.Ready)]
+    [InlineData(UserRole.Cashier, OrderStatus.OutForDelivery)]
+    [InlineData(UserRole.Cashier, OrderStatus.Delivered)]
+    [InlineData(UserRole.Cashier, OrderStatus.Completed)]
+    [InlineData(UserRole.Cashier, OrderStatus.Refunded)]
+    public async Task Staff_can_cancel_any_native_order_status_without_a_reason(UserRole role, OrderStatus status)
     {
-        AuthenticateAsRole(UserRole.Server);
+        AuthenticateAsRole(role);
         var created = await CreateReleasedTakeawayAsync();
 
+        int expectedVersion;
+        await using (var seed = DatabaseFixture.CreateContext())
+        {
+            var order = await seed.Orders.SingleAsync(value => value.Id == created.Id);
+            order.Status = status;
+            await seed.SaveChangesAsync();
+            expectedVersion = order.Version;
+        }
         var response = await PostAsJsonAsync($"/api/Orders/{created.Id}/cancel", new
         {
-            cancellationReason = "Server cancellation attempt",
-            expectedVersion = created.Version
+            expectedVersion
         });
         var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
 
-        body.Success.Should().BeFalse();
-        body.ErrorCode.Should().Be(ErrorCodes.KitchenRoleRequired);
+        body.Success.Should().BeTrue();
         await using var context = DatabaseFixture.CreateContext();
         (await context.Orders.SingleAsync(order => order.Id == created.Id)).Status
-            .Should().Be(OrderStatus.Confirmed);
+            .Should().Be(OrderStatus.Cancelled);
     }
 
     [Fact]

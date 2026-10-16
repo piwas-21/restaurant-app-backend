@@ -22,7 +22,7 @@ public class OrderPermittedActionsServiceTests
             "CancelOrder", "MarkUrgent");
         actions.All(action => action.ReasonCode is not null || action.Allowed).Should().BeTrue();
         Action(actions, OrderAction.RefundPayment).RequiresReason.Should().BeTrue();
-        Action(actions, OrderAction.CancelOrder).RequiresReason.Should().BeTrue();
+        Action(actions, OrderAction.CancelOrder).RequiresReason.Should().BeFalse();
         Action(actions, OrderAction.MarkUrgent).RequiresReason.Should().BeTrue();
         actions.Where(action => action.Action is not ("RefundPayment" or "CancelOrder" or "MarkUrgent"))
             .Should().OnlyContain(action => !action.RequiresReason);

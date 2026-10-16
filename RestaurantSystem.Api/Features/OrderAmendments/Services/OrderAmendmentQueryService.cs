@@ -31,16 +31,27 @@ public sealed class OrderAmendmentQueryService : IOrderAmendmentQueryService
     }
 
     public async Task<IReadOnlyList<OrderAmendmentHistoryDto>> ListAsync(
-        Guid orderId, CancellationToken cancellationToken)
+        Guid orderId, CancellationToken cancellationToken, bool includeGroup = false)
     {
         OrderAmendmentPolicy.RequireFeature(_features);
         OrderAmendmentPolicy.RequireActor(_currentUser);
-        if (!await _context.Orders.AnyAsync(order => order.Id == orderId, cancellationToken))
-            throw new NotFoundException("The source order was not found.");
+        var source = await _context.Orders.AsNoTracking()
+            .Where(order => order.Id == orderId)
+            .Select(order => new { order.ServiceSessionId, RootId = order.AmendmentRootOrderId ?? order.Id })
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new NotFoundException("The source order was not found.");
+        var members = _context.Orders.Where(order => order.Id == orderId);
+        if (includeGroup)
+        {
+            members = source.ServiceSessionId is Guid visitId
+                ? _context.Orders.Where(order => order.ServiceSessionId == visitId)
+                : _context.Orders.Where(order => (order.AmendmentRootOrderId ?? order.Id) == source.RootId);
+        }
+        var memberIds = members.Select(order => order.Id);
 
         var amendments = await _context.Set<OrderAmendment>()
             .AsNoTracking()
-            .Where(amendment => amendment.SourceOrderId == orderId)
+            .Where(amendment => memberIds.Contains(amendment.SourceOrderId))
             .OrderByDescending(amendment => amendment.CreatedAt)
             .ToListAsync(cancellationToken);
         var supplements = await LoadSupplementsAsync(amendments, cancellationToken);

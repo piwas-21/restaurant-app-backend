@@ -6,7 +6,7 @@ public static class TableGuestVisitServiceExtensions
 {
     public static IServiceCollection AddTableGuestVisitServices(this IServiceCollection services)
     {
-        services.AddScoped<ITableGuestAdmissionService, TableGuestAdmissionService>();
+        services.AddScoped<ITableGuestJoinService, TableGuestJoinService>();
         services.AddScoped<ITableGuestAccountReader, TableGuestAccountReader>();
         services.AddScoped<ITableGuestParticipantPaymentAuthorization, TableGuestParticipantPaymentAuthorization>();
         services.AddScoped<ITableGuestVisitRevoker, TableGuestVisitRevoker>();

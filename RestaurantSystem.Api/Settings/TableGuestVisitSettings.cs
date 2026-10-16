@@ -9,7 +9,6 @@ public sealed class TableGuestVisitSettings
     public int AccountReadsPerIpPerMinute { get; set; } = 600;
     public int RoundAttemptsPerIpPerMinute { get; set; } = 100;
     public int RoundAttemptsPerMinute { get; set; } = 10;
-    public int AdmissionLifetimeHours { get; set; } = 12;
     public int ParticipantLifetimeHours { get; set; } = 12;
 
     public bool IsValid() => JoinsPerMinute is >= 1 and <= 60
@@ -17,6 +16,5 @@ public sealed class TableGuestVisitSettings
         && RoundAttemptsPerMinute is >= 1 and <= 60
         && AccountReadsPerIpPerMinute is >= 1 and <= 6000
         && RoundAttemptsPerIpPerMinute is >= 1 and <= 1000
-        && AdmissionLifetimeHours is >= 1 and <= 24
         && ParticipantLifetimeHours is >= 1 and <= 24;
 }
