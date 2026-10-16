@@ -160,13 +160,13 @@ public sealed class CashierOrderGroupsTests(DatabaseFixture databaseFixture) : I
     {
         await using var context = DatabaseFixture.CreateContext();
         var session = await context.TableServiceSessions.SingleAsync(value => value.Id == _openSessionId);
-        var source = NewOrder("AMENDED-WITHOUT-DISPATCH", session, 90);
+        var source = NewOrder("AMENDED-NO-ADD", session, 90);
         source.ServiceSessionId = null;
         source.Type = OrderType.Takeaway;
         context.Orders.Add(source);
         context.OrderAmendments.Add(HistoricalAmendment(source.Id, null));
         await context.SaveChangesAsync();
-        var result = await Read("search=AMENDED-WITHOUT-DISPATCH");
+        var result = await Read("search=AMENDED-NO-ADD");
         result.Items.Should().ContainSingle();
         result.Items.Single().HasUpdates.Should().BeTrue();
         result.Items.Single().Orders.Single().Id.Should().Be(source.Id);

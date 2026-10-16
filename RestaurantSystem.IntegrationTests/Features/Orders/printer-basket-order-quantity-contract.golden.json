@@ -102,7 +102,7 @@
         "targetStatus": null,
         "allowed": false,
         "reasonCode": "StaffRequired",
-        "requiresReason": true
+        "requiresReason": false
       },
       {
         "action": "MarkUrgent",
