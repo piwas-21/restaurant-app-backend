@@ -4,6 +4,8 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -17,6 +19,9 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 [Collection("Database Lane 2")]
 public sealed class CashierOrderGroupsTests(DatabaseFixture databaseFixture) : IntegrationTestBase(databaseFixture)
 {
+    protected override void ConfigureTestServices(IServiceCollection services) =>
+        services.PostConfigure<TenantFeatureSettings>(settings => settings.OrderAmendmentsV1 = true);
+
     private static readonly DateTime Opened = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
     private Guid _openSessionId;
     private Guid _closedSessionId;
@@ -170,6 +175,44 @@ public sealed class CashierOrderGroupsTests(DatabaseFixture databaseFixture) : I
         result.Items.Should().ContainSingle();
         result.Items.Single().HasUpdates.Should().BeTrue();
         result.Items.Single().Orders.Single().Id.Should().Be(source.Id);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Group_history_reads_all_members_in_one_request_without_unrelated_orders(bool visit)
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        var session = await context.TableServiceSessions.SingleAsync(value => value.Id == _openSessionId);
+        var root = NewOrder("HISTORY-ROOT", session, 91);
+        var child = NewOrder("HISTORY-CHILD", session, 92);
+        var unrelated = NewOrder("HISTORY-OTHER", session, 93);
+        child.AmendmentRootOrderId = root.Id;
+        if (!visit)
+        {
+            root.ServiceSessionId = null;
+            child.ServiceSessionId = null;
+        }
+        unrelated.ServiceSessionId = _closedSessionId;
+        context.Orders.AddRange(root, child, unrelated);
+        context.OrderAmendments.AddRange(HistoricalAmendment(root.Id, null),
+            HistoricalAmendment(child.Id, null), HistoricalAmendment(unrelated.Id, null));
+        await context.SaveChangesAsync();
+        AuthenticateAsAdmin();
+        foreach (var selected in new[] { root.Id, child.Id })
+        {
+            var response = await Client.GetAsync($"/api/staff/orders/{selected}/amendments?includeGroup=true");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var history = await ReadResponseAsync<ApiResponse<List<OrderAmendmentHistoryDto>>>(response);
+            history!.Data!.Select(value => value.SourceOrderId).Should().BeEquivalentTo(new[] { root.Id, child.Id });
+        }
+        var singleResponse = await Client.GetAsync($"/api/staff/orders/{root.Id}/amendments");
+        singleResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var single = await ReadResponseAsync<ApiResponse<List<OrderAmendmentHistoryDto>>>(singleResponse);
+        single!.Data!.Should().ContainSingle().Which.SourceOrderId.Should().Be(root.Id);
+        AuthenticateAsUser();
+        var denied = await Client.GetAsync($"/api/staff/orders/{root.Id}/amendments?includeGroup=true");
+        denied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private static OrderAmendment HistoricalAmendment(Guid source, Guid? supplement) => new()

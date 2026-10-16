@@ -35,8 +35,8 @@ public sealed class OrderAmendmentsController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<OrderAmendmentHistoryDto>>>> History(
-        Guid orderId) =>
-        Ok(await _mediator.SendQuery(new GetOrderAmendmentsQuery(orderId)));
+        Guid orderId, [FromQuery] bool includeGroup = false) =>
+        Ok(await _mediator.SendQuery(new GetOrderAmendmentsQuery(orderId, includeGroup)));
 
     [HttpGet("eligibility")]
     public async Task<ActionResult<ApiResponse<OrderAmendmentEligibilityDto>>> Eligibility(

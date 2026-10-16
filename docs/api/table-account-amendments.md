@@ -120,3 +120,5 @@ cancelled order through `POST /api/orders/{orderId}/cancel`. The reason is optio
 amendment financial reservations still require reconciliation. Cancellation retains order,
 status-history and tender identities; gateway captures are never represented as refunded
 without gateway evidence. Provider-managed orders retain their provider decision workflow.
+
+Staff history supports `GET /api/staff/orders/{orderId}/amendments?includeGroup=true` to load the complete visit or standalone amendment chain in one request. Membership is resolved from persisted visit/root identity; callers cannot supply unrelated order IDs. Omitting the option preserves single-order history.

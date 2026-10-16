@@ -71,7 +71,8 @@ public interface IOrderAmendmentQueryService
 {
     Task<IReadOnlyList<OrderAmendmentHistoryDto>> ListAsync(
         Guid orderId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool includeGroup = false);
 
     Task<OrderAmendmentOperationLookupDto> LookupAsync(
         Guid operationId,
