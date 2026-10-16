@@ -46,5 +46,6 @@ internal static class TableOccupancyRecoveryResponses
         value.OriginalRemainingAmount,
         value.WasLegacyUnassigned,
         value.WasKitchenReleased,
-        value.HadRoutingHistory);
+        value.HadRoutingHistory)
+    { OriginalBillChargeAmount = value.OriginalBillChargeAmount };
 }

@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.KitchenBoard.Dtos;
@@ -34,6 +36,8 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
 
     protected override void ConfigureTestServices(IServiceCollection services)
     {
+        services.RemoveAll<ITenantClock>();
+        services.AddSingleton<ITenantClock>(new FixedTenantClock("UTC", new DateTimeOffset(TestNow)));
         services.RemoveAll<ITenantModules>();
         services.AddSingleton<ITenantModules>(new KitchenBoardModules());
         services.RemoveAll<ITenantFeatures>();
@@ -579,8 +583,8 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
         var next = await Client.GetAsync(
             $"/api/staff/kitchen-board/work?pageSize=10&correctionsCursor={Uri.EscapeDataString(initialCursor!)}");
         var changed = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(next))!.Data!;
-        changed.Corrections.Items.Should().BeEmpty("acknowledged corrections leave the active-work feed");
-        changed.Corrections.RemovedIds.Should().Contain(workItemId);
+        changed.Corrections.Items.Should().ContainSingle(item => item.WorkItemId == workItemId && item.IsCompleted);
+        changed.Corrections.RemovedIds.Should().NotContain(workItemId);
 
         await using var verify = DatabaseFixture.CreateContext();
         (await verify.KitchenBoardWorkCompletions.CountAsync(work => work.OrderId == orderId
@@ -774,8 +778,8 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
 
         await SendAckAsync(nameof(DevicePrintStatus.Printed));
         var printed = await ReadDeltaAsync(cursor);
-        printed.Items.Should().BeEmpty("completed corrections leave the active-work feed");
-        printed.RemovedIds.Should().Contain(workItemId);
+        printed.Items.Should().ContainSingle(item => item.WorkItemId == workItemId && item.IsCompleted);
+        printed.RemovedIds.Should().NotContain(workItemId);
 
         await SendAckAsync(nameof(DevicePrintStatus.Failed));
         var failed = await ReadDeltaAsync(printed.NextCursor!);
@@ -783,8 +787,8 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
 
         await SendAckAsync(nameof(DevicePrintStatus.Printed));
         var reprinted = await ReadDeltaAsync(failed.NextCursor!);
-        reprinted.Items.Should().BeEmpty();
-        reprinted.RemovedIds.Should().Contain(workItemId);
+        reprinted.Items.Should().ContainSingle(item => item.WorkItemId == workItemId && item.IsCompleted);
+        reprinted.RemovedIds.Should().NotContain(workItemId);
     }
 
     [Theory]
@@ -888,6 +892,26 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
                 catch (TimeoutException) { }
             }
         }
+    }
+
+    [Fact]
+    public async Task Board_keeps_completed_work_today_and_excludes_prior_business_days()
+    {
+        var current = await SeedOrderAsync(OrderStatus.Completed, DevicePrintStatus.NotConfigured);
+        var previous = await SeedOrderAsync(OrderStatus.Ready, DevicePrintStatus.NotConfigured);
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            var previousOrder = await context.Orders.SingleAsync(order => order.Id == previous);
+            previousOrder.BusinessDate = DateOnly.FromDateTime(TestNow.AddDays(-1));
+            await context.SaveChangesAsync();
+        }
+        AuthenticateAsRole(UserRole.KitchenStaff);
+        var response = await Client.GetAsync("/api/staff/kitchen-board/work?pageSize=100");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(response))!.Data!;
+        body.Orders.Items.Should().Contain(order => order.OrderId == current
+            && order.Status == nameof(OrderStatus.Completed));
+        body.Orders.Items.Should().NotContain(order => order.OrderId == previous);
     }
 
     private async Task<Guid> SeedOrderAsync(OrderStatus status, DevicePrintStatus routeStatus)

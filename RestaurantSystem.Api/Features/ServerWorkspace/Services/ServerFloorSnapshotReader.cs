@@ -190,7 +190,7 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
         var legacyRows = await legacy
             .Select(order => new FloorOrderRow(
                 order.Id, null, order.TableId, order.TableNumber, order.Status,
-                order.Total, order.BillingCreditAmount, order.TotalPaid, order.RemainingAmount,
+                order.Total + order.BillChargeAmount, order.BillingCreditAmount, order.TotalPaid, order.RemainingAmount,
                 collectibleLegacyIds.Contains(order.Id)))
             .ToListAsync(cancellationToken);
         var sessionRows = sessions.SelectMany(session => (session.Bill?.Rounds ?? [])
@@ -200,7 +200,7 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
                 round.Order.TableId,
                 round.Order.TableNumber,
                 ParseStatus(round.Order.Status),
-                round.Order.Total,
+                round.Order.Total + round.Order.BillChargeAmount,
                 round.Order.BillingCreditAmount,
                 round.Order.TotalPaid,
                 round.Order.RemainingAmount,

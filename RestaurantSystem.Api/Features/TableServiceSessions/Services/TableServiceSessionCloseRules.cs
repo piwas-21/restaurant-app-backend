@@ -20,7 +20,7 @@ public static class TableServiceSessionCloseRules
         new(status, EffectiveOutstanding(total, billingCreditAmount, totalPaid), isFullyRefunded);
 
     internal static IQueryable<TableServiceCloseCharge> SelectCloseCharges(this IQueryable<Order> orders) =>
-        orders.Select(order => new TableServiceCloseCharge(order.Status, order.Total,
+        orders.Select(order => new TableServiceCloseCharge(order.Status, order.Total + order.BillChargeAmount,
             order.BillingCreditAmount, order.TotalPaid, order.PaymentStatus, order.OrderNumber,
             order.TableId, order.TableNumber));
 
@@ -62,7 +62,7 @@ public static class TableServiceSessionCloseRules
     internal static Expression<Func<Order, bool>> BlockingLegacyQuery(decimal paymentTolerance) => order =>
         order.Status != OrderStatus.Completed && order.Status != OrderStatus.Cancelled
         || order.Status == OrderStatus.Completed && order.PaymentStatus != PaymentStatus.Refunded
-            && order.Total - order.BillingCreditAmount - order.TotalPaid > paymentTolerance;
+            && order.Total + order.BillChargeAmount - order.BillingCreditAmount - order.TotalPaid > paymentTolerance;
 
     public static bool IsBlockingLegacyOrder(
         TableServiceSessionOrderState order, decimal paymentTolerance) =>
@@ -77,11 +77,11 @@ public static class TableServiceSessionCloseRules
             ? 0m : Math.Max(0m, order.RemainingAmount);
 
     public static decimal Outstanding(Order order) => Outstanding(FromCharge(
-        order.Status, order.Total, order.BillingCreditAmount, order.TotalPaid,
+        order.Status, order.Total + order.BillChargeAmount, order.BillingCreditAmount, order.TotalPaid,
         order.PaymentStatus == PaymentStatus.Refunded));
 
     public static decimal Outstanding(TableOccupancyRecoveryDisposition disposition) => Outstanding(FromCharge(
-        disposition.OriginalStatus, disposition.OriginalTotal, disposition.OriginalBillingCreditAmount,
+        disposition.OriginalStatus, disposition.OriginalTotal + disposition.OriginalBillChargeAmount, disposition.OriginalBillingCreditAmount,
         disposition.OriginalTotalPaid, disposition.OriginalPaymentStatus == PaymentStatus.Refunded));
 
     public static TableServiceSessionCloseAssessment Assess(

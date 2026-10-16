@@ -161,7 +161,7 @@ public sealed partial class RepairLegacyTableServiceSessionCommandHandler
             .Where(order => order.Status != OrderStatus.Completed
                 && order.Status != OrderStatus.Cancelled
                 || order.Status == OrderStatus.Completed
-                && order.Total - order.BillingCreditAmount - order.TotalPaid > _paymentTolerance)
+                && order.Total + order.BillChargeAmount - order.BillingCreditAmount - order.TotalPaid > _paymentTolerance)
             .ToListAsync(cancellationToken);
     }
 

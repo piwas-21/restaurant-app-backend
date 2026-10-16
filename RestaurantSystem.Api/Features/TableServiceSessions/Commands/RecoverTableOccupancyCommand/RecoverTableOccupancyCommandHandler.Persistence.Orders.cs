@@ -21,6 +21,7 @@ public sealed partial class RecoverTableOccupancyCommandHandler
             OriginalStatus = order.Status,
             OriginalPaymentStatus = order.PaymentStatus,
             OriginalTotal = order.Total,
+            OriginalBillChargeAmount = order.BillChargeAmount,
             OriginalBillingCreditAmount = order.BillingCreditAmount,
             OriginalTotalPaid = order.TotalPaid,
             OriginalRemainingAmount = order.RemainingAmount,
