@@ -81,15 +81,10 @@ public sealed class GuestRoundKitchenRoutingTests : IntegrationTestBase
         AuthenticateAsRole(UserRole.Server);
         var sessionResponse = await PostAsJsonAsync("/api/table-service-sessions", new { tableId = _tableId });
         var session = (await ReadResponseAsync<ApiResponse<TableServiceSessionDto>>(sessionResponse))!.Data!;
-        var admissionResponse = await PostAsJsonAsync(
-            $"/api/table-guest-visits/{session.ServiceSessionId}/admission-code", new { });
-        var admission = (await ReadResponseAsync<ApiResponse<TableGuestAdmissionCodeDto>>(admissionResponse))!.Data!;
-
         AuthenticateAsAnonymous();
         var joinResponse = await PostAsJsonAsync("/api/table-guest-visits/join", new
         {
             qrCodeData = _qrCode,
-            admissionCode = admission.AdmissionCode,
         });
         var participant = (await ReadResponseAsync<ApiResponse<TableGuestJoinDto>>(joinResponse))!.Data!;
         var basketSession = Guid.NewGuid().ToString("N");

@@ -158,6 +158,8 @@ For a legacy run with duplicate names, preserve both artifact ZIPs, digests and 
 belongs to the failed attempt, remove only that incomplete copy, then rerun the aggregate against the successful
 replacement. Never alter discovery counts, test reports or coverage floors to make a retry pass.
 
+Each integration shard has a 30-minute whole-job budget covering restore/build, tests, coverage/discovery and artifact uploads. Test selection, assertions and merged-coverage floors remain enforced.
+
 **Planned but never built** (carried over from the retired GitLab-era hardening plan, still open):
 
 - **Container image scan.** [build-image.yml](.github/workflows/build-image.yml) builds and pushes to GHCR with no

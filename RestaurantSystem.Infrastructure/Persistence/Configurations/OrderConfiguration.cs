@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Constants;
@@ -15,7 +16,8 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasMaxLength(20);
 
         builder.Property(o => o.BusinessDate).ValueGeneratedOnAdd();
-        builder.Property(o => o.DailyOrderNumber).ValueGeneratedOnAdd();
+        builder.Property(o => o.DailyOrderNumber).ValueGeneratedOnAdd()
+            .Metadata.SetValueGenerationStrategy(NpgsqlValueGenerationStrategy.None);
 
         builder.HasIndex(o => o.OrderNumber)
             .IsUnique();

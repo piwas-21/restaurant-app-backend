@@ -5,7 +5,7 @@ using RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Queries;
 
-public sealed record GetOrderAmendmentsQuery(Guid OrderId)
+public sealed record GetOrderAmendmentsQuery(Guid OrderId, bool IncludeGroup = false)
     : IQuery<ApiResponse<IReadOnlyList<OrderAmendmentHistoryDto>>>;
 
 public sealed class GetOrderAmendmentsQueryHandler
@@ -18,7 +18,7 @@ public sealed class GetOrderAmendmentsQueryHandler
     public async Task<ApiResponse<IReadOnlyList<OrderAmendmentHistoryDto>>> Handle(
         GetOrderAmendmentsQuery query, CancellationToken cancellationToken) =>
         ApiResponse<IReadOnlyList<OrderAmendmentHistoryDto>>.SuccessWithData(
-            await _queries.ListAsync(query.OrderId, cancellationToken), "Order amendment history loaded");
+            await _queries.ListAsync(query.OrderId, cancellationToken, query.IncludeGroup), "Order amendment history loaded");
 }
 
 public sealed record GetOrderAmendmentOperationQuery(Guid OperationId)

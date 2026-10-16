@@ -36,7 +36,11 @@ Configure `OrderAmendmentResolution` in `appsettings.json`. Defaults are amendme
 
 ## Guest admission and account reads
 
-`POST /api/table-guest-visits/join` accepts `qrCodeData` plus the staff-issued `admissionCode`. It is intentionally reachable without a login: admission proves access to the current open visit. Staff issue the code with `POST /api/table-guest-visits/{serviceSessionId}/admission-code`; that endpoint requires table-service staff permission and the Server/Cashier module.
+`POST /api/table-guest-visits/join` accepts only `qrCodeData` and is reachable without a login.
+The active configured table QR selects its current visit. If none is open, joining starts a
+visit only after the normal legacy-activity and staff-readiness checks pass. Table and visit
+locks serialize simultaneous joins with turnover. The staff admission-code route and human
+code entry have been removed; historical admission records remain for audit compatibility.
 
 The join result returns the visit ID, participant capability and expiry. Hold the capability in per-tab session storage; never put it in a URL or analytics. Only its hash is stored by the server. `GET /api/table-guest-visits/{serviceSessionId}/account` uses `X-Table-Participant` and returns a sanitized item/balance view without other guests' identities or free preparation notes. A close revokes credentials. Account reads use a consistent snapshot followed by a fresh authorization check, so a visit closing during assembly does not expose the former party's bill.
 
@@ -97,10 +101,24 @@ Admin, Cashier and Server can read `GET /api/Tables/{tableId}/occupancy-recovery
 
 Recovery frees physical occupancy and resets readiness while leaving payable visits open. Its preview includes only orders matched by stable table ID or exact numeric table-number fallback, and it archives only the table association of those blocking legacy orders through immutable disposition records. Orders with no table identity remain unassigned cashier work and are not changed or associated with the recovered table. Orders, payments, refunds, unknown tender states, checkout attempts, routed work and preparation status remain in history; a pending row is cancelled only when it is unpaid, unrouted, unreleased, unallocated and has no payment or checkout attempt. No kitchen or printer work is dispatched. Unidentified legacy visit identities still require explicit repair. After recovery, the table can be marked ready and opened for a new visit without inheriting the prior visit's occupancy blockers.
 
-Human guest admission codes use ten Crockford Base32 characters when the staff issuance request omits `preferShortCode`, preserving compatibility with older staff and guest clients. Updated callers may request six characters with `POST /api/table-guest-visits/{serviceSessionId}/admission-code?preferShortCode=true`. Guest join accepts both lengths. Both formats retain hashed storage, visit scope, expiry, rotation and rate limits.
+`StaffOrderSimplification` makes participant admission references optional and backfills
+amendment ancestry. Startup applies it before serving HTTP. Once QR-only participants exist,
+old binaries that require an admission reference cannot safely read them; use a forward repair.
+The migration refuses a schema downgrade while QR-only participants exist rather than inventing admission credentials.
 
 New equal-share plans in CHF and EUR floor the first `N-1` shares to a 5-minor-unit increment and assign the exact remainder to the last share. The increment is stored with each plan so an already-issued plan keeps its reviewed amounts. Plans that would produce a zero or negative share are refused; custom amounts retain exact minor-unit values.
 
 ## Contribution receipt retention
 
 A contribution receipt includes `receiptExpiresAt`, the expiry already persisted with its receipt grant. This field authorizes bounded client cleanup only after the originating contribution is confirmed terminal. Clients talking to older additive contracts can omit that field and preserve the receipt conservatively. A local clock, return hint or storage cap must never discard unresolved payment evidence or imply capture. The receipt continues to disclose only that contribution after visit closure.
+
+## Staff order cancellation
+
+Server and Cashier can cancel native orders at any fulfillment status except an already
+cancelled order through `POST /api/orders/{orderId}/cancel`. The reason is optional (maximum
+500 characters); `expectedVersion` protects the confirmed snapshot. Unresolved payment and
+amendment financial reservations still require reconciliation. Cancellation retains order,
+status-history and tender identities; gateway captures are never represented as refunded
+without gateway evidence. Provider-managed orders retain their provider decision workflow.
+
+Staff history supports `GET /api/staff/orders/{orderId}/amendments?includeGroup=true` to load the complete visit or standalone amendment chain in one request. Membership is resolved from persisted visit/root identity; callers cannot supply unrelated order IDs. Omitting the option preserves single-order history.

@@ -2,17 +2,18 @@
 
 `GET /api/orders/cashier-groups` is a staff-only, cashier-module read. It uses the same
 filters as `GET /api/orders`, but pages groups rather than individual orders. A group is
-one open table service visit (including a released, still-payable visit), or one order
-without an open visit. Closed visits are not combined. Customer names and table labels
+one table service visit (including closed and released visits), or one original order
+with all its amendment dispatches. Customer names and table labels
 are never used to infer membership. Every order keeps its original ID and order number.
 
 The response is `ApiResponse<PagedResult<CashierOrderGroupDto>>`. Each item contains:
 
 - `groupKey`: `visit:<uuid>` or `order:<uuid>`; stable presentation identity.
-- `serviceSessionId`: the open visit UUID, or null for a standalone row.
+- `serviceSessionId`: the visit UUID, or null for a standalone row.
 - `tableNumber`: the first member's numeric compatibility value, or null.
 - `releasedAt`: the visit's release time, or null. Released visits remain collectible.
 - `isArchivedFromTable`: a recovered legacy order belongs to a prior occupancy, not the current guests.
+- `hasUpdates`: later rounds or a committed amendment exist, including updates without additions.
 - `orders`: complete member `OrderDto` rows, oldest first with ID as a tie-breaker.
 
 Filters select a group when at least one member matches. Its full membership remains in
@@ -30,3 +31,11 @@ order synchronization feed remains unchanged for operational notifications.
 Collecting from a group navigates to `/cashier/collection?serviceSessionId=<uuid>`.
 Individual order actions keep their order context; an order with visit membership must
 collect against the visit account rather than `POST /api/orders/{id}/payments`.
+
+Cashier renders one row per group. Later rounds and amendment dispatches remain accessible
+inside Amendment history, including when new amendments are disabled or their history read
+fails. The Orders navigation badge asks for the server's tenant day and counts today's groups;
+archived days are excluded. Operational preparation and payment identities remain separate.
+
+`orders.amendment_root_order_id` records the original standalone order for every supplement.
+The migration backfills committed historical chains without rewriting orders or payments.

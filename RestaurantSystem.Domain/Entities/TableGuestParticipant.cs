@@ -6,12 +6,12 @@ namespace RestaurantSystem.Domain.Entities;
 public sealed class TableGuestParticipant : Entity
 {
     public Guid ServiceSessionId { get; set; }
-    public Guid AdmissionId { get; set; }
+    public Guid? AdmissionId { get; set; }
     public string TokenHash { get; set; } = string.Empty;
     public DateTime ExpiresAt { get; set; }
     public DateTime? RevokedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }
 
     public TableServiceSession ServiceSession { get; set; } = null!;
-    public TableGuestAdmission Admission { get; set; } = null!;
+    public TableGuestAdmission? Admission { get; set; }
 }

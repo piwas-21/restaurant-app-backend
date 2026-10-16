@@ -42,7 +42,6 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
     private OrderPermittedActionDto Evaluate(OrderAction action, Order order)
     {
         var requiresReason = action is OrderAction.RefundPayment
-            or OrderAction.CancelOrder
             or OrderAction.MarkUrgent;
 
         // Marketplace decisions, settlement and receipts need their dedicated workflow. Keep
@@ -150,29 +149,17 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 
     private (bool Allowed, string? ReasonCode) CancelAction(Order order)
     {
-        var authorization = OrderWriteAuthorizationPolicy.ForCancellation(
-            _currentUser.Role, order);
-        if (!authorization.Allowed)
-        {
-            return (false, authorization.ErrorCode);
-        }
-
         var role = RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired);
         if (!role.Allowed)
         {
             return role;
         }
 
-        if (IsServer && order.IsKitchenReleased && order.Status is not OrderStatus.Confirmed)
-        {
-            return (false, OrderActionReasonCodes.KitchenRoleRequired);
-        }
-
         // The cancel endpoint intentionally has its own terminal guard rather than consulting the
         // transition table: it is the existing write contract, and old rows may contain a status
         // value that the lifecycle table cannot reach. Mirror that endpoint without inventing a
         // new transition rule here.
-        return order.Status is OrderStatus.Completed or OrderStatus.Cancelled
+        return order.Status is OrderStatus.Cancelled
             ? (false, OrderActionReasonCodes.InvalidStatusTransition)
             : (true, null);
     }

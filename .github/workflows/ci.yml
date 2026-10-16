@@ -140,7 +140,9 @@ jobs:
   dotnet_test:
     name: dotnet test (integration) shard ${{ matrix.shard }}/3
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Budget includes restore/build, tests, coverage/discovery and artifact uploads.
+    # Leave upload margin after a successful long-running shard, rather than cancelling its evidence.
+    timeout-minutes: 30
     strategy:
       # All shards always run: a red shard must not hide the state of another one.
       fail-fast: false
