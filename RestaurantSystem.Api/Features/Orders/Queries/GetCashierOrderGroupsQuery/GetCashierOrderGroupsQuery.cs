@@ -105,12 +105,15 @@ public sealed class GetCashierOrderGroupsQueryHandler(
                 group.SessionId.HasValue ? releasedVisits[group.SessionId.Value] : null,
                 !group.SessionId.HasValue && archivedOrderIds.Contains(group.Id))
                 with
-            { HasUpdates = members.Count > 1 || members.Any(order => amendedIds.Contains(order.Id)) };
+            { HasUpdates = HasGroupUpdates(members, amendedIds) };
         }).ToList();
         await snapshot.CommitAsync(cancellationToken);
         return ApiResponse<PagedResult<CashierOrderGroupDto>>.SuccessWithData(
             new PagedResult<CashierOrderGroupDto>(items, total, pageNumber, filters.PageSize, totalPages));
     }
+
+    private static bool HasGroupUpdates(List<Order> members, HashSet<Guid> amendedIds) =>
+        members.Count > 1 || members.Any(order => amendedIds.Contains(order.Id));
 
     private void ValidateFilters(OrderFilters filters)
     {

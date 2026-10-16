@@ -45,11 +45,7 @@ public sealed class TableGuestJoinService : ITableGuestJoinService
     public async Task<TableGuestJoinDto> JoinAsync(
         string qrCodeData, CancellationToken cancellationToken)
     {
-        EnsureEnabled();
-        if (string.IsNullOrWhiteSpace(qrCodeData) || qrCodeData.Length > 128)
-        {
-            throw Unavailable();
-        }
+        EnsureJoinAllowed(qrCodeData);
 
         await using var transaction = await _context.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted, cancellationToken);
@@ -128,9 +124,13 @@ public sealed class TableGuestJoinService : ITableGuestJoinService
         return new TableGuestJoinDto(session.Id, token, expiresAt);
     }
 
-    private void EnsureEnabled()
+    private void EnsureJoinAllowed(string qrCodeData)
     {
         if (!_features.TableGuestVisitsV1)
+        {
+            throw Unavailable();
+        }
+        if (string.IsNullOrWhiteSpace(qrCodeData) || qrCodeData.Length > 128)
         {
             throw Unavailable();
         }
