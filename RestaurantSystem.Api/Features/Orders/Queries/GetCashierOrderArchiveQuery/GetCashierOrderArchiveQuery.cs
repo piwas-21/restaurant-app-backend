@@ -35,7 +35,6 @@ public sealed class GetCashierOrderArchiveQueryHandler(
     : IQueryHandler<GetCashierOrderArchiveQuery, ApiResponse<CashierOrderArchiveDto>>
 {
     private const int MaximumPageSize = 100;
-    private const decimal PaymentTolerance = 0.01m;
 
     public async Task<ApiResponse<CashierOrderArchiveDto>> Handle(
         GetCashierOrderArchiveQuery request, CancellationToken cancellationToken)
@@ -48,30 +47,10 @@ public sealed class GetCashierOrderArchiveQueryHandler(
             Descending: true, Scope: OrderListScope.All), currentUser, clock, logger);
         var orders = await ReadPageAsync(ordersQuery, request.Page, request.PageSize, cancellationToken);
 
-        var unresolvedQuery = context.Orders
-            .IncludeOrderLineGraph()
-            .Include(order => order.Payments)
-            .Include(order => order.StatusHistory)
-            .Include(order => order.DeliveryAddress)
-            .Where(order => !order.IsDeleted
-                && order.BusinessDate < businessDate
-                && order.PriorDayReviewDismissedAt == null
-                && order.Status != OrderStatus.Cancelled
-                && order.Status != OrderStatus.Refunded
-                && order.PaymentStatus != PaymentStatus.Refunded
-                && (order.Status == OrderStatus.Pending
-                    || order.Status == OrderStatus.PendingApproval
-                    || order.Status == OrderStatus.Confirmed
-                    || order.Status == OrderStatus.Preparing
-                    || order.Status == OrderStatus.Ready
-                    || order.Status == OrderStatus.OutForDelivery
-                    || (order.Status == OrderStatus.Delivered || order.Status == OrderStatus.Completed)
-                    && order.TotalPaid < order.Total - order.BillingCreditAmount - PaymentTolerance))
-            .AsNoTracking()
-            .AsSplitQuery();
-        var unresolved = await ReadPageAsync(
-            unresolvedQuery, request.PriorDayUnresolvedPage,
-            request.PriorDayUnresolvedPageSize, cancellationToken);
+        // Keep the legacy response field for clients, but leave prior days in the dated archive.
+        // Hiding old work does not settle, cancel, or otherwise rewrite the order or its payments.
+        var unresolved = new PagedResult<OrderDto>(
+            [], 0, 1, request.PriorDayUnresolvedPageSize, 0);
 
         return ApiResponse<CashierOrderArchiveDto>.SuccessWithData(
             new CashierOrderArchiveDto(businessDate, orders, unresolved));
