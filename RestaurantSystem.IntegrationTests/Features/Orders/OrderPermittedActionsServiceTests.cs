@@ -55,7 +55,18 @@ public class OrderPermittedActionsServiceTests
     }
 
     [Theory]
+    [InlineData(UserRole.Cashier)]
+    [InlineData(UserRole.Admin)]
+    public void CashierCanMarkConfirmedNativeOrderReady(UserRole role)
+    {
+        var action = Action(Actions(NewOrder(OrderStatus.Confirmed), role), OrderAction.MarkReady);
+        action.Allowed.Should().BeTrue();
+        action.TargetStatus.Should().Be("Ready");
+    }
+
+    [Theory]
     [InlineData(OrderStatus.Confirmed, OrderAction.StartPreparing)]
+    [InlineData(OrderStatus.Confirmed, OrderAction.MarkReady)]
     [InlineData(OrderStatus.Preparing, OrderAction.MarkReady)]
     public void Kitchen_actions_are_not_granted_to_server(OrderStatus status, OrderAction action)
     {
