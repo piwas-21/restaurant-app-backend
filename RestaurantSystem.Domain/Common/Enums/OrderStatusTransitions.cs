@@ -40,7 +40,8 @@ public static class OrderStatusTransitions
         {
             OrderStatus.Pending => newStatus is OrderStatus.Confirmed or OrderStatus.Cancelled or OrderStatus.PendingApproval,
             OrderStatus.PendingApproval => newStatus is OrderStatus.Confirmed or OrderStatus.Cancelled,
-            OrderStatus.Confirmed => newStatus is OrderStatus.Preparing or OrderStatus.Cancelled,
+            // Staff can mark an already prepared order ready without a redundant preparing tap.
+            OrderStatus.Confirmed => newStatus is OrderStatus.Preparing or OrderStatus.Ready or OrderStatus.Cancelled,
             OrderStatus.Preparing => newStatus is OrderStatus.Ready or OrderStatus.Cancelled,
             OrderStatus.Ready => newStatus is OrderStatus.OutForDelivery or OrderStatus.Completed or OrderStatus.Cancelled,
             OrderStatus.OutForDelivery => newStatus is OrderStatus.Completed or OrderStatus.Cancelled,

@@ -8,8 +8,9 @@ internal static class ExternalOrderLocalMutationGuard
 {
     internal static bool AllowsPreparation(Order order, OrderStatus target)
         => order.ExternalReference is { Provider: "uber-eats", ExternalState: "ACCEPTED", FulfillmentType: "DELIVERY_BY_UBER" }
-            && order.IsKitchenReleased && order.Status is OrderStatus.Confirmed or OrderStatus.Preparing
-            && target is OrderStatus.Preparing or OrderStatus.Ready;
+            && order.IsKitchenReleased
+            && (order.Status, target) is (OrderStatus.Confirmed, OrderStatus.Preparing)
+                or (OrderStatus.Preparing, OrderStatus.Ready);
 
     internal static void RequireStatusMutation(Order order, OrderStatus target, int? expectedVersion, bool isApiToken)
     {
