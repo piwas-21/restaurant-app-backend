@@ -27,7 +27,7 @@ public sealed class CashierOrderArchiveTests(DatabaseFixture fixture) : Integrat
     private DateOnly _businessDate;
 
     [Fact]
-    public async Task Archive_defaults_to_tenant_business_date_and_pages_current_and_unresolved_queues()
+    public async Task Archive_defaults_to_tenant_business_date_and_pages_current_orders_without_old_warnings()
     {
         var currentPageOne = await ReadArchive(
             $"?search=ARCHIVE-TODAY&page=1&pageSize=1&priorDayUnresolvedPage=1&priorDayUnresolvedPageSize=1");
@@ -44,17 +44,42 @@ public sealed class CashierOrderArchiveTests(DatabaseFixture fixture) : Integrat
         currentPageOne.Orders.Items.Concat(currentPageTwo.Orders.Items)
             .Select(order => order.Id).Should().BeEquivalentTo(_todayOrderIds.ToArray());
 
-        currentPageOne.PriorDayUnresolvedOrders.TotalCount.Should().Be(2);
-        currentPageTwo.PriorDayUnresolvedOrders.TotalCount.Should().Be(2);
-        currentPageOne.PriorDayUnresolvedOrders.Items.Concat(currentPageTwo.PriorDayUnresolvedOrders.Items)
-            .Select(order => order.Id).Should().BeEquivalentTo([_priorActiveOrderId, _priorUnpaidCompletedOrderId]);
-        var unresolvedIds = currentPageOne.PriorDayUnresolvedOrders.Items
-            .Concat(currentPageTwo.PriorDayUnresolvedOrders.Items)
-            .Select(order => order.Id).ToList();
-        unresolvedIds.Should().NotContain(_priorPaidCompletedOrderId);
-        unresolvedIds.Should().NotContain(_priorDismissedOrderId);
-        unresolvedIds.Should().NotContain(_priorCancelledUnpaidOrderId);
-        unresolvedIds.Should().NotContain(_priorPaidDeliveredOrderId);
+        currentPageOne.PriorDayUnresolvedOrders.Should().BeEquivalentTo(
+            new PagedResult<OrderDto>([], 0, 1, 1, 0));
+        currentPageTwo.PriorDayUnresolvedOrders.Should().BeEquivalentTo(
+            new PagedResult<OrderDto>([], 0, 1, 1, 0));
+    }
+
+    [Fact]
+    public async Task Prior_day_orders_remain_in_their_dated_archive_without_settling_or_cancelling_them()
+    {
+        var priorDate = _businessDate.AddDays(-1);
+        var archive = await ReadArchive($"?businessDate={priorDate:yyyy-MM-dd}&pageSize=100");
+
+        archive.PriorDayUnresolvedOrders.Items.Should().BeEmpty();
+        archive.PriorDayUnresolvedOrders.TotalCount.Should().Be(0);
+        archive.Orders.Items.Select(order => order.Id).Should().Contain([
+            _priorActiveOrderId, _priorUnpaidCompletedOrderId, _priorPaidCompletedOrderId,
+            _priorDismissedOrderId, _priorCancelledUnpaidOrderId, _priorPaidDeliveredOrderId]);
+        var active = archive.Orders.Items.Single(order => order.Id == _priorActiveOrderId);
+        active.Status.Should().Be(nameof(OrderStatus.Preparing));
+        active.PaymentStatus.Should().Be(nameof(PaymentStatus.Pending));
+        active.Total.Should().Be(12m);
+        active.TotalPaid.Should().Be(0m);
+        var unpaidCompleted = archive.Orders.Items.Single(order => order.Id == _priorUnpaidCompletedOrderId);
+        unpaidCompleted.Status.Should().Be(nameof(OrderStatus.Completed));
+        unpaidCompleted.PaymentStatus.Should().Be(nameof(PaymentStatus.Pending));
+        unpaidCompleted.Total.Should().Be(20m);
+        unpaidCompleted.TotalPaid.Should().Be(0m);
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var persisted = await context.Orders.AsNoTracking().SingleAsync(order => order.Id == _priorActiveOrderId);
+        persisted.Status.Should().Be(OrderStatus.Preparing);
+        persisted.PaymentStatus.Should().Be(PaymentStatus.Pending);
+        persisted.Total.Should().Be(12m);
+        persisted.TotalPaid.Should().Be(0m);
+        persisted.PriorDayReviewDismissedAt.Should().BeNull();
     }
 
     [Fact]
@@ -66,11 +91,13 @@ public sealed class CashierOrderArchiveTests(DatabaseFixture fixture) : Integrat
         var repeated = await Client.PostAsync($"/api/orders/{_priorActiveOrderId}/prior-day-review/dismiss", null);
         repeated.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var archive = await ReadArchive($"?businessDate={_businessDate:yyyy-MM-dd}&pageSize=100");
-        archive.PriorDayUnresolvedOrders.Items.Select(order => order.Id)
-            .Should().NotContain(_priorActiveOrderId);
-        archive.PriorDayUnresolvedOrders.Items.Select(order => order.Id)
-            .Should().Contain(_priorUnpaidCompletedOrderId);
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var dismissed = await context.Orders.AsNoTracking().SingleAsync(order => order.Id == _priorActiveOrderId);
+            dismissed.PriorDayReviewDismissedAt.Should().NotBeNull();
+            dismissed.PriorDayReviewDismissedBy.Should().NotBeNullOrWhiteSpace();
+        }
 
         AuthenticateAsUser();
         var forbidden = await Client.PostAsync($"/api/orders/{_priorUnpaidCompletedOrderId}/prior-day-review/dismiss", null);
