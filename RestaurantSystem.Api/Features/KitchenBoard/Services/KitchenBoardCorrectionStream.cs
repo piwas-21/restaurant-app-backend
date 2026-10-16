@@ -21,7 +21,7 @@ internal static class KitchenBoardCorrectionStream
         var cancellationToken = request.CancellationToken;
         if (string.IsNullOrWhiteSpace(request.CursorValue))
         {
-            var total = await KitchenNotes(context, request.CurrentWatermark).CountAsync(cancellationToken);
+            var total = await KitchenNotes(request, request.CurrentWatermark).CountAsync(cancellationToken);
             return await SnapshotAsync(request, request.CurrentWatermark, total, null);
         }
 
@@ -46,7 +46,7 @@ internal static class KitchenBoardCorrectionStream
         var context = request.Context;
         var pageSize = request.PageSize;
         var cancellationToken = request.CancellationToken;
-        var query = KitchenNotes(context, upper);
+        var query = KitchenNotes(request, upper);
         if (afterId.HasValue)
         {
             query = query.Where(note => note.Id.CompareTo(afterId.Value) > 0);
@@ -103,17 +103,13 @@ internal static class KitchenBoardCorrectionStream
         var projected = await ProjectAsync(request, pageRows);
         var projectedById = projected.ToDictionary(item => item.WorkItemId);
         var rowIds = pageRows.Select(note => note.Id).ToArray();
-        var activeIds = await KitchenBoardWorkRules.ActiveCorrections(context)
+        var visibleIds = await KitchenNotes(request, null)
             .Where(note => rowIds.Contains(note.Id)).Select(note => note.Id)
             .ToHashSetAsync(cancellationToken);
-        var items = projected.Where(item => activeIds.Contains(item.WorkItemId)
-            && !item.IsCompleted && !item.Withdrawn).ToList();
-        var tombstones = projected.Where(item => item.Withdrawn).ToList();
-        var removed = pageRows.Where(note => !projectedById.TryGetValue(note.Id, out var item)
-                || !activeIds.Contains(note.Id) || item.IsCompleted || item.Withdrawn)
+        var items = projected.Where(item => visibleIds.Contains(item.WorkItemId)).ToList();
+        var removed = pageRows.Where(note => !projectedById.ContainsKey(note.Id) || !visibleIds.Contains(note.Id))
             .Select(note => note.Id).Distinct().ToList();
-        items.AddRange(tombstones);
-        var count = await KitchenBoardWorkRules.ActiveCorrections(context).CountAsync(cancellationToken);
+        var count = await KitchenNotes(request, null).CountAsync(cancellationToken);
         var hasMore = rows.Count > pageSize;
         var next = hasMore
             ? KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
@@ -135,8 +131,11 @@ internal static class KitchenBoardCorrectionStream
     }
 
     private static IQueryable<OrderOperationalNote> KitchenNotes(
-        ApplicationDbContext context, long? upper) => KitchenBoardWorkRules.ActiveCorrections(context)
-        .Where(note => !upper.HasValue || note.KitchenBoardSequence <= upper.Value);
+        KitchenBoardStreamReadContext request, long? upper) => request.Context.OrderOperationalNotes.AsNoTracking()
+        .Where(note => note.Audience == OrderNoteAudience.Kitchen && (note.KitchenChangesJson != null || note.WithdrawnAt.HasValue)
+            && note.Order.ExternalReference == null && !note.Order.IsDeleted
+            && note.CreatedAt >= request.DayStartUtc && note.CreatedAt < request.DayEndUtc
+            && (!upper.HasValue || note.KitchenBoardSequence <= upper.Value));
 
     private static IQueryable<OrderOperationalNote> ChangedKitchenNotes(
         ApplicationDbContext context, long lower, long upper) => context.OrderOperationalNotes

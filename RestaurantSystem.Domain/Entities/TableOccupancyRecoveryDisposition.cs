@@ -19,6 +19,7 @@ public sealed class TableOccupancyRecoveryDisposition : Entity
     public OrderStatus OriginalStatus { get; set; }
     public PaymentStatus OriginalPaymentStatus { get; set; }
     public decimal OriginalTotal { get; set; }
+    public decimal OriginalBillChargeAmount { get; set; }
     public decimal OriginalBillingCreditAmount { get; set; }
     public decimal OriginalTotalPaid { get; set; }
     public decimal OriginalRemainingAmount { get; set; }

@@ -1,5 +1,7 @@
 {
   "normalOrder": {
+    "billChargeAmount": 0.00,
+    "billCharges": [],
     "id": "10000000-0000-0000-0000-000000000001",
     "orderNumber": "PF-GUEST-QTY-001",
     "userId": null,
@@ -264,6 +266,8 @@
   },
   "projectionVersion": 2,
   "v2Order": {
+    "billChargeAmount": 0.00,
+    "billCharges": [],
     "id": "10000000-0000-0000-0000-000000000001",
     "orderNumber": "PF-GUEST-QTY-001",
     "userId": null,

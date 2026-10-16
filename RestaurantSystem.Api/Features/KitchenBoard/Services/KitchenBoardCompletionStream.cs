@@ -20,7 +20,7 @@ internal static class KitchenBoardCompletionStream
         var cancellationToken = request.CancellationToken;
         if (string.IsNullOrWhiteSpace(request.CursorValue))
         {
-            var count = await ActiveInitialCompletions(context).CountAsync(cancellationToken);
+            var count = await ActiveInitialCompletions(request).CountAsync(cancellationToken);
             return await SnapshotAsync(request, request.CurrentWatermark, count, null);
         }
 
@@ -45,7 +45,7 @@ internal static class KitchenBoardCompletionStream
         var context = request.Context;
         var pageSize = request.PageSize;
         var cancellationToken = request.CancellationToken;
-        var query = ActiveInitialCompletions(context)
+        var query = ActiveInitialCompletions(request)
             .Where(value => value.Sequence <= upper);
         if (afterSequence is not null)
         {
@@ -105,7 +105,7 @@ internal static class KitchenBoardCompletionStream
         var rows = await rowsQuery.OrderBy(value => value.Sequence)
             .Take(pageSize + 1).ToListAsync(cancellationToken);
         var items = rows.Take(pageSize).Select(Map).ToList();
-        var count = await ActiveInitialCompletions(context).CountAsync(cancellationToken);
+        var count = await ActiveInitialCompletions(request).CountAsync(cancellationToken);
         var hasMore = rows.Count > pageSize;
         var next = hasMore
             ? KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
@@ -136,8 +136,9 @@ internal static class KitchenBoardCompletionStream
         value.CreatedAt);
 
     private static IQueryable<KitchenBoardWorkCompletion> ActiveInitialCompletions(
-        ApplicationDbContext context) => context.KitchenBoardWorkCompletions.AsNoTracking()
-        .Where(value => value.Kind == KitchenBoardWorkKind.InitialOrder
+        KitchenBoardStreamReadContext request) => request.Context.KitchenBoardWorkCompletions.AsNoTracking()
+        .Where(value => value.Order.BusinessDate == request.BusinessDate
+            && value.Kind == KitchenBoardWorkKind.InitialOrder
             && value.WorkItemId == value.OrderId
             && value.Order.IsKitchenReleased && value.Order.ExternalReference == null
             && !value.Order.IsDeleted && value.Order.Status == OrderStatus.Ready);

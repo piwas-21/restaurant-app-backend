@@ -31,7 +31,7 @@ public static class StaffOrderOperationFingerprint
             request.Items,
             releaseToKitchen
         };
-        return Hash(JsonSerializer.Serialize(payload));
+        return Hash(JsonSerializer.Serialize(payload) + (request.BillCharges.Count == 0 ? string.Empty : JsonSerializer.Serialize(request.BillCharges)));
     }
 
     public static string CreateRelease(Guid orderId, int expectedVersion) =>

@@ -75,8 +75,11 @@ public partial class OrderMappingService : IOrderMappingService
             FidelityPointsDiscount = order.FidelityPointsDiscount,
             Tip = order.Tip,
             Total = order.Total,
-            PayableTotal = order.BillingCreditAmount > 0 ? order.PayableTotal : null,
+            PayableTotal = (order.BillingCreditAmount > 0 || order.BillChargeAmount > 0) ? order.PayableTotal : null,
             BillingCreditAmount = order.BillingCreditAmount,
+            BillChargeAmount = order.BillChargeAmount,
+            BillCharges = RestaurantSystem.Api.Features.BillCharges.Services.OrderBillChargeReader.Read(order)
+                .Select(c => new RestaurantSystem.Api.Features.BillCharges.Dtos.BillChargeDto(c.Key, c.Label, c.Amount, c.Currency)).ToList(),
             TotalPaid = order.TotalPaid,
             RemainingAmount = order.PayableTotal - order.TotalPaid,
             PaymentTipMinor = order.Payments?.Where(payment => payment.Status.IsCaptured())

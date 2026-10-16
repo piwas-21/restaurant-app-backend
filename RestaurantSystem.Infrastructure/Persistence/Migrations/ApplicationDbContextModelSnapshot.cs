@@ -4945,6 +4945,20 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("amendment_root_order_id");
 
+                    b.Property<decimal>("BillChargeAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("bill_charge_amount");
+
+                    b.Property<string>("BillChargesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("[]")
+                        .HasColumnName("bill_charges_json");
+
                     b.Property<decimal>("BillingCreditAmount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("decimal(10,2)")
@@ -9426,6 +9440,13 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("address_line2");
 
+                    b.Property<string>("BillChargeRulesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("[]")
+                        .HasColumnName("bill_charge_rules_json");
+
                     b.Property<string>("BundlePresentationMode")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -10272,6 +10293,13 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("order_number");
+
+                    b.Property<decimal>("OriginalBillChargeAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("original_bill_charge_amount");
 
                     b.Property<decimal>("OriginalBillingCreditAmount")
                         .HasPrecision(10, 2)

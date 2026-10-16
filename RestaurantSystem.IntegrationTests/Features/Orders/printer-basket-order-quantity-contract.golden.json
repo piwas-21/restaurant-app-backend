@@ -1,5 +1,7 @@
 {
   "normalOrder": {
+    "billChargeAmount": 0.00,
+    "billCharges": [],
     "id": "00000000-0000-0000-0000-000000000001",
     "orderNumber": "ORDER-NORMALIZED",
     "guestStatusToken": "guest-status-token-normalized",
@@ -752,6 +754,8 @@
     "businessTimeZoneId": "Europe/Zurich"
   },
   "v1PrinterOrder": {
+    "billChargeAmount": 0.00,
+    "billCharges": [],
     "id": "00000000-0000-0000-0000-000000000001",
     "orderNumber": "ORDER-NORMALIZED",
     "userId": "00000000-0000-0000-0000-000000000002",
@@ -1425,6 +1429,8 @@
   },
   "projectionVersion": 2,
   "v2PrinterOrder": {
+    "billChargeAmount": 0.00,
+    "billCharges": [],
     "id": "00000000-0000-0000-0000-000000000001",
     "orderNumber": "ORDER-NORMALIZED",
     "userId": "00000000-0000-0000-0000-000000000002",

@@ -85,7 +85,8 @@ internal sealed class TableOccupancyRecoverySnapshot
         order.RemainingAmount,
         legacyUnassigned,
         order.IsKitchenReleased || order.KitchenReleasedAt.HasValue,
-        order.RoutingStates.Count > 0);
+        order.RoutingStates.Count > 0)
+        { OriginalBillChargeAmount = order.BillChargeAmount };
 
     public static bool IsRouted(Order order) =>
         order.IsKitchenReleased || order.KitchenReleasedAt.HasValue || order.RoutingStates.Count > 0;
@@ -226,6 +227,7 @@ internal sealed class TableOccupancyRecoverySnapshot
             Append(builder, order.Status);
             Append(builder, order.PaymentStatus);
             Append(builder, order.Total.ToString(CultureInfo.InvariantCulture));
+            Append(builder, order.BillChargeAmount.ToString(CultureInfo.InvariantCulture));
             Append(builder, order.BillingCreditAmount.ToString(CultureInfo.InvariantCulture));
             Append(builder, order.TotalPaid.ToString(CultureInfo.InvariantCulture));
             Append(builder, order.RemainingAmount.ToString(CultureInfo.InvariantCulture));

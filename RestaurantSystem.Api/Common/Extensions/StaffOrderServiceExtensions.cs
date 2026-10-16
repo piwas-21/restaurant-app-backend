@@ -6,6 +6,7 @@ public static class StaffOrderServiceExtensions
 {
     public static IServiceCollection AddStaffOrderServices(this IServiceCollection services)
     {
+        services.AddScoped<RestaurantSystem.Api.Features.BillCharges.Services.IBillChargeService, RestaurantSystem.Api.Features.BillCharges.Services.BillChargeService>();
         services.AddScoped<IStaffCounterOrderBuilder, StaffCounterOrderBuilder>();
         services.AddScoped<IStaffCounterOrderPricing, StaffCounterOrderPricing>();
         services.AddScoped<IStaffOrderOperationStore, StaffOrderOperationStore>();

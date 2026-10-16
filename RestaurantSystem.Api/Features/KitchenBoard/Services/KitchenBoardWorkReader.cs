@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Features.KitchenBoard.Dtos;
 using RestaurantSystem.Api.Features.KitchenBoard.Queries.GetKitchenBoardWorkQuery;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -11,6 +12,7 @@ public sealed class KitchenBoardWorkReader(
     ApplicationDbContext context,
     IOperationalQueueCursor cursor,
     ICurrentUserService currentUser,
+    ITenantClock clock,
     ILogger<KitchenBoardWorkReader> logger) : IKitchenBoardWorkReader
 {
     public async Task<KitchenBoardWorkFeedDto> ReadAsync(
@@ -33,12 +35,17 @@ public sealed class KitchenBoardWorkReader(
             .MaxAsync(cancellationToken) ?? 0L;
         var completionWatermark = await context.KitchenBoardWorkCompletions.AsNoTracking()
             .Select(value => (long?)value.Sequence).MaxAsync(cancellationToken) ?? 0L;
-        var filter = KitchenBoardCursorPolicy.CreateFilter(currentUser);
+        var day = DateOnly.FromDateTime(clock.Now.Date);
+        var (start, end) = clock.TenantDayWindowUtc(day);
+        var filter = KitchenBoardCursorPolicy.CreateFilter(currentUser, day);
 
         var orders = await KitchenBoardOrderStream.ReadAsync(
             new KitchenBoardStreamReadContext
             {
                 Context = context,
+                BusinessDate = day,
+                DayStartUtc = start,
+                DayEndUtc = end,
                 Cursor = cursor,
                 FilterHash = filter,
                 CursorValue = query.OrdersCursor,
@@ -51,6 +58,9 @@ public sealed class KitchenBoardWorkReader(
             new KitchenBoardStreamReadContext
             {
                 Context = context,
+                BusinessDate = day,
+                DayStartUtc = start,
+                DayEndUtc = end,
                 Cursor = cursor,
                 FilterHash = filter,
                 CursorValue = query.CorrectionsCursor,
@@ -63,6 +73,9 @@ public sealed class KitchenBoardWorkReader(
             new KitchenBoardStreamReadContext
             {
                 Context = context,
+                BusinessDate = day,
+                DayStartUtc = start,
+                DayEndUtc = end,
                 Cursor = cursor,
                 FilterHash = filter,
                 CursorValue = query.CompletionsCursor,

@@ -6,6 +6,7 @@ namespace RestaurantSystem.Domain.Entities;
 /// <summary>Tenant identity and public preferences; a singleton seeded during provisioning.</summary>
 public class RestaurantInfo : Entity
 {
+    public string BillChargeRulesJson { get; set; } = "[]";
     public required string Name { get; set; }
     public required string AddressLine1 { get; set; }
     public string? AddressLine2 { get; set; }

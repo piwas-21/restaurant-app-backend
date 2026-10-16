@@ -12,7 +12,10 @@ public sealed record TableOccupancyRecoveryOrderDto(
     decimal OriginalRemainingAmount,
     bool WasLegacyUnassigned,
     bool WasKitchenReleased,
-    bool HadRoutingHistory);
+    bool HadRoutingHistory)
+{
+    public decimal OriginalBillChargeAmount { get; init; }
+}
 
 public sealed record TableOccupancyRecoveryPreviewDto(
     Guid TableId,

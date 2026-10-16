@@ -19,6 +19,7 @@ public sealed class TableOccupancyRecoveryDispositionConfiguration
         builder.Property(value => value.Kind).HasConversion<string>().HasMaxLength(40).IsRequired();
         builder.Property(value => value.OriginalStatus).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(value => value.OriginalPaymentStatus).HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Property(value => value.OriginalBillChargeAmount).HasPrecision(18, 2).HasDefaultValue(0m);
         builder.Property(value => value.OriginalTotal).HasPrecision(10, 2).IsRequired();
         builder.Property(value => value.OriginalBillingCreditAmount).HasPrecision(10, 2).IsRequired();
         builder.Property(value => value.OriginalTotalPaid).HasPrecision(10, 2).IsRequired();

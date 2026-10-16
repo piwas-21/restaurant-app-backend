@@ -29,7 +29,7 @@ public static class OrderSettlementEligibility
             payment.RefundedAmount > 0);
 
     private static readonly Expression<Func<Order, bool>> OutstandingBalancePredicate = order =>
-        order.TotalPaid < order.Total - order.BillingCreditAmount - PaymentTolerance;
+        order.TotalPaid < order.Total + order.BillChargeAmount - order.BillingCreditAmount - PaymentTolerance;
 
     private static readonly Expression<Func<Order, bool>> NoProcessingOnlineTenderPredicate = order =>
         !order.Payments.Any(payment =>

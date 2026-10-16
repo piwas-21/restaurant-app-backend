@@ -53,7 +53,7 @@ public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPayme
             .Select(order => new
             {
                 order.Id,
-                order.Total,
+                Total = order.Total + order.BillChargeAmount,
                 order.BillingCreditAmount,
                 order.TotalPaid
             })
