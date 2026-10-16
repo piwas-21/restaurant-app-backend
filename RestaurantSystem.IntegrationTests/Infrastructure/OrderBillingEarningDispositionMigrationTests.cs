@@ -184,6 +184,11 @@ public sealed class OrderBillingEarningDispositionMigrationTests(DatabaseFixture
     {
         await using var context = fixture.CreateContext();
         var snapshots = await context.OrderBillingSnapshots.AsNoTracking().ToDictionaryAsync(value => value.OrderId);
+        // These columns did not exist at PublishedParent; prove their defaults separately from retained evidence.
+        var charges = await context.Orders.AsNoTracking()
+            .Select(order => new { order.BillChargeAmount, order.BillChargesJson }).ToListAsync();
+        charges.Should().HaveCount(3);
+        charges.Should().OnlyContain(order => order.BillChargeAmount == 0m && order.BillChargesJson == "[]");
         snapshots[ids.Positive].EarnedPointsCandidate.Should().Be(80);
         snapshots[ids.Positive].EarningDisposition.Should().BeNull();
         snapshots[ids.Positive].EffectiveEarningDisposition.Should().Be(OrderBillingEarningDisposition.Evaluated);
@@ -220,7 +225,7 @@ public sealed class OrderBillingEarningDispositionMigrationTests(DatabaseFixture
         }
         if (tableName == "orders")
             payload += " - ARRAY['last_change_sequence', 'business_date', 'daily_order_number', 'effective_preparation_minutes',"
-                + " 'expected_ready_at', 'prior_day_review_dismissed_at', 'prior_day_review_dismissed_by', 'amendment_root_order_id']";
+                + " 'expected_ready_at', 'prior_day_review_dismissed_at', 'prior_day_review_dismissed_by', 'amendment_root_order_id', 'bill_charge_amount', 'bill_charges_json']";
         var sql = $"SELECT COALESCE(jsonb_agg(payload ORDER BY payload ->> 'id')::text, '[]') "
             + $"FROM (SELECT {payload} AS payload FROM {tableName} AS row) AS rows";
         await using var connection = new NpgsqlConnection(fixture.ConnectionString);

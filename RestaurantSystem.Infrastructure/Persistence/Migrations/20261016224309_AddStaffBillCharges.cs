@@ -46,6 +46,17 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("""
+                LOCK TABLE orders, table_occupancy_recovery_dispositions IN ACCESS EXCLUSIVE MODE;
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM orders WHERE bill_charge_amount <> 0 OR bill_charges_json <> '[]')
+                        OR EXISTS (SELECT 1 FROM table_occupancy_recovery_dispositions WHERE original_bill_charge_amount <> 0)
+                    THEN
+                        RAISE EXCEPTION 'Staff bill charge history must be retained' USING ERRCODE = '23514';
+                    END IF;
+                END $$;
+                """);
             migrationBuilder.DropColumn(
                 name: "original_bill_charge_amount",
                 table: "table_occupancy_recovery_dispositions");

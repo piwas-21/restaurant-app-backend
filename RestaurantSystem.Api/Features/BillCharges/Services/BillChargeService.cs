@@ -29,14 +29,7 @@ public sealed class BillChargeService(ApplicationDbContext context, ICurrentUser
         var additions = new List<OrderBillCharge>();
         foreach (var input in inputs)
         {
-            if (!rules.TryGetValue(input.Key, out var rule) || !rule.Enabled
-                || !rule.OrderTypes.Contains(order.Type.ToString(), StringComparer.Ordinal)
-                || role != "Admin" && !rule.Roles.Contains(role ?? string.Empty, StringComparer.Ordinal))
-                throw new BadRequestException("This bill charge is not enabled for this order or staff role.");
-            if (input.Amount < 0 || input.Amount > BillChargeRules.MaximumCharge
-                || !rule.AllowCustomAmount && input.Amount != 0 && input.Amount != rule.DefaultAmount)
-                throw new BadRequestException("Use the configured bill charge amount.");
-            money.ToMinor(input.Amount);
+            var rule = ValidateSelection(input, rules, order.Type.ToString(), role, money);
             if (input.Amount == 0) continue;
             if (existing.Any(c => c.Key == input.Key))
                 throw new ConflictException("This charge is already on the bill. Refresh the order before collecting payment.");
@@ -48,4 +41,18 @@ public sealed class BillChargeService(ApplicationDbContext context, ICurrentUser
         order.BillChargeAmount = existing.Sum(c => c.Amount);
         order.RemainingAmount = order.PayableTotal - order.TotalPaid;
     }
+    private static BillChargeRuleDto ValidateSelection(BillChargeInputDto input,
+        Dictionary<string, BillChargeRuleDto> rules, string orderType, string? role, AccountMoney money)
+    {
+        if (!rules.TryGetValue(input.Key, out var rule) || !rule.Enabled
+            || !rule.OrderTypes.Contains(orderType, StringComparer.Ordinal)
+            || role != "Admin" && !rule.Roles.Contains(role ?? string.Empty, StringComparer.Ordinal))
+            throw new BadRequestException("This bill charge is not enabled for this order or staff role.");
+        if (input.Amount < 0 || input.Amount > BillChargeRules.MaximumCharge
+            || !rule.AllowCustomAmount && input.Amount != 0 && input.Amount != rule.DefaultAmount)
+            throw new BadRequestException("Use the configured bill charge amount.");
+        money.ToMinor(input.Amount);
+        return rule;
+    }
+
 }
