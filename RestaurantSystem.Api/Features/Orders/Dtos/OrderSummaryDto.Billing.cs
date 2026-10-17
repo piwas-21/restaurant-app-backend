@@ -4,6 +4,7 @@ namespace RestaurantSystem.Api.Features.Orders.Dtos;
 
 public partial record OrderSummaryDto
 {
+    public decimal BillChargeAmount { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public decimal? PayableTotal { get; set; }
 

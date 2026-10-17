@@ -6,6 +6,12 @@ namespace RestaurantSystem.Api.Features.KitchenBoard.Services;
 
 internal sealed class KitchenBoardStreamReadContext
 {
+    public required DateOnly BusinessDate { get; init; }
+
+    public required DateTime DayStartUtc { get; init; }
+
+    public required DateTime DayEndUtc { get; init; }
+
     public required ApplicationDbContext Context { get; init; }
 
     public required IOperationalQueueCursor Cursor { get; init; }

@@ -10,9 +10,10 @@ namespace RestaurantSystem.Api.Features.KitchenBoard.Services;
 
 internal static class KitchenBoardCursorPolicy
 {
-    internal static string CreateFilter(ICurrentUserService caller) => Convert.ToHexString(
+    internal static string CreateFilter(ICurrentUserService caller, DateOnly day) => Convert.ToHexString(
         SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\u001f',
-            "kitchen-board:v1",
+            "kitchen-board:v2",
+            $"day={day:yyyy-MM-dd}",
             $"caller={caller.UserId?.ToString("N", CultureInfo.InvariantCulture) ?? string.Empty}",
             $"role={caller.Role?.ToString() ?? string.Empty}",
             $"apiToken={caller.IsApiToken}")))).ToLowerInvariant();

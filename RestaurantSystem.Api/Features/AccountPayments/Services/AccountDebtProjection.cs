@@ -91,7 +91,9 @@ internal static class AccountDebtProjection
         Order order, AccountMoney money, long applied, int billingAllocationVersion,
         List<AccountDebtSegment> due)
     {
-        var charge = money.ToMinor(order.Total);
+        RestaurantSystem.Api.Features.BillCharges.Services.OrderBillChargeReader.Read(order);
+        var extra = money.ToMinor(order.BillChargeAmount);
+        var charge = money.ToMinor(order.Total) + extra;
         var paid = NetCaptured(order, money);
         if (applied > paid || paid > charge)
             throw new ConflictException("The order's tender ledger requires reconciliation before account collection.");
@@ -102,7 +104,8 @@ internal static class AccountDebtProjection
         }
         if (billingAllocationVersion == 0)
         {
-            ProjectLegacyFoodScope(order, money, charge, 0, due);
+            ProjectLegacyFoodScope(order, money, money.ToMinor(order.Total), 0, due);
+            due.AddRange(AccountDebtMath.CreateUnitemized(order.Id, extra, 0));
             return;
         }
         var frozen = FrozenOrderChargeMath.Read(order, money);
@@ -110,7 +113,7 @@ internal static class AccountDebtProjection
             due.AddRange(AccountDebtMath.CreateLine(
                 order.Id, line.Item.Id, line.Item.Quantity, line.AmountMinor, 0));
         due.AddRange(AccountDebtMath.CreateUnitemized(
-            order.Id, checked(frozen.TipMinor + frozen.FeeMinor), 0));
+            order.Id, checked(frozen.TipMinor + frozen.FeeMinor + extra), 0));
     }
 
     private static IReadOnlyList<AccountDebtSegment> ApplyHistoricalContributions(

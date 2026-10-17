@@ -28,6 +28,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
     private readonly IOrderFidelityCoordinator _fidelity;
     private readonly ITableIdentityResolver _tables;
     private readonly IOrderPreparationService _preparation;
+    private readonly RestaurantSystem.Api.Features.BillCharges.Services.IBillChargeService _billCharges;
 
     [SuppressMessage("Maintainability", "S107:Methods should not have too many parameters",
         Justification = "These DI-only collaborators are the existing order construction pipeline; a parameter object or service locator would conceal required pricing and fidelity dependencies.")]
@@ -37,7 +38,8 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
         IOrderItemFactory itemFactory, IStaffCounterOrderPricing serverPricing,
         IOrderPricingService pricing,
         IOrderPaymentBuilder payments, IOrderFidelityCoordinator fidelity,
-        ITableIdentityResolver tables, IOrderPreparationService preparation)
+        ITableIdentityResolver tables, IOrderPreparationService preparation,
+        RestaurantSystem.Api.Features.BillCharges.Services.IBillChargeService billCharges)
     {
         _context = context;
         _currentUser = currentUser;
@@ -50,6 +52,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
         _fidelity = fidelity;
         _tables = tables;
         _preparation = preparation;
+        _billCharges = billCharges;
     }
 
     public async Task<StaffCounterOrderBuild> BuildAsync(
@@ -94,6 +97,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
 
         var itemsTotal = order.Items.Sum(item => item.ItemTotal);
         await _pricing.ApplyAsync(order, itemsTotal, legacy, customerId, cancellationToken);
+        await _billCharges.ApplyAsync(order, request.BillCharges, order.Id, acceptedCurrency, cancellationToken);
         var earning = await _fidelity.CalculatePointsToEarnAsync(order, itemsTotal, customerId, cancellationToken);
         _payments.UpdatePaymentSummary(order);
 

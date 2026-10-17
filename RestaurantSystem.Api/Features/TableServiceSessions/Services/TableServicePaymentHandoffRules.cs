@@ -27,7 +27,7 @@ public static class TableServicePaymentHandoffRules
             .Where(OrderSettlementEligibility.CanCollectQuery())
             .Select(order => new
             {
-                order.Total,
+                Total = order.Total + order.BillChargeAmount,
                 order.BillingCreditAmount,
                 order.TotalPaid
             })
@@ -47,7 +47,7 @@ public static class TableServicePaymentHandoffRules
             .Select(order => new
             {
                 order.Status,
-                order.Total,
+                Total = order.Total + order.BillChargeAmount,
                 order.BillingCreditAmount,
                 order.TotalPaid,
                 order.PaymentStatus

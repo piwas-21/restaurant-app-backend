@@ -3,6 +3,8 @@
   "data": {
     "items": [
       {
+        "billChargeAmount": 0.00,
+        "billCharges": [],
         "id": "__volatile__",
         "orderNumber": "PF238-A-BUNDLE",
         "userId": null,
@@ -168,6 +170,8 @@
         "businessTimeZoneId": "Europe/Zurich"
       },
       {
+        "billChargeAmount": 0.00,
+        "billCharges": [],
         "id": "__volatile__",
         "orderNumber": "PF238-B-DELIVERY",
         "userId": null,

@@ -20,7 +20,7 @@ internal static class KitchenBoardOrderStream
         var cancellationToken = request.CancellationToken;
         if (string.IsNullOrWhiteSpace(request.CursorValue))
         {
-            var total = await EligibleOrders(context, request.CurrentWatermark).CountAsync(cancellationToken);
+            var total = await EligibleOrders(request, request.CurrentWatermark).CountAsync(cancellationToken);
             return await SnapshotAsync(request, request.CurrentWatermark, total, null);
         }
 
@@ -45,7 +45,7 @@ internal static class KitchenBoardOrderStream
         var context = request.Context;
         var pageSize = request.PageSize;
         var cancellationToken = request.CancellationToken;
-        var query = EligibleOrders(context, upper);
+        var query = EligibleOrders(request, upper);
         if (afterId.HasValue)
         {
             query = query.Where(order => order.Id.CompareTo(afterId.Value) > 0);
@@ -107,7 +107,7 @@ internal static class KitchenBoardOrderStream
         var changedIds = pageRows.Select(change => change.OrderId).Distinct().ToArray();
         var current = changedIds.Length == 0
             ? []
-            : await LoadOrderGraph(EligibleOrders(context, null)
+            : await LoadOrderGraph(EligibleOrders(request, null)
                     .Where(order => changedIds.Contains(order.Id)))
                 .ToListAsync(cancellationToken);
         var currentById = await ProjectAsync(request, current);
@@ -115,7 +115,7 @@ internal static class KitchenBoardOrderStream
         var removed = changedIds.Where(id => !currentByIdMap.ContainsKey(id)).ToList();
         var page = changedIds.Where(currentByIdMap.ContainsKey)
             .Select(id => currentByIdMap[id]).ToList();
-        var count = await EligibleOrders(context, null).CountAsync(cancellationToken);
+        var count = await EligibleOrders(request, null).CountAsync(cancellationToken);
         var hasMore = rows.Count > pageSize;
         var next = hasMore
             ? KitchenBoardCursorPolicy.Protect(request.Cursor, request.FilterHash, StreamName,
@@ -138,13 +138,17 @@ internal static class KitchenBoardOrderStream
             hasMore ? OperationalQueueSyncModes.Changes : OperationalQueueSyncModes.Watermark);
     }
 
-    private static IQueryable<Order> EligibleOrders(ApplicationDbContext context, long? upper) =>
-        context.Orders.AsNoTracking()
-            .Where(order => !order.IsDeleted && order.IsKitchenReleased
+    private static IQueryable<Order> EligibleOrders(KitchenBoardStreamReadContext request, long? upper) =>
+        request.Context.Orders.AsNoTracking()
+            .Where(order => order.BusinessDate == request.BusinessDate
+                && !order.IsDeleted && order.IsKitchenReleased
                 && order.ExternalReference == null
                 && (order.Status == OrderStatus.Confirmed
                     || order.Status == OrderStatus.Preparing
-                    || order.Status == OrderStatus.Ready)
+                    || order.Status == OrderStatus.Ready
+                    || order.Status == OrderStatus.OutForDelivery
+                    || order.Status == OrderStatus.Delivered
+                    || order.Status == OrderStatus.Completed)
                 && (!upper.HasValue || order.LastChangeSequence <= upper.Value));
 
     private static IQueryable<Order> LoadOrderGraph(

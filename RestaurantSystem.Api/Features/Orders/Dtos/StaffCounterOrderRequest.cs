@@ -28,6 +28,7 @@ public record StaffCounterOrderRequest
     public string? PromoCode { get; set; }
     public int? PointsToRedeem { get; set; }
     public decimal? Tip { get; set; }
+    public List<RestaurantSystem.Api.Features.BillCharges.Dtos.BillChargeInputDto> BillCharges { get; set; } = [];
     public string? Notes { get; set; }
 
     // Staff creation deliberately records no payment. Collecting cash or recording a standalone card

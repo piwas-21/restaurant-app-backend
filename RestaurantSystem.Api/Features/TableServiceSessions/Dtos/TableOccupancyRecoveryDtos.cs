@@ -12,7 +12,11 @@ public sealed record TableOccupancyRecoveryOrderDto(
     decimal OriginalRemainingAmount,
     bool WasLegacyUnassigned,
     bool WasKitchenReleased,
-    bool HadRoutingHistory);
+    bool HadRoutingHistory)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public decimal OriginalBillChargeAmount { get; init; }
+}
 
 public sealed record TableOccupancyRecoveryPreviewDto(
     Guid TableId,
