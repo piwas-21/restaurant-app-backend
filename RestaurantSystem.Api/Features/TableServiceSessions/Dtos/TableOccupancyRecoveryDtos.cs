@@ -14,6 +14,7 @@ public sealed record TableOccupancyRecoveryOrderDto(
     bool WasKitchenReleased,
     bool HadRoutingHistory)
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public decimal OriginalBillChargeAmount { get; init; }
 }
 
