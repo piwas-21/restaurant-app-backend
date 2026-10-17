@@ -71,6 +71,29 @@ Follow [CLAUDE.md §8](CLAUDE.md#8--git-workflow) for the protected-branch requi
 
 Merge through the workspace `scripts/pr-merge-gate.sh piwas-21/restaurant-app-backend <pr> --merge`. In addition to CI and review threads, it requires the authenticated Sonar PR quality gate and zero open Sonar issues. A merge to `develop` does not activate default-off tenant features or establish production acceptance.
 
+### After a production release
+
+Bring the production merge commit back into `develop` through a reviewed PR before the next
+release. Matching file contents alone do not satisfy strict branch freshness: `main` must be an
+ancestor of the release branch.
+
+1. Fetch `origin/main` and `origin/develop`, then create a `chore/` branch from `origin/develop`
+   in an isolated worktree. Merge `origin/main` there with `git merge --no-edit origin/main`.
+2. Verify `git merge-base --is-ancestor origin/main HEAD`. Inspect both parents with
+   `git show --no-patch --format='%H %P' HEAD` and compare `git diff origin/develop HEAD`.
+   A release ancestry repair should preserve the reviewed runtime tree; explain every file change.
+3. Obtain independent manual review, push through the installed review hook, and open the
+   completed PR template against `develop`. Merge only through
+   `scripts/pr-merge-gate.sh piwas-21/restaurant-app-backend <pr> --merge` from the workspace.
+   The gate detects this backmerge and uses a merge commit; squashing loses the required ancestry.
+4. Re-fetch the branches and run `git merge-base --is-ancestor origin/main origin/develop`
+   before creating or merging the next `develop` → `main` release PR. Recheck its diff, CI,
+   review threads and Sonar issue count.
+
+Keep shared clones untouched. Do not use direct protected-branch pushes or `gh pr update-branch`
+to repair ancestry. An absent Sonar check, `NONE`, or zero populated conditions is an unanalysed
+scope; wait for a real analysis rather than treating an empty issue list as approval.
+
 ## Configuration
 
 | Setting | Source | Notes |
