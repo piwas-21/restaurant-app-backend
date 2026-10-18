@@ -21,22 +21,35 @@ public static class MobileCapabilityPolicy
 
     public static bool IsKnown(string capability) => RequiredModules.ContainsKey(capability);
 
+    private const string Enabled = "enabled";
+    private const string Disabled = "disabled";
+    private const string Unavailable = "unavailable";
+    private const string Unknown = "unknown";
+
     public static IReadOnlyDictionary<string, string> Resolve(CustomerMobileSettings settings,
+        ITenantModules modules, ITenantFeatures features, bool hasCurrency, bool supported) =>
+        RequiredModules.ToDictionary(pair => pair.Key,
+            pair => ResolveCapability(pair.Key, pair.Value, settings, modules, features, hasCurrency, supported),
+            StringComparer.Ordinal);
+
+    private static string ResolveCapability(string capability, string module, CustomerMobileSettings settings,
         ITenantModules modules, ITenantFeatures features, bool hasCurrency, bool supported)
     {
-        return RequiredModules.ToDictionary(pair => pair.Key, pair =>
+        if (!supported || settings.Lifecycle == Disabled) return Unavailable;
+        if (!settings.EnabledCapabilities.Contains(capability, StringComparer.Ordinal)
+            || !modules.IsEnabled(module)) return Disabled;
+        if (capability != "menu" && (settings.Lifecycle != "active" || !hasCurrency)) return Unavailable;
+        return capability switch
         {
-            if (!supported || settings.Lifecycle == "disabled") return "unavailable";
-            if (!settings.EnabledCapabilities.Contains(pair.Key, StringComparer.Ordinal)
-                || !modules.IsEnabled(pair.Value)) return "disabled";
-            if (pair.Key != "menu" && (settings.Lifecycle != "active" || !hasCurrency)) return "unavailable";
-            if (pair.Key == "table-visits" && !features.TableGuestVisitsV1) return "disabled";
-            if (pair.Key == "table-payments"
-                && (!features.TableGuestVisitsV1 || !features.TableGuestAccountPaymentsV1
-                    || !features.TableAccountPaymentsV1 || !modules.IsEnabled(ModuleIds.Server))) return "disabled";
-            // Merchant/provider availability is independently probed before offering online payment.
-            if (pair.Key is "online-payments" or "table-payments") return "unknown";
-            return "enabled";
-        }, StringComparer.Ordinal);
+            "table-visits" => features.TableGuestVisitsV1 ? Enabled : Disabled,
+            "table-payments" => GuestPaymentsConfigured(modules, features) ? Unknown : Disabled,
+            // Merchant/provider availability must be independently proved before offering payment.
+            "online-payments" => Unknown,
+            _ => Enabled
+        };
     }
+
+    private static bool GuestPaymentsConfigured(ITenantModules modules, ITenantFeatures features) =>
+        features.TableGuestVisitsV1 && features.TableGuestAccountPaymentsV1
+        && features.TableAccountPaymentsV1 && modules.IsEnabled(ModuleIds.Server);
 }
