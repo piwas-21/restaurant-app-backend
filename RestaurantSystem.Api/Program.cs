@@ -444,6 +444,12 @@ builder.Services.AddAppleAuthentication(builder.Configuration);
 builder.Services.Configure<ModuleSettings>(builder.Configuration.GetSection("Modules"));
 builder.Services.AddSingleton<ITenantModules, TenantModules>();
 
+// Native customer access requires a reviewed tenant identity and explicit capability activation.
+builder.Services.AddOptions<CustomerMobileSettings>()
+    .Bind(builder.Configuration.GetSection(CustomerMobileSettings.SectionName))
+    .Validate(settings => settings.IsValid(), "CustomerMobile settings are invalid.")
+    .ValidateOnStart();
+
 // Server Workspace V2 is an emergency-safe rollout switch, not an entitlement or an
 // authorization boundary. The deploy template maps TENANT_SERVER_WORKSPACE_V2 onto this
 // section, and the frontend reads the additive anonymous tenant-features endpoint. A
