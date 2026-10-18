@@ -38,6 +38,7 @@ limit_for_path() {
     # validation rules by every measure the limit cares about, but `*Validator.cs` does not match
     # it, so it could grow without bound while the validators deriving from it stayed compliant.
     *Validator.cs|*ValidatorBase.cs)                                 echo 60 ;;
+    Sofra.MobileService/*Dto.cs)                                    echo 60 ;;
     # DTOs (path contains /Dtos/)
     */Dtos/*.cs)                                                     echo 60 ;;
     # Configuration / settings classes
@@ -82,6 +83,7 @@ limit_for_path() {
     RestaurantSystem.Api/Common/Validation/*.cs)                     echo 300 ;;
     RestaurantSystem.Channels.Api/*.cs)                             echo 300 ;;
     RestaurantSystem.Channels.Infrastructure/*.cs)                   echo 300 ;;
+    Sofra.MobileService/*.cs)                                      echo 200 ;;
     *)                                                               echo 0 ;;
   esac
 }
@@ -99,7 +101,7 @@ is_baselined() {
 
 # Walk the API + Domain trees.
 list_all_files() {
-  find RestaurantSystem.Api RestaurantSystem.Domain RestaurantSystem.Channels.Api RestaurantSystem.Channels.Domain RestaurantSystem.Channels.Infrastructure -name "*.cs" -type f \
+  find RestaurantSystem.Api RestaurantSystem.Domain RestaurantSystem.Channels.Api RestaurantSystem.Channels.Domain RestaurantSystem.Channels.Infrastructure Sofra.MobileService -name "*.cs" -type f \
     -not -path "*/bin/*" -not -path "*/obj/*" -not -path "*/Migrations/*" 2>/dev/null
 }
 

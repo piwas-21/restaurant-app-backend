@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RestaurantSystem.Channels.I
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RestaurantSystem.Channels.Tests", "RestaurantSystem.Channels.Tests\RestaurantSystem.Channels.Tests.csproj", "{4F7570A7-1764-4532-9D8A-B7B3EA903345}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sofra.MobileService", "Sofra.MobileService\Sofra.MobileService.csproj", "{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -153,6 +155,18 @@ Global
 		{4F7570A7-1764-4532-9D8A-B7B3EA903345}.Release|x64.Build.0 = Release|Any CPU
 		{4F7570A7-1764-4532-9D8A-B7B3EA903345}.Release|x86.ActiveCfg = Release|Any CPU
 		{4F7570A7-1764-4532-9D8A-B7B3EA903345}.Release|x86.Build.0 = Release|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Debug|x64.Build.0 = Debug|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Debug|x86.Build.0 = Debug|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Release|x64.ActiveCfg = Release|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Release|x64.Build.0 = Release|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Release|x86.ActiveCfg = Release|Any CPU
+		{F18B5FEB-C7B0-4D7F-982F-4FD2EBDD9999}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
