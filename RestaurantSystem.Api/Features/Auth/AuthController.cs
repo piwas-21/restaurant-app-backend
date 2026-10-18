@@ -57,11 +57,9 @@ public class AuthController : ControllerBase
     /// Apple login
     /// </summary>
     /// <remarks>
-    /// The only endpoint in this controller that answers a failure with a non-200: a rejected
-    /// Apple token is a 400 and an unconfigured/unreachable Apple is a 503, both carrying the
+    /// A rejected Apple token is a 400 and an unconfigured/unreachable Apple is a 503, both carrying the
     /// usual <see cref="ApiResponse{T}"/> failure body plus an <c>errorCode</c>. Deliberately not
-    /// 401 — the mobile client refreshes its session on any 401, which would turn a refused login
-    /// into a spurious logout.
+    /// 401, keeping rejected sign-in distinct from an expired authenticated session.
     /// </remarks>
     [HttpPost("apple-login")]
     [AllowAnonymous]
@@ -81,7 +79,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Refresh access token
+    /// Refresh access token; invalid credentials return 401 and unexpected failures return 500.
     /// </summary>
     [HttpPost("refresh-token")]
     [AllowAnonymous]
@@ -89,7 +87,7 @@ public class AuthController : ControllerBase
     public async Task<ActionResult<ApiResponse<AuthResponse>>> RefreshToken([FromBody] RefreshTokenCommand command)
     {
         var result = await _mediator.SendCommand(command);
-        return Ok(result);
+        return result.Success ? Ok(result) : Unauthorized(result);
     }
 
     /// <summary>
