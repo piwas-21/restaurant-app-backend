@@ -40,6 +40,7 @@
 	</ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\RestaurantSystem.Api\RestaurantSystem.Api.csproj" />
+		<ProjectReference Include="..\Sofra.MobileService\Sofra.MobileService.csproj" />
 		<ProjectReference Include="..\RestaurantSystem.Infrastructure\RestaurantSystem.Infrastructure.csproj" />
 	</ItemGroup>
 
