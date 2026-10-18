@@ -12,6 +12,8 @@ public sealed class MobileServiceProgram
         var app = builder.Build();
         app.UseExceptionHandler();
         app.MapMobileDirectory();
+        // Intentionally anonymous liveness for infrastructure probes. Fixed status only;
+        // no configuration, tenant identities, dependency details or customer data are exposed.
         app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
         app.Run();
     }

@@ -31,6 +31,9 @@ public sealed class MobileDirectoryHttpTests
         Assert.Equal(["apiOrigin", "contractVersions", "id", "imageOrigin", "name", "slug", "status", "webOrigin"],
             tenant.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal).ToArray());
         Assert.Equal("https://alpha.example", tenant.GetProperty("apiOrigin").GetString());
+        using var health = await client.GetAsync("/health");
+        Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+        Assert.Equal("{\"status\":\"healthy\"}", await health.Content.ReadAsStringAsync());
         using var unknown = await client.GetAsync("/v1/internal-registry");
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
     }

@@ -41,3 +41,8 @@ format, file-length, existing integration CI and Sonar gates include the new hos
 This PR does not publish a domain, associate native app IDs, activate a tenant, configure a database,
 send push notifications or create a signed application. Review directory activation, trusted app
 origins, deployment health, configuration rollback and installed-app readback separately.
+
+`GET /health` is intentionally anonymous infrastructure liveness and returns only the fixed
+`{"status":"healthy"}` payload after validated host startup. It exposes no configuration, tenant
+identity, build/environment details, secrets, dependency diagnostics or customer data. It does not
+claim notification/database readiness; those dependencies need their own later readiness probes.
