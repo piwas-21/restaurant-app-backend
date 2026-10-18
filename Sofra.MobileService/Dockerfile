@@ -6,7 +6,8 @@ COPY Sofra.MobileService/Sofra.MobileService.csproj Sofra.MobileService/
 RUN dotnet restore Sofra.MobileService/Sofra.MobileService.csproj
 COPY Sofra.MobileService/*.cs Sofra.MobileService/
 COPY Sofra.MobileService/Directory/*.cs Sofra.MobileService/Directory/
-RUN dotnet publish Sofra.MobileService/Sofra.MobileService.csproj -c Release -o /app/publish --no-restore /p:UseAppHost=false
+RUN dotnet publish Sofra.MobileService/Sofra.MobileService.csproj \
+    -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app

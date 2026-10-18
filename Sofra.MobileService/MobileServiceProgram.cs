@@ -4,6 +4,8 @@ namespace Sofra.MobileService;
 
 public sealed class MobileServiceProgram
 {
+    private MobileServiceProgram() { }
+
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
