@@ -15,7 +15,7 @@ namespace RestaurantSystem.Api.Features.Menus;
 /// drill-in needs. Previously the list query carried the full tree while the detail query returned a thin
 /// subset — this unifies them (list keeps its ingredients; detail gains them). The caller loads the
 /// navigations it reads (menu-definition → sections → items → product → detailed-ingredients →
-/// descriptions, plus descriptions and images).
+/// descriptions/global ingredient, plus descriptions and images).
 /// <para>
 /// Since §9.2 the caller must ALSO load <c>ProductCategories → Category</c>: a bundle with no mask
 /// of its own inherits its primary category's, and an unloaded collection resolves as UNRESTRICTED
@@ -215,6 +215,7 @@ public static class MenuBundleMapper
                     DisplayOrder = di.DisplayOrder,
                     MaxQuantity = di.MaxQuantity,
                     Kind = di.Kind,
+                    IsNoneOption = IngredientAnswerProjection.IsNoneOption(di),
                     ExclusionGroup = di.ExclusionGroup,
                     Content = di.Descriptions?
                         .GroupBy(desc => desc.LanguageCode)

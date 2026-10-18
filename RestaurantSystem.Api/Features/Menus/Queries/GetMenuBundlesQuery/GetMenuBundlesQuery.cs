@@ -1,3 +1,4 @@
+using RestaurantSystem.Api.Features.Catalog;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -35,6 +36,7 @@ public class GetMenuBundlesQueryHandler(
     public async Task<ApiResponse<PagedResult<MenuBundleDto>>> Handle(GetMenuBundlesQuery query, CancellationToken cancellationToken)
     {
         var queryable = _context.Products
+            .WithBundleIngredientAnswers()
             // ProductCategories -> Category is load-bearing, not cosmetic: a bundle with no mask of
             // its own inherits its PRIMARY category's, and an unloaded collection reads as
             // UNRESTRICTED. Omit this include and every restricted bundle reports as orderable,
