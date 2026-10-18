@@ -10,6 +10,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.User.Commands.UpdateUserProfileCommand;
 
+/// <param name="PhoneNumber">Omitted or null preserves the number; an empty string clears it.</param>
 /// <param name="PreferredLanguage">
 /// The language this account's mails are written in (§1 rank 2). ABSENT MEANS UNCHANGED — a client
 /// that does not know about this field, which is every client until S6, must not clear a preference
@@ -63,9 +64,14 @@ public class UpdateUserProfileCommandHandler : ICommandHandler<UpdateUserProfile
         user.FirstName = command.FirstName;
         user.LastName = command.LastName;
 
-        if (!string.IsNullOrEmpty(command.PhoneNumber))
+        if (command.PhoneNumber is not null)
         {
-            user.PhoneNumber = command.PhoneNumber;
+            var phone = command.PhoneNumber.Length == 0 ? null : command.PhoneNumber;
+            if (user.PhoneNumber != phone)
+            {
+                user.PhoneNumber = phone;
+                user.PhoneNumberConfirmed = false;
+            }
         }
 
         // Pattern-matched rather than assigned straight: Normalize is nullable, and the only thing
