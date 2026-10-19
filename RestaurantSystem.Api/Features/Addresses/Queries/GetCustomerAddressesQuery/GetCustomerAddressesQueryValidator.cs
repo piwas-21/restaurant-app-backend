@@ -6,7 +6,7 @@ public sealed class GetCustomerAddressesQueryValidator : AbstractValidator<GetCu
 {
     public GetCustomerAddressesQueryValidator()
     {
-        RuleFor(value => value.SchemaVersion).Equal(1);
+        RuleFor(value => value.SchemaVersion).NotNull().Equal(1);
         RuleFor(value => value.AfterId).NotEqual(Guid.Empty).When(value => value.AfterId.HasValue);
     }
 }

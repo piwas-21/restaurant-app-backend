@@ -9,7 +9,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Addresses.Queries.GetCustomerAddressesQuery;
 
-public sealed record GetCustomerAddressesQuery(int SchemaVersion, Guid? AfterId = null)
+public sealed record GetCustomerAddressesQuery(int? SchemaVersion, Guid? AfterId = null)
     : IQuery<ApiResponse<CustomerAddressPageDto>>;
 
 public sealed class GetCustomerAddressesQueryHandler(ApplicationDbContext context, ICurrentUserService currentUser)
