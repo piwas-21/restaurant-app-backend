@@ -7,6 +7,14 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 public sealed class CustomerBasketOperationHashTests
 {
     [Fact]
+    public void Existing_add_payload_digest_stays_compatible_with_accepted_receipts()
+    {
+        var request = new AddToBasketDto { ProductId = Guid.Parse("11111111-1111-4111-8111-111111111111"), Quantity = 2 };
+        // Independently derived from sorted PascalCase JSON with explicit null fields and SHA-256.
+        CustomerBasketOperationHash.Payload(request).Should().Be("d59d30e77079ee8b427257d1b61d2774b6d0c33db467924854fb27b3a21d8e23"); // pragma: allowlist secret
+    }
+
+    [Fact]
     public void Dictionary_insertion_order_does_not_change_the_request_identity()
     {
         var first = Guid.NewGuid(); var second = Guid.NewGuid();
@@ -22,6 +30,18 @@ public sealed class CustomerBasketOperationHashTests
         CustomerBasketOperationHash.Payload(payload with { Quantity = 3 }).Should().NotBe(CustomerBasketOperationHash.Payload(payload));
         CustomerBasketOperationHash.Payload(payload with { SpecialInstructions = "Without salt" }).Should().NotBe(CustomerBasketOperationHash.Payload(payload));
         CustomerBasketOperationHash.Payload(payload with { SelectedIngredients = [second, first] }).Should().NotBe(CustomerBasketOperationHash.Payload(payload));
+    }
+
+    [Fact]
+    public void Legacy_and_native_writers_share_owner_locks_without_changing_legacy_session_lookup()
+    {
+        var session = Guid.NewGuid(); var user = Guid.NewGuid();
+        CustomerBasketOperationHash.WriteOwnerLock(session.ToString("D"), null)
+            .Should().Be(CustomerBasketOperationHash.OwnerLock(session, null));
+        CustomerBasketOperationHash.WriteOwnerLock("legacy-session", user)
+            .Should().Be(CustomerBasketOperationHash.OwnerLock(Guid.NewGuid(), user));
+        CustomerBasketOperationHash.WriteOwnerLock("legacy-session", null)
+            .Should().NotBe(CustomerBasketOperationHash.WriteOwnerLock("other-session", null));
     }
 
     [Fact]

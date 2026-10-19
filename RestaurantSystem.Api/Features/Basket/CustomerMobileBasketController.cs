@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Commands.AddToBasketCommand;
+using RestaurantSystem.Api.Features.Basket.Commands.MutateCustomerBasketItemCommand;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Queries.GetCustomerBasketQuery;
@@ -34,4 +35,12 @@ public sealed class CustomerMobileBasketController(CustomMediator mediator) : Co
             throw new BadRequestException("A non-empty operation ID is required.");
         return Ok(await mediator.SendCommand(AddToBasketCommand.FromRequest(sessionId, request)));
     }
+    [HttpPost("items/{basketItemId:guid}/operations")]
+    [AllowAnonymous]
+    [EnableRateLimiting(CustomerBasketOperationRegistration.AddPolicyName)]
+    public async Task<ActionResult<ApiResponse<BasketDto>>> MutateItem(
+        [FromHeader(Name = "X-Session-Id")] string sessionId, Guid basketItemId,
+        [FromBody] CustomerBasketItemMutationDto request) =>
+        Ok(await mediator.SendCommand(new MutateCustomerBasketItemCommand(sessionId, basketItemId, request)));
+
 }

@@ -1,8 +1,6 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -115,15 +113,8 @@ public sealed class CustomerBasketReadTests(DatabaseFixture fixture) : Integrati
         (await BasketCountAsync()).Should().Be(0);
     }
 
-    private string Token(UserRole role, bool expired = false)
-    {
-        var settings = Factory.Services.GetRequiredService<IOptions<JwtSettings>>().Value;
-        var now = DateTime.UtcNow;
-        var token = new JwtSecurityToken(settings.Issuer, settings.Audience,
-            [new Claim(ClaimTypes.NameIdentifier, TestAuthHandler.UserId), new Claim(ClaimTypes.Role, role.ToString())],
-            now.AddHours(-2), now.AddMinutes(expired ? -30 : 30), settings.SigningCredentials);
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
+    private string Token(UserRole role, bool expired = false) =>
+        CustomerBasketTokens.Create(Factory.Services, role, expired);
 
     private async Task<Guid> SeedBasketAsync(Guid? userId, string session)
     {

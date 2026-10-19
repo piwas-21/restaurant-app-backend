@@ -2,7 +2,6 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
 using RestaurantSystem.Api.Common.Exceptions;
-using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 
 namespace RestaurantSystem.Api.Features.Basket.Services.Operations;
 
@@ -22,9 +21,18 @@ internal static class CustomerBasketOperationHash
     public static long OwnerLock(Guid session, Guid? userId) =>
         Lock("customer-basket-owner", userId.HasValue ? $"user:{userId:D}" : $"guest:{session:D}");
 
+    // Legacy routes retain their existing session syntax and lookup. UUID sessions still share
+    // the native owner's lock; other legacy identifiers get a separate deterministic scope.
+    public static long WriteOwnerLock(string sessionId, Guid? userId)
+    {
+        if (userId.HasValue) return OwnerLock(Guid.Empty, userId);
+        if (Guid.TryParseExact(sessionId, "D", out var session)) return OwnerLock(session, null);
+        return Lock("customer-basket-owner", $"legacy-guest:{sessionId}");
+    }
+
     public static long OperationLock(Guid operationId) => Lock("customer-basket-operation", operationId.ToString("D"));
 
-    public static string Payload(AddToBasketDto item)
+    public static string Payload<T>(T item)
     {
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))

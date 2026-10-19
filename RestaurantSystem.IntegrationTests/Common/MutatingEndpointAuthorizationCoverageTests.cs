@@ -56,9 +56,9 @@ public class MutatingEndpointAuthorizationCoverageTests
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// 197 with account payments, including the seven guest-checkout and signed-wakeup writes.
+    /// Floor 198 includes native root-item edits; account-payment and guest-checkout writes remain covered.
     /// </summary>
-    private const int KnownMutatingActionCount = 197;
+    private const int KnownMutatingActionCount = 198;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -91,6 +91,9 @@ public class MutatingEndpointAuthorizationCoverageTests
         // New effects also require mobile ordering opt-in; replay remains scoped to the original
         // guest/customer owner. Staff, machine tokens and failed authentication are refused.
         "CustomerMobileBasketController.AddItem [POST]",
+        // Absolute native root edits additionally bind the reviewed basket ID/fingerprint; the
+        // shared operation transaction checks owner, rollout and exact payload before mutation.
+        "CustomerMobileBasketController.MutateItem [POST]",
         // Each payment action validates the original visit's hashed participant capability,
         // typed attempt ownership and frozen scope/version. New writes also require feature,
         // module, gateway and configured contribution limits; recovery preserves original identity.
