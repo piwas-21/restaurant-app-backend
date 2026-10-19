@@ -18,9 +18,7 @@ public sealed class GetCustomerAccountDeletionQueryHandler(ApplicationDbContext 
     public async Task<ApiResponse<CustomerAccountDeletionDto>> Handle(GetCustomerAccountDeletionQuery query,
         CancellationToken cancellationToken)
     {
-        var owner = CustomerAccountAccess.RequireOwner(currentUser);
-        var account = await context.Users.AsNoTracking()
-            .Where(user => user.Id == owner && !user.IsDeleted && user.Role == UserRole.Customer)
+        var account = await CustomerAccountAccess.Current(context, currentUser).AsNoTracking()
             .Select(user => new { user.DeletionScheduledAt }).SingleOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException("Customer account unavailable.");
         var state = account.DeletionScheduledAt.HasValue ? "scheduled" : "not-requested";
