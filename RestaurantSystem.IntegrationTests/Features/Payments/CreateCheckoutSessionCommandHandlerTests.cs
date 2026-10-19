@@ -47,6 +47,34 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
 
     public Task DisposeAsync() => Task.CompletedTask;
 
+    [Fact]
+    public async Task Native_orders_cannot_start_a_competing_legacy_checkout_while_web_orders_still_can()
+    {
+        var webId = await SeedOrderAsync(total: 42.50m);
+        var nativeId = await SeedOrderAsync(total: 42.50m);
+        await using (var seed = _fixture.CreateContext())
+        {
+            seed.Set<CustomerOrderOperation>().Add(new()
+            {
+                OperationId = Guid.NewGuid(),
+                OwnerHash = new string('a', 64),
+                PayloadHash = new string('b', 64),
+                OrderId = nativeId,
+                CompletedAt = DateTime.UtcNow
+            });
+            await seed.SaveChangesAsync();
+        }
+        await HandleAsync(webId, FakeCheckout(out var normal));
+        normal.Should().ContainSingle();
+        var blocked = FakeCheckout(out var native, strict: true);
+        await FluentActions.Invoking(() => HandleAsync(nativeId, blocked)).Should().ThrowAsync<ConflictException>();
+        native.Should().BeEmpty();
+        blocked.VerifyNoOtherCalls();
+        await using var read = _fixture.CreateContext();
+        (await read.OrderCheckoutSessions.CountAsync(value => value.OrderId == webId)).Should().Be(1);
+        (await read.OrderCheckoutSessions.AnyAsync(value => value.OrderId == nativeId)).Should().BeFalse();
+    }
+
     /// <summary>
     /// The point of the slice. 42.50 on the order becomes 4250 minor units at Stripe and 4250 on
     /// the row S5 will assert against — one number, from the column the server wrote.

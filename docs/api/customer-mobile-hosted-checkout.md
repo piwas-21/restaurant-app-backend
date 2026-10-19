@@ -1,6 +1,6 @@
 # Native hosted checkout
 
-Status: provider adapter in development. No native payment endpoint or activation is delivered by
+Status: provider adapter and durable journal in development. No native payment endpoint or activation is delivered by
 this slice. The native app continues to refuse online payment until durable recovery is connected.
 
 `CheckoutSessionRequest.NativeRouting` is optional for existing web callers. When absent, the
@@ -28,8 +28,21 @@ change the expiry, recalculate money, rotate the key or mint a replacement to ov
 result. See [Stripe idempotency](https://docs.stripe.com/api/idempotent_requests) and
 [Checkout session creation](https://docs.stripe.com/api/checkout/sessions/create).
 
-Required follow-through: durable journal committed before provider I/O; short isolated database
-phases and canonical reconciliation; exclusion of competing legacy creation for native orders;
+The journal store commits one original request per accepted native order, under the original private
+operation proof and current customer/guest ownership. It matches erasure's Order-before-User lock
+order, requires the original billing snapshot/processing online intent and rejects changed accepted
+money, table-account orders and existing web sessions. Existing journals recover their original
+request even when current configuration changes; this is not permission to create at the provider
+after activation is withdrawn. The new settings default disabled. The public capability remains
+unknown and the native app still refuses online payment.
+
+Migration `20261019193218_AddCustomerOrderCheckoutJournal` stores opaque references and frozen
+money/routing evidence without customer contact or credentials. Unique order/operation/key/session
+constraints prevent a replacement request. Nonempty recovery history refuses downgrade under an
+exclusive table lock. Account/order erasure cannot cascade this financial recovery record away.
+The ordinary web creation path refuses native operation orders before provider I/O.
+
+Required follow-through: short isolated lease/evidence write phases and canonical reconciliation;
 proof-bound customer/guest endpoints; client SecureStore persistence and browser/foreground recovery;
 central verified links; process-death/concurrency/provider acceptance. These remain open, as do
 signing, deployment and installed iOS/Android payment journeys. Adapter tests use mocked transport.

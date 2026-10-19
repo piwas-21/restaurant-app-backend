@@ -15,6 +15,7 @@ public static class CustomerCheckoutServiceExtensions
         services.AddScoped<ICustomerCheckoutOrderCreator, CustomerCheckoutOrderCreator>();
         services.AddScoped<ICustomerCheckoutAcceptance, CustomerCheckoutAcceptance>();
         services.AddScoped<ICustomerOrderReceiptReader, CustomerOrderReceiptReader>();
+        services.AddScoped<ICustomerOrderCheckoutJournalStore, CustomerOrderCheckoutJournalStore>();
         return services;
     }
 }

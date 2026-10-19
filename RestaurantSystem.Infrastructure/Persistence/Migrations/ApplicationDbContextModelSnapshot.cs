@@ -2637,6 +2637,111 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("CustomerFormFieldConfigurations", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerOrderCheckoutJournal", b =>
+                {
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<long?>("ApplicationFeeMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("application_fee_minor");
+
+                    b.Property<string>("CreateIdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("create_idempotency_key");
+
+                    b.Property<string>("CreatePayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("create_payload_hash");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime?>("LastVerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_verified_at");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTime>("MaximumCreateRetryAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("maximum_create_retry_at");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("order_number");
+
+                    b.Property<string>("ProviderAccountId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("provider_account_id");
+
+                    b.Property<bool>("ProviderLiveMode")
+                        .HasColumnType("boolean")
+                        .HasColumnName("provider_live_mode");
+
+                    b.Property<string>("ProviderSessionId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("provider_session_id");
+
+                    b.Property<string>("ReturnUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("return_url");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("OrderId");
+
+                    b.HasIndex("CreateIdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("ProviderSessionId")
+                        .IsUnique()
+                        .HasFilter("provider_session_id IS NOT NULL");
+
+                    b.ToTable("customer_order_checkout_journals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_order_checkout_journal_shape", "order_id <> '00000000-0000-0000-0000-000000000000'::uuid AND operation_id <> '00000000-0000-0000-0000-000000000000'::uuid AND amount_minor > 0 AND currency ~ '^[a-z]{3}$' AND (application_fee_minor IS NULL OR (application_fee_minor > 0 AND application_fee_minor < amount_minor)) AND expires_at > started_at AND maximum_create_retry_at > started_at AND maximum_create_retry_at <= started_at + INTERVAL '23 hours' AND ((lease_id IS NULL AND lease_expires_at IS NULL) OR (lease_id IS NOT NULL AND lease_expires_at IS NOT NULL))");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerOrderOperation", b =>
                 {
                     b.Property<Guid>("OperationId")

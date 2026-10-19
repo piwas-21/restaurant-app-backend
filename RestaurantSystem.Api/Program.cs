@@ -451,6 +451,11 @@ builder.Services.AddOptions<CustomerMobileSettings>()
     .Validate(settings => settings.IsValid(), "CustomerMobile settings are invalid.")
     .ValidateOnStart();
 
+builder.Services.AddOptions<CustomerHostedCheckoutSettings>()
+    .Bind(builder.Configuration.GetSection(CustomerHostedCheckoutSettings.SectionName))
+    .Validate(settings => settings.IsValid(), "CustomerHostedCheckout settings are invalid.")
+    .ValidateOnStart();
+
 // Server Workspace V2 is an emergency-safe rollout switch, not an entitlement or an
 // authorization boundary. The deploy template maps TENANT_SERVER_WORKSPACE_V2 onto this
 // section, and the frontend reads the additive anonymous tenant-features endpoint. A

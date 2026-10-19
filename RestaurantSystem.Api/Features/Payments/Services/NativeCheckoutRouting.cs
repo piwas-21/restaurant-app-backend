@@ -27,12 +27,33 @@ public sealed record NativeCheckoutRouting(Guid OperationId, StripeProviderConte
             || uri.UserInfo.Length != 0 || uri.Fragment.Length != 0
             || ReturnUrl.Contains('\\') || ReturnUrl.Length > 2048
             || uri.AbsolutePath.Split('/') is not ["", "r", var slug, "payment-return", var reference]
-            || slug.Length is < 1 or > 64 || slug.Split('-').Any(part => part.Length == 0)
-            || slug.Any(value => !char.IsAsciiLetterLower(value) && !char.IsAsciiDigit(value) && value != '-')
+            || !ValidSlug(slug)
             || reference != orderId.ToString("D") || uri.Query != $"?operation={OperationId:D}"
             || ReturnUrl != $"{uri.GetLeftPart(UriPartial.Authority)}/r/{slug}/payment-return/{orderId:D}?operation={OperationId:D}")
             throw new BadRequestException("The frozen native payment return URL is invalid.");
     }
+
+    public static bool IsValidConfiguration(string linkOrigin, string tenantSlug) => ValidSlug(tenantSlug)
+        && Uri.TryCreate(linkOrigin, UriKind.Absolute, out var uri)
+        && uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort && uri.UserInfo.Length == 0
+        && uri.AbsolutePath == "/" && uri.Query.Length == 0 && uri.Fragment.Length == 0
+        && !linkOrigin.Contains('\\') && linkOrigin.Length <= 1024
+        && linkOrigin == uri.GetLeftPart(UriPartial.Authority);
+
+    public static NativeCheckoutRouting Create(string linkOrigin, string tenantSlug, Guid orderId,
+        Guid operationId, StripeProviderContext context)
+    {
+        if (!IsValidConfiguration(linkOrigin, tenantSlug))
+            throw new BadRequestException("Native payment links require reviewed configuration.");
+        var routing = new NativeCheckoutRouting(operationId, context,
+            $"{linkOrigin}/r/{tenantSlug}/payment-return/{orderId:D}?operation={operationId:D}");
+        routing.RequireReturn(orderId);
+        return routing;
+    }
+
+    private static bool ValidSlug(string slug) => slug.Length is >= 1 and <= 64
+        && slug.Split('-').All(part => part.Length > 0)
+        && slug.All(value => char.IsAsciiLetterLower(value) || char.IsAsciiDigit(value) || value == '-');
 
     public Dictionary<string, string> Metadata() => new()
     {
