@@ -3,26 +3,13 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Addresses.Dtos;
-using RestaurantSystem.Api.Features.Addresses.Interfaces;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Addresses.Commands.UpdateAddressCommand;
 
-public record UpdateAddressCommand : ICommand<ApiResponse<AddressDto>>, IAddressContent
+public record UpdateAddressCommand : AddressContent, ICommand<ApiResponse<AddressDto>>
 {
     public Guid Id { get; set; }
-    public string Label { get; set; } = string.Empty;
-    public string AddressLine1 { get; set; } = string.Empty;
-    public string? AddressLine2 { get; set; }
-    public string City { get; set; } = string.Empty;
-    public string? State { get; set; }
-    public string PostalCode { get; set; } = string.Empty;
-    public string Country { get; set; } = string.Empty;
-    public string? Phone { get; set; }
-    public bool IsDefault { get; set; }
-    public double? Latitude { get; set; }
-    public double? Longitude { get; set; }
-    public string? DeliveryInstructions { get; set; }
 }
 
 public class UpdateAddressCommandHandler : ICommandHandler<UpdateAddressCommand, ApiResponse<AddressDto>>

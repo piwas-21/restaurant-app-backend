@@ -1,6 +1,6 @@
 # Saved-address input validation
 
-Create and update use the same address-content rules before their existing owner-scoped handlers.
+Create and update inherit one address-content record and use the same validation rules before their existing owner-scoped handlers.
 The storage contract is `20250831180232_addAddressesAndOrders` plus `UserAddressConfiguration`:
 
 | Field | Required | Maximum Unicode characters |
