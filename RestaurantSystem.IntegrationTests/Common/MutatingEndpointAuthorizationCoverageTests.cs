@@ -56,9 +56,9 @@ public class MutatingEndpointAuthorizationCoverageTests
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 207 includes native root edits, durable cancellations and reviewed channel operations; account-payment and guest-checkout writes remain covered.
+    /// Floor 208 includes native root edits, durable cancellations and reviewed channel operations; account-payment and guest-checkout writes remain covered.
     /// </summary>
-    private const int KnownMutatingActionCount = 207;
+    private const int KnownMutatingActionCount = 208;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -115,6 +115,10 @@ public class MutatingEndpointAuthorizationCoverageTests
         "CustomerMobileCheckoutController.Submit [POST]",
         "CustomerMobileCheckoutController.Recover [POST]",
         "CustomerMobileCheckoutController.Cancel [POST]",
+        // Read-only receipt POST keeps the operation capability out of URLs. The original
+        // owner/session/digest must resolve an accepted receipt; failed auth/staff cannot downgrade.
+        // No contact, address or operator/guest tokens are returned; ingress shares the basket budget.
+        "CustomerMobileOrdersController.Receipt [POST]",
         // Each payment action validates the original visit's hashed participant capability,
         // typed attempt ownership and frozen scope/version. New writes also require feature,
         // module, gateway and configured contribution limits; recovery preserves original identity.
