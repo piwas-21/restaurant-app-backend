@@ -152,7 +152,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                     DisplayOrder = di.DisplayOrder,
                     MaxQuantity = di.MaxQuantity,
                     GlobalIngredientId = di.GlobalIngredientId,
-                    IsNoneOption = di.GlobalIngredient is { IsDeleted: false, IsNoneOption: true },
+                    IsNoneOption = IngredientAnswerProjection.IsNoneOption(di),
                     Kind = di.Kind,
                     ExclusionGroup = di.ExclusionGroup,
                     Content = di.Descriptions

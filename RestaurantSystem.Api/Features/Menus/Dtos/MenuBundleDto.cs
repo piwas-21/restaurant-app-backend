@@ -166,7 +166,7 @@ public class MenuBundleSectionItemDto
 
     /// <summary>
     /// The OPTION PRODUCT's own sauce group rule (S6, plan D9/D9a/D10), copied from its product row:
-    /// how many sauces the guest must choose, the cap (<c>null</c> = no cap, never 0), and how many
+    /// how many sauces the guest must choose, the cap (<c>null</c> = no cap, 0 = no sauces), and how many
     /// charged sauce units are free.
     /// </summary>
     /// <remarks>
@@ -209,6 +209,8 @@ public class MenuBundleIngredientDto
     // (`OptionalIngredientsSection`, which `BundleOptionRow` mounts), so the group a row belongs to
     // has to survive this projection too or bundles would be the one surface where sauces vanish.
     public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
+
+    public bool IsNoneOption { get; set; }
 
     // §9, and here for the same reason `Kind` is: a bundle option row renders through the SAME guest
     // section, so a mutual-exclusion group that did not survive this projection would be the one
