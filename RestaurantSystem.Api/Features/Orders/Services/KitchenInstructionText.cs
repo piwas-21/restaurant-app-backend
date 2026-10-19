@@ -20,7 +20,9 @@ internal static class KitchenInstructionText
             || Repeats(part, "No: ", removed) || Repeats(part, "Sides: ", sides);
         var generatedSummary = parts.Any(Generated);
         var remaining = parts.Where(part => !Generated(part) &&
-            !(Same(part, item.VariationName) && (generatedSummary || parts.Length == 1)));
+            !(Same(part, item.VariationName) && (generatedSummary || parts.Length == 1))).ToArray();
+        if (parts.Length > 0 && remaining.Length == parts.Length)
+            return item.SpecialInstructions;
         var comment = string.Join(" | ", remaining);
         return string.IsNullOrWhiteSpace(comment) ? null : comment;
     }

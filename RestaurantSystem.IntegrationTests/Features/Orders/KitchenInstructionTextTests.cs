@@ -28,6 +28,8 @@ public class KitchenInstructionTextTests
     [InlineData("Medium Teapot | Add: A Little Sugar | No: Sugar | Please serve hot", "Please serve hot")]
     [InlineData("Please serve hot | Add: A Little Sugar", "Please serve hot")]
     [InlineData("No: boiling water", "No: boiling water")]
+    [InlineData("  Please serve hot  ", "  Please serve hot  ")]
+    [InlineData("  No: boiling water | Add: lemon  ", "  No: boiling water | Add: lemon  ")]
     [InlineData("Add: lemon", "Add: lemon")]
     public void Only_proven_structured_summaries_are_suppressed(string text, string? expected)
     {
