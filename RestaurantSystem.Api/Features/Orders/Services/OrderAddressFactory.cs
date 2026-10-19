@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Entities;
@@ -30,17 +31,16 @@ public class OrderAddressFactory : IOrderAddressFactory
         CancellationToken cancellationToken)
     {
         // Case 1: client passed UseAddressId — copy from the saved UserAddress.
-        if (addressDto?.UseAddressId != null)
+        if (addressDto?.UseAddressId is Guid addressId)
         {
+            if (!userId.HasValue)
+                throw new ForbiddenException("Sign in to use a saved delivery address.");
             var savedAddress = await _context.UserAddresses
                 .FirstOrDefaultAsync(
-                    a => a.Id == addressDto.UseAddressId && !a.IsDeleted,
-                    cancellationToken);
-
-            if (savedAddress != null)
-            {
-                return SnapshotFromUserAddress(savedAddress, orderId);
-            }
+                    a => a.Id == addressId && a.UserId == userId.Value && !a.IsDeleted,
+                    cancellationToken)
+                ?? throw new NotFoundException("Saved delivery address unavailable.");
+            return SnapshotFromUserAddress(savedAddress, orderId);
         }
 
         // Case 2: client passed inline address fields — use them verbatim.
