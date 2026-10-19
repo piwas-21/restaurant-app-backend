@@ -1,6 +1,5 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Net.Http.Headers;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
@@ -8,7 +7,6 @@ using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.Tenant.Queries.GetCustomerMobileBootstrapQuery;
-using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -23,10 +21,7 @@ public sealed class CustomerBasketOperationService(
     {
         var session = CustomerBasketOperationHash.Session(sessionId);
         if (operationId == Guid.Empty) throw new BadRequestException("A non-empty operation ID is required.");
-        if (currentUser.IsApiToken || currentUser.IsAuthenticated && currentUser.Role != UserRole.Customer)
-            throw new ForbiddenException("Customer basket operations require a customer or guest session.");
-        if (!currentUser.IsAuthenticated && httpContext.HttpContext?.Request.Headers.ContainsKey(HeaderNames.Authorization) == true)
-            throw new UnauthorizedAccessException("Renew customer authentication before retrying this basket operation.");
+        CustomerBasketAccess.EnsureCustomerOrGuest(currentUser, httpContext.HttpContext);
         var owner = CustomerBasketOperationHash.Owner(session, currentUser.UserId);
         var payload = CustomerBasketOperationHash.Payload(item);
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
