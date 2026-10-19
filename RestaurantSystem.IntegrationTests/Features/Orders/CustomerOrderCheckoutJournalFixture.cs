@@ -18,6 +18,7 @@ using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Settings;
+using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
@@ -104,8 +105,13 @@ public abstract class CustomerOrderCheckoutJournalFixture(DatabaseFixture databa
         return result.OrderId!.Value;
     }
 
-    protected async Task<CustomerOrderCheckoutJournal> FreezeAsync(Guid? owner = null, string? session = null,
-        CustomerOrderRecoveryDto? proof = null, IInterceptor[]? interceptors = null)
+    protected Task<CustomerOrderCheckoutJournal> FreezeAsync(Guid? owner = null, string? session = null,
+        CustomerOrderRecoveryDto? proof = null, IInterceptor[]? interceptors = null) =>
+        WithCheckoutAsync((_, journals, _) => journals.FreezeAsync(session ?? Session, proof ?? Proof, CancellationToken.None),
+            owner, interceptors);
+
+    protected async Task<T> WithCheckoutAsync<T>(Func<ApplicationDbContext, CustomerOrderCheckoutJournalStore,
+        CustomerOrderCheckoutLeaseStore, Task<T>> action, Guid? owner = null, IInterceptor[]? interceptors = null)
     {
         await using var context = Database.CreateContext(interceptors ?? []);
         var guard = new Mock<ICustomerCheckoutGuard>(MockBehavior.Strict);
@@ -124,16 +130,17 @@ public abstract class CustomerOrderCheckoutJournalFixture(DatabaseFixture databa
         var charge = new Mock<ICheckoutChargeResolver>();
         charge.Setup(value => value.Resolve(It.IsAny<decimal>(), It.IsAny<string>()))
             .Returns((decimal total, string? currency) => actualCharges.Resolve(total + (ChangedCharge ? 0.01m : 0), currency));
+        var creation = new CustomerOrderCheckoutCreationPolicy(context, new CustomMediator(services), Options.Create(Settings), charge.Object,
+            new OnlinePaymentIntentGuard(context, Mock.Of<RestaurantSystem.Api.Common.Services.Interfaces.ICurrentUserService>()));
+        var operations = Store(context, owner, owner.HasValue, owner.HasValue ? UserRole.Customer : null);
         var store = new CustomerOrderCheckoutJournalStore(context, guard.Object,
-            Store(context, owner, owner.HasValue, owner.HasValue ? UserRole.Customer : null), new CustomMediator(services),
-            gateway.Object, Options.Create(stripe), Options.Create(Settings),
-            charge.Object,
-            new OnlinePaymentIntentGuard(context, Mock.Of<RestaurantSystem.Api.Common.Services.Interfaces.ICurrentUserService>()), Clock);
-        var journal = await store.FreezeAsync(session ?? Session, proof ?? Proof, CancellationToken.None);
+            operations, gateway.Object, Options.Create(stripe), Options.Create(Settings), creation, Clock);
+        var leases = new CustomerOrderCheckoutLeaseStore(context, guard.Object, operations, store, creation, Clock);
+        var result = await action(context, store, leases);
         context.Database.CurrentTransaction.Should().BeNull();
         // The strict gateway exposes configuration only. Accessing its provider Client would fail.
         gateway.VerifyGet(value => value.Client, Times.Never);
-        return journal;
+        return result;
     }
 
     protected async Task AssertNoCheckoutAsync()

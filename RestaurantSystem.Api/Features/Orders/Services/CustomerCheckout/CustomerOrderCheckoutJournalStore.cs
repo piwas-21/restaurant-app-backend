@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Exceptions;
-using RestaurantSystem.Api.Features.Basket.Services.Operations;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Features.Payments.Services;
@@ -15,10 +13,9 @@ namespace RestaurantSystem.Api.Features.Orders.Services.CustomerCheckout;
 
 /// <summary>Commits the original request before any provider I/O; replay never reprices or rotates identity.</summary>
 public sealed class CustomerOrderCheckoutJournalStore(ApplicationDbContext context,
-    ICustomerCheckoutGuard guard, ICustomerOrderOperationStore operations, CustomMediator mediator,
+    ICustomerCheckoutGuard guard, ICustomerOrderOperationStore operations,
     IStripeGateway gateway, IOptions<StripeSettings> stripe,
-    IOptions<CustomerHostedCheckoutSettings> options, ICheckoutChargeResolver charges,
-    IOnlinePaymentIntentGuard intents, TimeProvider clock) : ICustomerOrderCheckoutJournalStore
+    IOptions<CustomerHostedCheckoutSettings> options, ICustomerOrderCheckoutCreationPolicy creation, TimeProvider clock) : ICustomerOrderCheckoutJournalStore
 {
     public async Task<CustomerOrderCheckoutJournal> FreezeAsync(string sessionId, CustomerOrderRecoveryDto proof,
         CancellationToken cancellationToken)
@@ -48,22 +45,10 @@ public sealed class CustomerOrderCheckoutJournalStore(ApplicationDbContext conte
                 await transaction.CommitAsync(cancellationToken);
                 return existing;
             }
-            var settings = options.Value;
-            if (!settings.Enabled || !settings.IsValid()) throw Unavailable();
-            var bootstrap = await CustomerBasketAvailability.ReadOrderingAsync(mediator, cancellationToken);
-            // The public policy deliberately leaves provider readiness unknown. This private
-            // preparation proves configured provider context separately; it does not activate the app.
-            if (bootstrap.Capabilities.GetValueOrDefault("online-payments") is not ("unknown" or "enabled"))
-                throw Unavailable();
-            OnlinePaymentEligibility.EnsurePayable(order);
-            await intents.EnsureProcessingAsync(orderId, cancellationToken);
+            var (amount, fee) = await creation.ReadAsync(order, cancellationToken);
             if (await context.OrderCheckoutSessions.AnyAsync(value => value.OrderId == orderId, cancellationToken))
                 throw new ConflictException("Reconcile the existing checkout before starting a native payment.");
-            var billing = await context.OrderBillingSnapshots.AsNoTracking()
-                .SingleOrDefaultAsync(value => value.OrderId == orderId, cancellationToken) ?? throw Unavailable();
-            var (amount, fee) = charges.Resolve(order.PayableTotal, billing.Currency);
-            if (amount.Minor != billing.TotalMinor)
-                throw new ConflictException("The accepted order changed. Ask the restaurant to review its payment.");
+            var settings = options.Value;
             var routing = NativeCheckoutRouting.Create(settings.LinkOrigin, settings.TenantSlug, orderId,
                 proof.OperationId, StripeProviderContext.Read(gateway, stripe.Value));
             var request = new CheckoutSessionRequest

@@ -1,6 +1,6 @@
 # Native hosted checkout
 
-Status: provider adapter and durable journal in development. No native payment endpoint or activation is delivered by
+Status: provider adapter, durable journal and leased canonical evidence recovery in development. No native payment endpoint or activation is delivered by
 this slice. The native app continues to refuse online payment until durable recovery is connected.
 
 `CheckoutSessionRequest.NativeRouting` is optional for existing web callers. When absent, the
@@ -42,7 +42,19 @@ constraints prevent a replacement request. Nonempty recovery history refuses dow
 exclusive table lock. Account/order erasure cannot cascade this financial recovery record away.
 The ordinary web creation path refuses native operation orders before provider I/O.
 
-Required follow-through: short isolated lease/evidence write phases and canonical reconciliation;
-proof-bound customer/guest endpoints; client SecureStore persistence and browser/foreground recovery;
+Lease acquisition and canonical-evidence recording use separate short transactions. Both recover the
+original operation proof and recheck the current order owner under the Order-before-User locks.
+A minute-long durable lease prevents concurrent publication; expiry permits only the same original
+request within its original replay deadline. Expired/replaced workers cannot record results. Provider
+create and canonical reread occur outside database transactions. Missing sessions, mismatched evidence,
+transport failure and late responses retain the original request and processing intent. Known-session
+recovery never falls back to another create, including after settings withdrawal or the retry deadline.
+
+Canonical recording retains the provider reference even if current creation eligibility changes.
+The recovery result withholds the payable URL after closure, part-payment, capability/settings withdrawal
+or original session expiry. This internal evidence service does not settle tenders, expose an endpoint
+or enable native online payment. Ordinary settlement has no new native session row to act on.
+
+Required follow-through: canonical native settlement and original-proof customer/guest endpoints; client SecureStore persistence and browser/foreground recovery;
 central verified links; process-death/concurrency/provider acceptance. These remain open, as do
 signing, deployment and installed iOS/Android payment journeys. Adapter tests use mocked transport.
