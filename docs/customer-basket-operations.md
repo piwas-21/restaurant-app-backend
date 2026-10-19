@@ -54,3 +54,10 @@ Rollback preserves retry identity: once a receipt exists, the migration refuses 
 an exclusive table lock, including when a concurrent receipt commits while rollback waits. Disable
 native ordering and roll back the application while retaining this additive schema. An empty table
 can still be rolled back. Historical migration tests restore the current schema before lane reset.
+
+Both add routes share one fixed-window IP budget, configured by
+`BasketAdds:AttemptsPerIpPerMinute` (default 600, allowed 1–6000). It covers legacy adds and durable
+operations so an alternate route or rotated session ID cannot bypass it. There is no request
+queue; exhaustion returns HTTP 429 with Retry-After before basket/receipt effects. The client
+retains a pending operation and requires an explicit recovery action. Other IPs have independent
+budgets. This is ingress protection, separate from session/principal authorization.
