@@ -3,8 +3,10 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Sofra.MobileService;
+using Sofra.MobileService.Directory;
 
 namespace RestaurantSystem.IntegrationTests.Features.MobileDirectory;
 
@@ -39,35 +41,49 @@ public sealed class MobileDirectoryHttpTests
     }
 
     [Fact]
-    public void InvalidIdentityAndUnknownPrivateDirectoryFieldsPreventHostStartup()
+    public async Task InvalidIdentityAndUnknownPrivateDirectoryFieldsPreventHostStartup()
     {
-        using var invalid = new DirectoryFactory(new Dictionary<string, string?> { ["MobileDirectory:Tenants:0:Id"] = Guid.Empty.ToString() });
-        Assert.Throws<OptionsValidationException>(() => invalid.CreateClient());
-        using var unknown = new DirectoryFactory(new Dictionary<string, string?> { ["MobileDirectory:Tenants:0:DatabasePassword"] = "must-be-refused" });
-        var error = Assert.Throws<InvalidOperationException>(() => unknown.CreateClient());
+        using var invalid = DirectoryHost(new Dictionary<string, string?> { ["MobileDirectory:Tenants:0:Id"] = Guid.Empty.ToString() });
+        await Assert.ThrowsAsync<OptionsValidationException>(() => invalid.StartAsync());
+        using var unknown = DirectoryHost(new Dictionary<string, string?> { ["MobileDirectory:Tenants:0:DatabasePassword"] = "must-be-refused" });
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => unknown.StartAsync());
         Assert.Contains("ErrorOnUnknownConfiguration", error.Message, StringComparison.Ordinal);
+        Assert.Contains("DatabasePassword", error.ToString(), StringComparison.Ordinal);
+    }
+
+    // DeferredHostBuilder can mask an expected startup failure with a disposed-provider race.
+    // Exercise the same registration on a real host to observe the validation error itself.
+    private static IHost DirectoryHost(IReadOnlyDictionary<string, string?> overrides)
+    {
+        var builder = Host.CreateApplicationBuilder();
+        ConfigureDirectory(builder.Configuration, overrides);
+        builder.Services.AddMobileDirectory(builder.Configuration);
+        return builder.Build();
     }
 
     private sealed class DirectoryFactory(IReadOnlyDictionary<string, string?>? overrides = null) : WebApplicationFactory<MobileServiceProgram>
     {
-        protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.ConfigureAppConfiguration((_, config) =>
+        protected override void ConfigureWebHost(IWebHostBuilder builder) =>
+            builder.ConfigureAppConfiguration((_, config) => ConfigureDirectory(config, overrides));
+    }
+
+    private static void ConfigureDirectory(IConfigurationBuilder config, IReadOnlyDictionary<string, string?>? overrides)
+    {
+        config.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["MobileDirectory:Environment"] = "staging",
-                ["MobileDirectory:Revision"] = "reviewed-1",
-                ["MobileDirectory:Tenants:0:Id"] = MobileDirectoryFixture.AlphaId.ToString(),
-                ["MobileDirectory:Tenants:0:Slug"] = "alpha",
-                ["MobileDirectory:Tenants:0:Name"] = "Alpha",
-                ["MobileDirectory:Tenants:0:ApiOrigin"] = "https://alpha.example",
-                ["MobileDirectory:Tenants:0:WebOrigin"] = "https://alpha.example",
-                ["MobileDirectory:Tenants:0:ImageOrigin"] = "https://images.example",
-                ["MobileDirectory:Tenants:0:Status"] = "active",
-                ["MobileDirectory:Tenants:0:ContractVersions:0"] = "1",
-                ["InternalProvisioning:DatabasePassword"] = "not-a-secret-control",
-                ["InternalProvisioning:PrivateBillingReference"] = "must-not-be-public"
-            });
-            if (overrides is not null) config.AddInMemoryCollection(overrides);
+            ["MobileDirectory:Environment"] = "staging",
+            ["MobileDirectory:Revision"] = "reviewed-1",
+            ["MobileDirectory:Tenants:0:Id"] = MobileDirectoryFixture.AlphaId.ToString(),
+            ["MobileDirectory:Tenants:0:Slug"] = "alpha",
+            ["MobileDirectory:Tenants:0:Name"] = "Alpha",
+            ["MobileDirectory:Tenants:0:ApiOrigin"] = "https://alpha.example",
+            ["MobileDirectory:Tenants:0:WebOrigin"] = "https://alpha.example",
+            ["MobileDirectory:Tenants:0:ImageOrigin"] = "https://images.example",
+            ["MobileDirectory:Tenants:0:Status"] = "active",
+            ["MobileDirectory:Tenants:0:ContractVersions:0"] = "1",
+            ["InternalProvisioning:DatabasePassword"] = "not-a-secret-control",
+            ["InternalProvisioning:PrivateBillingReference"] = "must-not-be-public"
         });
+        if (overrides is not null) config.AddInMemoryCollection(overrides);
     }
 }
