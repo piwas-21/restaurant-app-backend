@@ -17,13 +17,7 @@ internal static class StaffExplicitCustomization
     {
         var selection = ExplicitCustomizationSelection.Resolve(product, source.CustomizationSelections);
         var usesGroups = product.CustomizationGroups.Any(group => group.IsActive);
-        var children = selection.ProductOptions.Select(option => new CreateOrderItemDto
-        {
-            ProductId = option.Product.Id,
-            Quantity = source.Quantity * option.Quantity,
-            UnitPrice = option.AdditionalPrice,
-            Kind = OrderItemKind.CustomizationOption
-        }).ToList();
+        var children = selection.ProductOptions.Select(option => Child(source, option)).ToList();
 
         return new(
             usesGroups ? selection.SelectedIngredientIds : source.SelectedIngredientIds,
@@ -31,4 +25,21 @@ internal static class StaffExplicitCustomization
             selection.ProductOptions.Sum(option => option.AdditionalPrice),
             children);
     }
+    private static CreateOrderItemDto Child(CreateOrderItemDto source, ResolvedProductCustomization option)
+    {
+        var presentation = source.CustomizationOptionPresentation?.GetValueOrDefault(option.MembershipId);
+        return new()
+        {
+            ProductId = option.Product.Id,
+            Quantity = source.Quantity * option.Quantity,
+            UnitPrice = option.AdditionalPrice,
+            Kind = OrderItemKind.CustomizationOption,
+            QuantityBasis = presentation?.QuantityBasis,
+            ConfigurationScope = presentation?.ConfigurationScope,
+            CompositionRole = presentation?.CompositionRole,
+            PresentationLabel = presentation?.PresentationLabel,
+            PresentationOrder = presentation?.PresentationOrder
+        };
+    }
+
 }

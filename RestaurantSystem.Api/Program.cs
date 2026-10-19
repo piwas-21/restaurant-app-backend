@@ -824,6 +824,7 @@ builder.Services.AddAccountCheckoutServices();
 builder.Services.AddAccountCheckoutWebhookServices();
 builder.Services.AddOrderDetailServices();
 builder.Services.AddStaffOrderServices();
+builder.Services.AddCustomerCheckoutServices();
 builder.Services.AddServerWorkspaceServices();
 builder.Services.AddKitchenBoardServices();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();

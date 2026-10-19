@@ -10,7 +10,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
 /// <summary>Resolves every counter line against the live catalogue before OrderItemFactory runs.</summary>
-public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
+public sealed partial class StaffCounterOrderPricing : IStaffCounterOrderPricing
 {
     private readonly ApplicationDbContext _context;
     private readonly ILineCustomizationBuilder _customizations;
@@ -32,7 +32,7 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
     }
 
     private CreateOrderItemDto PriceLine(
-        CreateOrderItemDto source, IReadOnlyDictionary<Guid, Product> products)
+        CreateOrderItemDto source, IReadOnlyDictionary<Guid, Product> products, bool sourceIsBasket = false)
     {
         ArgumentNullException.ThrowIfNull(source);
 
@@ -49,12 +49,12 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
             ?? throw new NotFoundException($"Product {source.ProductId.Value} not found");
         BasketComponentGuard.EnsureNotOrderedAlone(product);
         var variation = ResolveVariation(product, source.ProductVariationId);
-        return PriceLine(source, product, variation, products);
+        return PriceLine(source, product, variation, products, sourceIsBasket);
     }
 
     private CreateOrderItemDto PriceLine(
         CreateOrderItemDto source, Product product, ProductVariation? variation,
-        IReadOnlyDictionary<Guid, Product> products)
+        IReadOnlyDictionary<Guid, Product> products, bool sourceIsBasket = false)
     {
         if (source.Quantity <= 0)
         {
@@ -77,7 +77,7 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
         if (product.Type == ProductType.Menu)
         {
             return PriceBundle(
-                source, product, variation, customization, children, products);
+                source, product, variation, customization, children, products, sourceIsBasket);
         }
 
         if (children is not { Count: > 0 })
@@ -93,98 +93,14 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
             };
         }
 
-        var priced = PriceSideItems(source, unitPrice, customization, children, products);
+        var priced = PriceSideItems(source, unitPrice, customization, children, products, sourceIsBasket);
         priced.ChildItems!.AddRange(explicitCustomization.ProductOptionChildren);
         return priced;
     }
 
-    private CreateOrderItemDto PriceBundle(
-        CreateOrderItemDto source, Product product, ProductVariation? variation,
-        LineCustomization customization, List<CreateOrderItemDto>? children,
-        IReadOnlyDictionary<Guid, Product> products)
-    {
-        var sections = product.MenuDefinition?.Sections.ToList()
-            ?? throw new NotFoundException("Menu definition not found");
-        var sourceChildren = children ?? [];
-        var selections = new List<SelectedMenuOptionDto>(sourceChildren.Count);
-        var sectionItems = new List<(CreateOrderItemDto Child, MenuSectionItem Item)>(sourceChildren.Count);
-
-        foreach (var child in sourceChildren)
-        {
-            ArgumentNullException.ThrowIfNull(child);
-            if (!child.ProductId.HasValue)
-            {
-                throw new BadRequestException("A bundle option must reference a product.");
-            }
-
-            if (!child.SectionId.HasValue || child.SectionId.Value == Guid.Empty)
-            {
-                throw new BadRequestException("A bundle option must identify its menu section.");
-            }
-
-            if (child.Quantity <= 0 || child.Quantity % source.Quantity != 0)
-            {
-                throw new BadRequestException("Bundle option quantity does not match the parent quantity.");
-            }
-
-            var optionQuantity = child.Quantity / source.Quantity;
-            var sectionItem = MenuBundleSelectionRules.ResolveSectionItem(
-                sections, child.SectionId.Value, child.ProductId.Value, child.ProductVariationId);
-            sectionItems.Add((child, sectionItem));
-            selections.Add(new SelectedMenuOptionDto
-            {
-                SectionId = child.SectionId.Value,
-                ItemId = child.ProductId.Value,
-                ProductVariationId = sectionItem.ProductVariationId,
-                Quantity = optionQuantity,
-                SpecialInstructions = child.SpecialInstructions,
-                SelectedIngredients = child.SelectedIngredientIds,
-                IngredientQuantities = child.IngredientQuantities
-            });
-        }
-
-        // The same required/min/max/membership rule as the Basket menu path. Quantities passed to
-        // this helper are per parent unit; the staff wire keeps child quantities line-absolute.
-        var optionsPerParent = MenuBundleSelectionRules.ValidateAndSumOptionPrices(sections, selections);
-        var pricedChildren = new List<CreateOrderItemDto>(sectionItems.Count);
-        decimal nestedOptionPricesPerParent = 0m;
-        foreach (var (child, sectionItem) in sectionItems)
-        {
-            var childProduct = products.GetValueOrDefault(child.ProductId!.Value)
-                ?? throw new NotFoundException($"Product {child.ProductId.Value} not found");
-            var childVariation = ResolveVariation(childProduct, child.ProductVariationId);
-            BasketBaseProductGuard.EnsureVariationChosen(childProduct, childVariation);
-            var pricedChild = PriceLine(child, childProduct, childVariation, products);
-
-            // A bundle section replaces the option's base price, but never its variation modifier
-            // (or any composed surcharge already resolved on that option).
-            var childUnitPrice = sectionItem.AdditionalPrice
-                + (pricedChild.UnitPrice - childProduct.BasePrice);
-            nestedOptionPricesPerParent += (pricedChild.UnitPrice
-                - childProduct.BasePrice - (childVariation?.PriceModifier ?? 0m))
-                * (child.Quantity / source.Quantity);
-            pricedChildren.Add(pricedChild with
-            {
-                UnitPrice = childUnitPrice,
-                Kind = OrderItemKind.BundleChild
-            });
-        }
-
-        return source with
-        {
-            UnitPrice = product.BasePrice + (variation?.PriceModifier ?? 0m)
-                + optionsPerParent + nestedOptionPricesPerParent,
-            // The parent can carry its own map-only/selection customization. It is per unit in the
-            // shared builder and line-absolute in CreateOrderItemDto.
-            CustomizationPrice = customization.CustomizationPrice * source.Quantity,
-            IngredientQuantities = customization.IngredientQuantities,
-            ChildItems = pricedChildren
-        };
-    }
-
     private CreateOrderItemDto PriceSideItems(
         CreateOrderItemDto source, decimal unitPrice, LineCustomization customization,
-        List<CreateOrderItemDto> children, IReadOnlyDictionary<Guid, Product> products)
+        List<CreateOrderItemDto> children, IReadOnlyDictionary<Guid, Product> products, bool sourceIsBasket = false)
     {
         decimal sidesPerParent = 0m;
         var pricedChildren = new List<CreateOrderItemDto>(children.Count);
@@ -206,7 +122,7 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
                 throw new BadRequestException("Side-item quantity must be greater than zero.");
             }
 
-            var pricedChild = PriceLine(child, products);
+            var pricedChild = PriceLine(child, products, sourceIsBasket);
             sidesPerParent += pricedChild.UnitPrice * child.Quantity;
             // The child quantity is per parent unit and its customization is already absolute for
             // that child line. Scale it by the root quantity so OrderItemFactory adds the full amount.
@@ -227,9 +143,9 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
     }
 
     private async Task<IReadOnlyDictionary<Guid, Product>> LoadProductsAsync(
-        IReadOnlyCollection<CreateOrderItemDto> items, CancellationToken cancellationToken)
+        IReadOnlyCollection<CreateOrderItemDto> items, CancellationToken cancellationToken, bool includeSides = false)
     {
-        var lines = Flatten(items).ToList();
+        var lines = OrderInputTree.Flatten(items).ToList();
         var menuIds = lines
             .Where(item => item.MenuId.HasValue)
             .Select(item => item.MenuId!.Value)
@@ -252,7 +168,7 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
             .Select(item => item.ProductId!.Value)
             .Distinct()
             .ToList();
-        var products = await _context.Products
+        var query = _context.Products
             .Include(item => item.Variations)
             .Include(item => item.DetailedIngredients)
             .Include(item => item.CustomizationGroups)
@@ -265,25 +181,10 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
                     .ThenInclude(section => section.Items)
                         .ThenInclude(item => item.ProductVariation)
             .AsSplitQuery()
-            .Where(item => ids.Contains(item.Id) && !item.IsDeleted)
-            .ToListAsync(cancellationToken);
+            .Where(item => ids.Contains(item.Id) && !item.IsDeleted);
+        if (includeSides) query = query.Include(item => item.SuggestedSideItems);
+        var products = await query.ToListAsync(cancellationToken);
         return products.ToDictionary(item => item.Id);
-    }
-
-    private static IEnumerable<CreateOrderItemDto> Flatten(
-        IEnumerable<CreateOrderItemDto> items)
-    {
-        foreach (var item in items)
-        {
-            yield return item;
-            if (item.ChildItems is not null)
-            {
-                foreach (var child in Flatten(item.ChildItems))
-                {
-                    yield return child;
-                }
-            }
-        }
     }
 
     private static ProductVariation? ResolveVariation(Product product, Guid? variationId)

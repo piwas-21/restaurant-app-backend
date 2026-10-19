@@ -4,6 +4,8 @@ namespace RestaurantSystem.Api.Features.Orders.Dtos;
 
 public partial record CreateOrderItemDto
 {
+    // Server-owned presentation from a persisted basket, keyed by exact customization membership.
+    internal IReadOnlyDictionary<Guid, CreateOrderItemDto>? CustomizationOptionPresentation { get; set; }
     internal Guid? ParentComponentMenuSectionItemId { get; init; }
     internal Guid? SuggestedSideItemId { get; init; }
     internal QuantityBasis? QuantityBasis { get; init; }

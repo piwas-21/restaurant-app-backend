@@ -19,6 +19,7 @@ public partial class OrderItemFactory
         // variation remains supported only when it resolves unambiguously.
         if (item.MenuSectionItemId.HasValue)
         {
+            if (TryTrackedChoiceSection(parent, item, out var trackedSection)) return trackedSection;
             var row = await _context.MenuSectionItems.AsNoTracking()
                 .Where(option => option.Id == item.MenuSectionItemId.Value
                     && option.MenuSection.MenuDefinition.ProductId == parent.ProductId
@@ -43,4 +44,24 @@ public partial class OrderItemFactory
             throw new BadRequestException("The selected choice section does not contain this bundle component.");
         return sections.Count == 1 ? sections[0] : null;
     }
+    private bool TryTrackedChoiceSection(OrderItem parent, CreateOrderItemDto item, out Guid? sectionId)
+    {
+        sectionId = null;
+        var product = _context.Products.Local.FirstOrDefault(candidate => candidate.Id == parent.ProductId);
+        var definition = product?.MenuDefinition;
+        if (definition is null || !_context.Entry(definition).Collection(value => value.Sections).IsLoaded
+            || definition.Sections.Any(section => !_context.Entry(section).Collection(value => value.Items).IsLoaded))
+            return false;
+        // A complete graph already loaded by the batch pricer is authoritative. Re-querying each
+        // selected component would make quote cost grow by one database round trip per line.
+        var row = definition.Sections.SelectMany(section => section.Items)
+            .SingleOrDefault(candidate => candidate.Id == item.MenuSectionItemId);
+        if (row is null || row.ProductId != item.ProductId
+            || item.SectionId.HasValue && row.MenuSectionId != item.SectionId
+            || row.ProductVariationId.HasValue && row.ProductVariationId != item.ProductVariationId)
+            throw new BadRequestException("The selected choice section does not contain this bundle component.");
+        sectionId = row.MenuSectionId;
+        return true;
+    }
+
 }

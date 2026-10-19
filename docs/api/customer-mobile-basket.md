@@ -60,6 +60,8 @@ remain possible after channel availability or native ordering is withdrawn.
 Operation advisory locks serialize replay. Shared owner locks cover native and legacy basket/channel
 service writes, including login merge; customer locks span devices. Merge locks both guest and customer
 owners in deterministic order. Read-only service calls take no write lock.
+The separate [checkout quote](customer-mobile-checkout.md) takes the owner lock while reviewing the
+purchase and current catalogue, so an intervening basket writer cannot change its reviewed source.
 The basket effect and receipt commit in one transaction, including the existing basket service's saves.
 A failure before commit rolls both back. Receipts retain only UUIDs/hashes/decision time and cancellation state, survive basket cleanup
 and cannot be removed by the guarded historical downgrade. No new migration accompanies root edits or write coordination.
