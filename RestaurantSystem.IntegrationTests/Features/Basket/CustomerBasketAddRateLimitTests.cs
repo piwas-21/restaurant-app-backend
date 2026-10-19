@@ -46,7 +46,9 @@ public sealed class CustomerBasketAddRateLimitTests(DatabaseFixture fixture) : I
     [Theory]
     [InlineData("/api/customer-mobile/basket/items", "/api/basket/items")]
     [InlineData("/api/basket/items", "/api/customer-mobile/basket/items")]
-    public async Task Both_add_routes_share_an_ip_budget_that_rotating_sessions_cannot_escape(string first, string second)
+    [InlineData("/api/customer-mobile/basket/items", "/api/customer-mobile/basket/items/11111111-1111-4111-8111-111111111111/operations")]
+    [InlineData("/api/customer-mobile/basket/items/11111111-1111-4111-8111-111111111111/operations", "/api/basket/items")]
+    public async Task Native_mutations_and_both_add_routes_share_an_ip_budget_that_rotating_sessions_cannot_escape(string first, string second)
     {
         AuthenticateAsAnonymous();
         Client.DefaultRequestHeaders.Add("X-Session-Id", Guid.NewGuid().ToString("D"));

@@ -16,14 +16,18 @@ public sealed class CustomerBasketOperationService(
     ApplicationDbContext context, IBasketService baskets, ICurrentUserService currentUser,
     CustomMediator mediator, IHttpContextAccessor httpContext) : ICustomerBasketOperationService
 {
-    public async Task<BasketDto> AddAsync(string sessionId, AddToBasketDto item, Guid operationId,
-        CancellationToken cancellationToken)
+    public Task<BasketDto> AddAsync(string sessionId, AddToBasketDto item, Guid operationId,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(sessionId, operationId, CustomerBasketOperationHash.Payload(item),
+            () => baskets.AddItemToBasketAsync(sessionId, currentUser.UserId, item), cancellationToken);
+
+    public async Task<BasketDto> ExecuteAsync(string sessionId, Guid operationId, string payload,
+        Func<Task<BasketDto>> apply, CancellationToken cancellationToken)
     {
         var session = CustomerBasketOperationHash.Session(sessionId);
         if (operationId == Guid.Empty) throw new BadRequestException("A non-empty operation ID is required.");
         CustomerBasketAccess.EnsureCustomerOrGuest(currentUser, httpContext.HttpContext);
         var owner = CustomerBasketOperationHash.Owner(session, currentUser.UserId);
-        var payload = CustomerBasketOperationHash.Payload(item);
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
         var operationLock = CustomerBasketOperationHash.OperationLock(operationId);
         await context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({operationLock})", cancellationToken);
@@ -42,7 +46,7 @@ public sealed class CustomerBasketOperationService(
         var bootstrap = await mediator.SendQuery(new GetCustomerMobileBootstrapQuery(1), cancellationToken);
         if (bootstrap.Data?.Capabilities.GetValueOrDefault("ordering") != "enabled")
             throw new NotFoundException("Customer mobile ordering is unavailable.");
-        var basket = await baskets.AddItemToBasketAsync(sessionId, currentUser.UserId, item);
+        var basket = await apply();
         context.Set<CustomerBasketOperation>().Add(new CustomerBasketOperation
         {
             OperationId = operationId,
@@ -65,7 +69,7 @@ public sealed class CustomerBasketOperationService(
             throw new ConflictException("This operation ID was already used for different basket details.");
         var basket = await baskets.GetBasketAsync(sessionId, currentUser.UserId);
         if (basket is null || basket.Id != operation.BasketId)
-            throw new ConflictException("This item was already added, but its basket is no longer available. Refresh your basket.");
+            throw new ConflictException("This operation was already applied, but its basket is no longer available. Refresh your basket.");
         cancellationToken.ThrowIfCancellationRequested();
         return basket;
     }

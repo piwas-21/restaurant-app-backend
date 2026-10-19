@@ -7,6 +7,14 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 public sealed class CustomerBasketOperationHashTests
 {
     [Fact]
+    public void Existing_add_payload_digest_stays_compatible_with_accepted_receipts()
+    {
+        var request = new AddToBasketDto { ProductId = Guid.Parse("11111111-1111-4111-8111-111111111111"), Quantity = 2 };
+        // Independently derived from sorted PascalCase JSON with explicit null fields and SHA-256.
+        CustomerBasketOperationHash.Payload(request).Should().Be("d59d30e77079ee8b427257d1b61d2774b6d0c33db467924854fb27b3a21d8e23"); // pragma: allowlist secret
+    }
+
+    [Fact]
     public void Dictionary_insertion_order_does_not_change_the_request_identity()
     {
         var first = Guid.NewGuid(); var second = Guid.NewGuid();

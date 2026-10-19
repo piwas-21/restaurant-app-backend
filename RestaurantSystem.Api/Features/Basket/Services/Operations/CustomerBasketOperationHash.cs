@@ -2,7 +2,6 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
 using RestaurantSystem.Api.Common.Exceptions;
-using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 
 namespace RestaurantSystem.Api.Features.Basket.Services.Operations;
 
@@ -24,7 +23,7 @@ internal static class CustomerBasketOperationHash
 
     public static long OperationLock(Guid operationId) => Lock("customer-basket-operation", operationId.ToString("D"));
 
-    public static string Payload(AddToBasketDto item)
+    public static string Payload<T>(T item)
     {
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))

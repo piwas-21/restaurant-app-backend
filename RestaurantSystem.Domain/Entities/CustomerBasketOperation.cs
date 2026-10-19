@@ -1,6 +1,6 @@
 namespace RestaurantSystem.Domain.Entities;
 
-/// <summary>Durable receipt for one customer basket add. No credentials or request body are stored.</summary>
+/// <summary>Durable receipt for one customer basket operation. No credentials or request body are stored.</summary>
 public sealed class CustomerBasketOperation
 {
     public Guid OperationId { get; set; }
