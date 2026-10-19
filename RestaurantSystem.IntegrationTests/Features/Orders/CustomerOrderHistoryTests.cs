@@ -135,17 +135,17 @@ public sealed partial class CustomerOrderHistoryTests(DatabaseFixture fixture) :
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("?schemaVersion=0")]
-    [InlineData("?schemaVersion=2")]
-    [InlineData("?schemaVersion=1&beforeOrderDate=2026-10-19T12:00:00Z")]
-    [InlineData("?schemaVersion=1&beforeOrderId=00000001-0000-4000-8000-000000000000")]
-    [InlineData("?schemaVersion=1&beforeOrderDate=bad&beforeOrderId=00000001-0000-4000-8000-000000000000")]
-    [InlineData("?schemaVersion=1&beforeOrderDate=2026-10-19T12:00:00Z&beforeOrderId=00000000-0000-0000-0000-000000000000")]
-    public async Task Invalid_versions_and_incomplete_cursors_are_refused_with_a_valid_positive_control(string query)
+    [InlineData("missing-version", "")]
+    [InlineData("zero-version", "?schemaVersion=0")]
+    [InlineData("future-version", "?schemaVersion=2")]
+    [InlineData("missing-cursor-id", "?schemaVersion=1&beforeOrderDate=2026-10-19T12:00:00Z")]
+    [InlineData("missing-cursor-date", "?schemaVersion=1&beforeOrderId=00000001-0000-4000-8000-000000000000")]
+    [InlineData("malformed-cursor-date", "?schemaVersion=1&beforeOrderDate=bad&beforeOrderId=00000001-0000-4000-8000-000000000000")]
+    [InlineData("empty-cursor-id", "?schemaVersion=1&beforeOrderDate=2026-10-19T12:00:00Z&beforeOrderId=00000000-0000-0000-0000-000000000000")]
+    public async Task Invalid_versions_and_incomplete_cursors_are_refused_with_a_valid_positive_control(string scenario, string query)
     {
         AuthenticateCustomer();
-        (await Client.GetAsync(Path + query)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Client.GetAsync(Path + query)).StatusCode.Should().Be(HttpStatusCode.BadRequest, scenario);
         (await Client.GetAsync(Path + "?schemaVersion=1")).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
