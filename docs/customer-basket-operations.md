@@ -8,6 +8,21 @@ the existing add semantics. The operation rail requires a non-empty lower-case c
 operations. Other roles and machine tokens cannot use it. A present but rejected Authorization
 header returns HTTP 401; it cannot silently downgrade a customer operation into a guest add.
 
+## Native basket reads
+
+`GET /api/customer-mobile/basket` requires the same canonical session, customer-or-guest access
+and enabled native ordering rollout. It rejects a present failed Authorization header before lookup,
+using the same access guard as durable adds. Staff and API tokens are forbidden. It delegates the
+existing owned read: customers are matched by customer ID, guests by an unowned exact session.
+Reads create no basket or receipt and do not acknowledge a pending add.
+
+A missing basket returns the existing nil-ID, null-user, zero-total, empty-items envelope with the
+request session. Clients must use the native URL: the legacy anonymous read can return that same
+envelope after rejecting a customer JWT, so it cannot distinguish expired authentication from a
+genuinely missing customer basket. Older deployments return 404 on the native route; do not fall back.
+This additive route requires deployment but no further schema or DTO change. Existing receipt replay
+remains separately available after rollout withdrawal; a fresh native read is rollout gated.
+
 Persist the operation ID, exact request and original environment/tenant/principal/session before
 sending. Reuse that identity only for a retry of the same logical add. A deliberate additional add
 needs a new operation. This contract does not authorize automatic order or payment retries.
