@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -137,6 +137,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<TableServicePaymentHandoff> TableServicePaymentHandoffs { get; set; }
         public DbSet<OrderOperationalNote> OrderOperationalNotes { get; set; }
         public DbSet<KitchenBoardWorkCompletion> KitchenBoardWorkCompletions { get; set; }
+        public DbSet<CashierPrintJob> CashierPrintJobs { get; set; }
         public DbSet<OrderRoutingState> OrderRoutingStates { get; set; }
         public DbSet<StaffOrderOperation> StaffOrderOperations { get; set; }
         public DbSet<OrderCheckoutSession> OrderCheckoutSessions { get; set; }

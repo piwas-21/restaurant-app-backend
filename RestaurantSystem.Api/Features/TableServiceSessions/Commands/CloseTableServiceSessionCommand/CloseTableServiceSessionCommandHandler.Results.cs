@@ -1,4 +1,6 @@
 using RestaurantSystem.Api.Common.Models;
+using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 
@@ -6,6 +8,13 @@ namespace RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTable
 
 public sealed partial class CloseTableServiceSessionCommandHandler
 {
+    private async Task QueueClosedBillAsync(Guid sessionId, int version, CancellationToken cancellationToken)
+    {
+        if (_cashierPrintQueue is not null && await _context.Orders.AnyAsync(order => order.ServiceSessionId == sessionId
+                && order.Status != OrderStatus.Cancelled, cancellationToken))
+            await _cashierPrintQueue.QueueAsync(new(sessionId, null, sessionId, version), true, cancellationToken);
+    }
+
     private async Task<ApiResponse<TableServiceSessionDto>> ReadResultAsync(
         Guid id, CancellationToken cancellationToken)
     {

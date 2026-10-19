@@ -37,6 +37,16 @@ public partial class UpdateOrderStatusCommandHandler
                 ErrorCodes.CashierRequired);
         }
 
+        if (command.AcknowledgeCompletedWork == true && (command.ExpectedVersion is null
+            || !_currentUserService.IsStaff || _currentUserService.IsApiToken
+            || order.ExternalReference is not null
+            || command.NewStatus is not (OrderStatus.Completed or OrderStatus.OutForDelivery)))
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "Refresh the order and confirm its completed kitchen work as a staff member.",
+                ErrorCodes.OrderVersionConflict);
+        }
+
         if (!order.IsKitchenReleased)
         {
             return ApiResponse<OrderDto>.FailureWithCode(

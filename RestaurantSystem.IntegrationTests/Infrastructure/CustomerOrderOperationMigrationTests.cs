@@ -54,7 +54,9 @@ public sealed class CustomerOrderOperationMigrationTests(DatabaseFixture fixture
         refusal.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
         refusal.MessageText.Should().Be("Customer order operation history must be retained");
         (await context.Set<CustomerOrderOperation>().AsNoTracking().SingleAsync()).OperationId.Should().Be(operation.OperationId);
-        (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
+        // Later empty migrations can roll back before this receipt guard refuses.
+        (await context.Database.GetAppliedMigrationsAsync()).Last().Should()
+            .Be("20261019111141_" + nameof(AddCustomerOrderOperations));
     }
     [Fact]
     public async Task Concurrent_commit_is_observed_before_downgrade_can_discard_a_receipt()

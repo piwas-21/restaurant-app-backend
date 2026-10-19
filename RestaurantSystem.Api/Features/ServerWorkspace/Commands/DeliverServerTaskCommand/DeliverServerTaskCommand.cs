@@ -17,7 +17,7 @@ namespace RestaurantSystem.Api.Features.ServerWorkspace.Commands.DeliverServerTa
 
 public sealed record DeliverServerTaskCommand(
     Guid OrderId,
-    int ExpectedVersion) : ICommand<ApiResponse<OrderDto>>;
+    int ExpectedVersion, bool AcknowledgeCompletedWork = false) : ICommand<ApiResponse<OrderDto>>;
 
 public sealed class DeliverServerTaskCommandHandler
     : ICommandHandler<DeliverServerTaskCommand, ApiResponse<OrderDto>>
@@ -61,7 +61,7 @@ public sealed class DeliverServerTaskCommandHandler
         }
 
         var boardEnabled = KitchenBoardFeaturePolicy.IsEnabled(_features);
-        if (boardEnabled)
+        if (boardEnabled && !command.AcknowledgeCompletedWork)
         {
             var boardState = (await KitchenBoardHandoverGuard.ReadAsync(
                 _context, [order], true, cancellationToken))[order.Id];
@@ -75,7 +75,7 @@ public sealed class DeliverServerTaskCommandHandler
                     boardBlock);
             }
         }
-        else if (ServerTaskRoutingPolicy.HasRequiredException(order))
+        else if (!command.AcknowledgeCompletedWork && ServerTaskRoutingPolicy.HasRequiredException(order))
         {
             return ApiResponse<OrderDto>.FailureWithCode(
                 "Resolve required order routing before delivering it.",
@@ -96,6 +96,7 @@ public sealed class DeliverServerTaskCommandHandler
             OrderId = command.OrderId,
             ExpectedVersion = command.ExpectedVersion,
             NewStatus = ResolveTargetStatus(order),
+            AcknowledgeCompletedWork = command.AcknowledgeCompletedWork,
         }, cancellationToken);
     }
 
