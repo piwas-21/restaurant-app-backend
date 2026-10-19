@@ -44,13 +44,21 @@ internal static class CashierReceiptSnapshot
             BillChargeAmount = orders.Sum(order => order.BillChargeAmount),
             BillCharges = orders.SelectMany(order => order.BillCharges).ToList(),
             BillingCreditAmount = bill.BillingCreditAmount,
-            PaymentStatus = refunded > 0 && bill.Rounds.All(round => round.SettlementState == "Refunded") ? "Refunded"
-                : refunded > 0 ? "PartiallyRefunded"
-                : bill.Credit > 0 ? "Overpaid" : remaining <= 0 ? "Paid" : "Pending",
+            PaymentStatus = PaymentStatus(bill, remaining, refunded),
             Items = orders.SelectMany(order => order.Items).ToList(),
             Payments = orders.SelectMany(order => order.Payments).ToList(),
         };
         return Sanitize(receipt);
+    }
+
+    private static string PaymentStatus(TableBillDto bill, decimal remaining, decimal refunded)
+    {
+        if (refunded > 0 && bill.Rounds.All(round => round.SettlementState == "Refunded"))
+            return "Refunded";
+        if (refunded > 0) return "PartiallyRefunded";
+        if (bill.Credit > 0) return "Overpaid";
+        if (remaining <= 0) return "Paid";
+        return "Pending";
     }
 
     internal static OrderDto Sanitize(OrderDto source)

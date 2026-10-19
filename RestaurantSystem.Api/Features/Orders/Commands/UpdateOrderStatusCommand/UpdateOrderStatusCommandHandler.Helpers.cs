@@ -37,7 +37,7 @@ public partial class UpdateOrderStatusCommandHandler
                 ErrorCodes.CashierRequired);
         }
 
-        if (command.AcknowledgeCompletedWork && (command.ExpectedVersion is null
+        if (command.AcknowledgeCompletedWork == true && (command.ExpectedVersion is null
             || !_currentUserService.IsStaff || _currentUserService.IsApiToken
             || order.ExternalReference is not null
             || command.NewStatus is not (OrderStatus.Completed or OrderStatus.OutForDelivery)))
