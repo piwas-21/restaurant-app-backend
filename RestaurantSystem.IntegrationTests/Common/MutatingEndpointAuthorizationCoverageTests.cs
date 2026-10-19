@@ -57,10 +57,10 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 231 includes owned native receipt reads and account-deletion requests alongside native
+    /// Floor 235 includes native address writes, owned native receipt reads and account-deletion requests alongside native
     /// root edits, durable cancellations, channel operations, account payments and guest checkout.
     /// </summary>
-    private const int KnownMutatingActionCount = 231;
+    private const int KnownMutatingActionCount = 235;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate

@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,13 +20,19 @@ namespace RestaurantSystem.IntegrationTests.Features.Addresses;
 public sealed partial class CustomerAddressesTests(DatabaseFixture fixture) : IntegrationTestBase(fixture)
 {
     private const string Path = "/api/customer-mobile/account/addresses";
-    protected override void ConfigureTestServices(IServiceCollection services) =>
+    protected override void ConfigureTestServices(IServiceCollection services)
+    {
         services.PostConfigure<AuthenticationOptions>(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
         });
+        // The fixture's default policy names its test scheme; legacy [Authorize] routes must
+        // use the same real JWT owner as native [RequireRole] routes in compatibility controls.
+        services.PostConfigure<AuthorizationOptions>(options => options.DefaultPolicy =
+            new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme).RequireAuthenticatedUser().Build());
+    }
 
     [Fact]
     public async Task Pages_are_bounded_ordered_owned_and_exclude_audit_location_and_deleted_data()

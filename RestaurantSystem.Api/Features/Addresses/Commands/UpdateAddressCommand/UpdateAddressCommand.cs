@@ -11,6 +11,7 @@ namespace RestaurantSystem.Api.Features.Addresses.Commands.UpdateAddressCommand;
 public record UpdateAddressCommand : AddressContent, ICommand<ApiResponse<AddressDto>>
 {
     public Guid Id { get; set; }
+    internal bool PreserveCoordinates { get; init; }
 }
 
 public class UpdateAddressCommandHandler : ICommandHandler<UpdateAddressCommand, ApiResponse<AddressDto>>
@@ -38,7 +39,7 @@ public class UpdateAddressCommandHandler : ICommandHandler<UpdateAddressCommand,
         }
 
         var isDefault = command.IsDefault ?? false;
-        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken);
+        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken, command.RequireCustomer);
 
         try
         {
@@ -68,8 +69,11 @@ public class UpdateAddressCommandHandler : ICommandHandler<UpdateAddressCommand,
             address.Country = command.Country;
             address.Phone = command.Phone;
             address.IsDefault = isDefault;
-            address.Latitude = command.Latitude;
-            address.Longitude = command.Longitude;
+            if (!command.PreserveCoordinates)
+            {
+                address.Latitude = command.Latitude;
+                address.Longitude = command.Longitude;
+            }
             address.DeliveryInstructions = command.DeliveryInstructions;
             address.UpdatedAt = DateTime.UtcNow;
             address.UpdatedBy = userId.Value.ToString();

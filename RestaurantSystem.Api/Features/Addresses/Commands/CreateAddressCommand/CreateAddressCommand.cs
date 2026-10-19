@@ -36,7 +36,7 @@ public class CreateAddressCommandHandler : ICommandHandler<CreateAddressCommand,
         }
 
         var isDefault = command.IsDefault ?? false;
-        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken);
+        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken, command.RequireCustomer);
 
         try
         {
