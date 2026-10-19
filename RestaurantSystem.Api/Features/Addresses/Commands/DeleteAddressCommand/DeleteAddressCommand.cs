@@ -1,7 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Addresses.Services;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Addresses.Commands.DeleteAddressCommand;
@@ -32,6 +33,8 @@ public class DeleteAddressCommandHandler : ICommandHandler<DeleteAddressCommand,
             return ApiResponse<string>.Failure("User not authenticated");
         }
 
+        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken);
+
         var address = await _context.UserAddresses
             .FirstOrDefaultAsync(a => a.Id == command.Id && a.UserId == userId.Value && !a.IsDeleted, cancellationToken);
 
@@ -46,6 +49,7 @@ public class DeleteAddressCommandHandler : ICommandHandler<DeleteAddressCommand,
         address.DeletedBy = userId.Value.ToString();
 
         await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         _logger.LogInformation("Address {AddressId} deleted successfully for user {UserId}", command.Id, userId.Value);
         return ApiResponse<string>.SuccessWithData("Address deleted successfully");
