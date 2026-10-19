@@ -2385,6 +2385,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("basket_id");
 
+                    b.Property<bool>("IsCancelled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_cancelled");
+
                     b.Property<string>("OwnerHash")
                         .IsRequired()
                         .HasMaxLength(64)

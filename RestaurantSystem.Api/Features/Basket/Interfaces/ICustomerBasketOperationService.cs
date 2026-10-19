@@ -7,6 +7,10 @@ public interface ICustomerBasketOperationService
 {
     Task<BasketDto> AddAsync(string sessionId, AddToBasketDto item, Guid operationId,
         CancellationToken cancellationToken);
+    Task<CustomerBasketOperationResolutionDto> CancelAddAsync(string sessionId, AddToBasketDto request,
+        CancellationToken cancellationToken);
+    Task<CustomerBasketOperationResolutionDto> CancelMutationAsync(string sessionId, Guid basketItemId,
+        CustomerBasketItemMutationDto request, CancellationToken cancellationToken);
     Task<BasketDto> ExecuteAsync(string sessionId, Guid operationId, string payload,
         Func<Task<BasketDto>> apply, CancellationToken cancellationToken);
 }

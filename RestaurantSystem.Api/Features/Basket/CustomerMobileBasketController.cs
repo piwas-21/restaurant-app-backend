@@ -5,6 +5,8 @@ using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Commands.AddToBasketCommand;
+using RestaurantSystem.Api.Features.Basket.Commands.CancelCustomerBasketAddCommand;
+using RestaurantSystem.Api.Features.Basket.Commands.CancelCustomerBasketItemCommand;
 using RestaurantSystem.Api.Features.Basket.Commands.MutateCustomerBasketItemCommand;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
@@ -43,4 +45,18 @@ public sealed class CustomerMobileBasketController(CustomMediator mediator) : Co
         [FromBody] CustomerBasketItemMutationDto request) =>
         Ok(await mediator.SendCommand(new MutateCustomerBasketItemCommand(sessionId, basketItemId, request)));
 
+    [HttpPost("items/cancel")]
+    [AllowAnonymous]
+    [EnableRateLimiting(CustomerBasketOperationRegistration.AddPolicyName)]
+    public async Task<ActionResult<ApiResponse<CustomerBasketOperationResolutionDto>>> CancelAdd(
+        [FromHeader(Name = "X-Session-Id")] string sessionId, [FromBody] AddToBasketDto request) =>
+        Ok(await mediator.SendCommand(new CancelCustomerBasketAddCommand(sessionId, request)));
+
+    [HttpPost("items/{basketItemId:guid}/operations/cancel")]
+    [AllowAnonymous]
+    [EnableRateLimiting(CustomerBasketOperationRegistration.AddPolicyName)]
+    public async Task<ActionResult<ApiResponse<CustomerBasketOperationResolutionDto>>> CancelMutation(
+        [FromHeader(Name = "X-Session-Id")] string sessionId, Guid basketItemId,
+        [FromBody] CustomerBasketItemMutationDto request) =>
+        Ok(await mediator.SendCommand(new CancelCustomerBasketItemCommand(sessionId, basketItemId, request)));
 }

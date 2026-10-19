@@ -7,5 +7,7 @@ public sealed class CustomerBasketOperation
     public required string OwnerHash { get; set; }
     public required string PayloadHash { get; set; }
     public Guid BasketId { get; set; }
+    // Cancelled rows keep a nil BasketId so older compatible binaries also refuse late execution.
+    public bool IsCancelled { get; set; }
     public DateTime AppliedAt { get; set; }
 }

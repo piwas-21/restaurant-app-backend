@@ -18,11 +18,52 @@ public sealed class CustomerBasketOperationService(
 {
     public Task<BasketDto> AddAsync(string sessionId, AddToBasketDto item, Guid operationId,
         CancellationToken cancellationToken) =>
-        ExecuteAsync(sessionId, operationId, CustomerBasketOperationHash.Payload(item),
+        ExecuteAsync(sessionId, operationId, CustomerBasketPayload.Add(item),
             () => baskets.AddItemToBasketAsync(sessionId, currentUser.UserId, item), cancellationToken);
 
-    public async Task<BasketDto> ExecuteAsync(string sessionId, Guid operationId, string payload,
-        Func<Task<BasketDto>> apply, CancellationToken cancellationToken)
+    public Task<BasketDto> ExecuteAsync(string sessionId, Guid operationId, string payload,
+        Func<Task<BasketDto>> apply, CancellationToken cancellationToken) =>
+        RunAsync(sessionId, operationId, payload, async previous =>
+        {
+            if (previous is not null)
+            {
+                if (previous.IsCancelled) throw new ConflictException("This basket operation was cancelled. Refresh your basket.");
+                return await ReplayAsync(previous, sessionId, cancellationToken)
+                    ?? throw new ConflictException("This operation was already applied, but its basket is no longer available. Refresh your basket.");
+            }
+            // Accepted operations remain recoverable after native rollout is withdrawn.
+            var bootstrap = await mediator.SendQuery(new GetCustomerMobileBootstrapQuery(1), cancellationToken);
+            if (bootstrap.Data?.Capabilities.GetValueOrDefault("ordering") != "enabled")
+                throw new NotFoundException("Customer mobile ordering is unavailable.");
+            var basket = await apply();
+            context.Set<CustomerBasketOperation>().Add(Receipt(sessionId, operationId, payload, basket.Id, false));
+            return basket;
+        }, cancellationToken);
+
+    public Task<CustomerBasketOperationResolutionDto> CancelAddAsync(string sessionId, AddToBasketDto request,
+        CancellationToken cancellationToken) =>
+        CancelAsync(sessionId, request.OperationId ?? Guid.Empty, CustomerBasketPayload.Add(request), cancellationToken);
+
+    public Task<CustomerBasketOperationResolutionDto> CancelMutationAsync(string sessionId, Guid basketItemId,
+        CustomerBasketItemMutationDto request, CancellationToken cancellationToken) =>
+        CancelAsync(sessionId, request.OperationId, CustomerBasketPayload.Mutation(basketItemId, request), cancellationToken);
+
+    private Task<CustomerBasketOperationResolutionDto> CancelAsync(string sessionId, Guid operationId,
+        string payload, CancellationToken cancellationToken) =>
+        RunAsync(sessionId, operationId, payload, async previous =>
+        {
+            if (previous is { IsCancelled: false })
+                return new CustomerBasketOperationResolutionDto(operationId, CustomerBasketOperationOutcome.Applied,
+                    await ReplayAsync(previous, sessionId, cancellationToken));
+            if (previous is null)
+                context.Set<CustomerBasketOperation>().Add(Receipt(sessionId, operationId, payload, Guid.Empty, true));
+            // No new effect is applied, including when the original payload was refused or ordering
+            // was disabled. The durable receipt seals late execution of this exact operation.
+            return new CustomerBasketOperationResolutionDto(operationId, CustomerBasketOperationOutcome.Cancelled, null);
+        }, cancellationToken);
+
+    private async Task<T> RunAsync<T>(string sessionId, Guid operationId, string payload,
+        Func<CustomerBasketOperation?, Task<T>> work, CancellationToken cancellationToken)
     {
         var session = CustomerBasketOperationHash.Session(sessionId);
         if (operationId == Guid.Empty) throw new BadRequestException("A non-empty operation ID is required.");
@@ -37,40 +78,32 @@ public sealed class CustomerBasketOperationService(
             .SingleOrDefaultAsync(operation => operation.OperationId == operationId, cancellationToken);
         if (previous is not null)
         {
-            var replay = await ReplayAsync(previous, owner, payload, sessionId, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return replay;
+            if (!string.Equals(previous.OwnerHash, owner, StringComparison.Ordinal))
+                throw new NotFoundException("Basket operation unavailable.");
+            if (!string.Equals(previous.PayloadHash, payload, StringComparison.Ordinal))
+                throw new ConflictException("This operation ID was already used for different basket details.");
         }
-
-        // Previously accepted operations remain recoverable after native rollout is withdrawn.
-        var bootstrap = await mediator.SendQuery(new GetCustomerMobileBootstrapQuery(1), cancellationToken);
-        if (bootstrap.Data?.Capabilities.GetValueOrDefault("ordering") != "enabled")
-            throw new NotFoundException("Customer mobile ordering is unavailable.");
-        var basket = await apply();
-        context.Set<CustomerBasketOperation>().Add(new CustomerBasketOperation
-        {
-            OperationId = operationId,
-            OwnerHash = owner,
-            PayloadHash = payload,
-            BasketId = basket.Id,
-            AppliedAt = DateTime.UtcNow
-        });
-        await context.SaveChangesAsync(cancellationToken);
+        var result = await work(previous);
+        if (previous is null) await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return basket;
+        return result;
     }
 
-    private async Task<BasketDto> ReplayAsync(CustomerBasketOperation operation, string owner, string payload,
-        string sessionId, CancellationToken cancellationToken)
+    private CustomerBasketOperation Receipt(string sessionId, Guid operationId, string payload, Guid basketId, bool cancelled) => new()
     {
-        if (!string.Equals(operation.OwnerHash, owner, StringComparison.Ordinal))
-            throw new NotFoundException("Basket operation unavailable.");
-        if (!string.Equals(operation.PayloadHash, payload, StringComparison.Ordinal))
-            throw new ConflictException("This operation ID was already used for different basket details.");
+        OperationId = operationId,
+        OwnerHash = CustomerBasketOperationHash.Owner(CustomerBasketOperationHash.Session(sessionId), currentUser.UserId),
+        PayloadHash = payload,
+        BasketId = basketId,
+        IsCancelled = cancelled,
+        AppliedAt = DateTime.UtcNow
+    };
+
+    private async Task<BasketDto?> ReplayAsync(CustomerBasketOperation operation, string sessionId,
+        CancellationToken cancellationToken)
+    {
         var basket = await baskets.GetBasketAsync(sessionId, currentUser.UserId);
-        if (basket is null || basket.Id != operation.BasketId)
-            throw new ConflictException("This operation was already applied, but its basket is no longer available. Refresh your basket.");
         cancellationToken.ThrowIfCancellationRequested();
-        return basket;
+        return basket?.Id == operation.BasketId ? basket : null;
     }
 }
