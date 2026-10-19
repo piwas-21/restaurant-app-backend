@@ -30,6 +30,16 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("""
+                LOCK TABLE customer_basket_operations IN ACCESS EXCLUSIVE MODE;
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM customer_basket_operations)
+                    THEN
+                        RAISE EXCEPTION 'Customer basket operation history must be retained' USING ERRCODE = '23514';
+                    END IF;
+                END $$;
+                """);
             migrationBuilder.DropTable(
                 name: "customer_basket_operations");
         }

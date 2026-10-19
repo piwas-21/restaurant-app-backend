@@ -49,3 +49,8 @@ principal/session isolation, capability withdrawal, rollback after real basket s
 This source needs its additive migration and backend deployment before a dependent native release.
 Generated production OpenAPI, deployment readback and installed-app recovery remain separate evidence.
 Ordering/payment idempotency, full native basket UI and process-death acceptance remain required.
+
+Rollback preserves retry identity: once a receipt exists, the migration refuses downgrade under
+an exclusive table lock, including when a concurrent receipt commits while rollback waits. Disable
+native ordering and roll back the application while retaining this additive schema. An empty table
+can still be rolled back. Historical migration tests restore the current schema before lane reset.
