@@ -10,6 +10,8 @@ public static class CustomerCheckoutServiceExtensions
         services.AddScoped<ICustomerCheckoutItems, CustomerCheckoutItems>();
         services.AddScoped<ICustomerCheckoutDraft, CustomerCheckoutDraft>();
         services.AddScoped<ICustomerCheckoutQuoteService, CustomerCheckoutQuoteService>();
+        services.AddScoped<ICustomerCheckoutIntentPolicy, CustomerCheckoutIntentPolicy>();
+        services.AddScoped<ICustomerCheckoutAcceptance, CustomerCheckoutAcceptance>();
         return services;
     }
 }

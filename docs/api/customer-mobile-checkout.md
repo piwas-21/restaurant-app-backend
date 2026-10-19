@@ -52,8 +52,8 @@ precondition, not a signature or a payment credential; an accepting endpoint mus
 Repeated reviews do not create orders, order numbers, payments, loyalty transactions, basket receipts,
 or notifications; they do not consume limited discounts or change the stored basket. Existing public
 configuration readers may seed missing venue metadata. A quote is not an order acceptance receipt,
-and cannot make an order/payment retry safe. Durable native order and payment operations are separate
-contracts. No migration accompanies quoting. Source/CI acceptance does not prove deployment, flag
+and cannot make an order/payment retry safe. Durable native order preparation/submission/recovery use the separate
+[acceptance contract](customer-mobile-order-acceptance.md); hosted payment operations remain separate. No migration accompanies quoting. Source/CI acceptance does not prove deployment, flag
 activation, provider settlement or device acceptance.
 
 The HTTP and pure contract oracles are the `CustomerCheckout*Tests` integration suites. They include
