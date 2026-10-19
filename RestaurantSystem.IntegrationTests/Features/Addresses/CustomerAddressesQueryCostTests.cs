@@ -34,7 +34,9 @@ public sealed partial class CustomerAddressesTests
         page.Success.Should().BeTrue();
         page.Data!.Items.Select(value => value.Id).Should().Equal(Enumerable.Range(1, 20).Select(Id));
         page.Data.NextAfterId.Should().Be(Id(20));
-        reads.Queries.Should().ContainSingle().Which.Should().Contain("LIMIT");
+        var sql = reads.Queries.Should().ContainSingle().Which;
+        sql.Should().Contain("row <= 21", "the address window must be bounded independently of the outer customer limit");
+        sql.Should().Contain("user_id = @", "the address window must filter its owner before ranking rows");
         context.ChangeTracker.Entries().Should().BeEmpty("private list reads must not track the customer's address collection");
     }
 

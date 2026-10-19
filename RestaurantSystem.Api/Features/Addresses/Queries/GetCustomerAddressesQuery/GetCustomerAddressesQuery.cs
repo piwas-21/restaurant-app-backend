@@ -19,12 +19,13 @@ public sealed class GetCustomerAddressesQueryHandler(ApplicationDbContext contex
     public async Task<ApiResponse<CustomerAddressPageDto>> Handle(GetCustomerAddressesQuery query,
         CancellationToken cancellationToken)
     {
+        var owner = CustomerAccountAccess.RequireOwner(currentUser);
         // A single bounded projection keeps the current customer predicate and private rows in
         // the same database read. The cursor is navigation only and never selects the owner.
         var account = await CustomerAccountAccess.Current(context, currentUser).AsNoTracking()
             .Select(user => new
             {
-                Items = context.UserAddresses.Where(address => address.UserId == user.Id && !address.IsDeleted
+                Items = context.UserAddresses.Where(address => address.UserId == user.Id && address.UserId == owner && !address.IsDeleted
                         && (!query.AfterId.HasValue || address.Id.CompareTo(query.AfterId.Value) > 0))
                     .OrderBy(address => address.Id).Take(PageSize + 1)
                     .Select(address => new CustomerAddressDto(address.Id, address.Label, address.AddressLine1,
