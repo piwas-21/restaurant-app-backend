@@ -1,3 +1,4 @@
+﻿using RestaurantSystem.Api.Features.Basket.Services.Operations;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -772,6 +773,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IEmailBrandingProvider, EmailBrandingProvider>();
 builder.Services.AddScoped<IProductCustomizationGroupSynchronizer, ProductCustomizationGroupSynchronizer>();
 builder.Services.AddScoped<IBasketService, BasketService>();
+builder.Services.AddCustomerBasketOperations();
 builder.Services.AddScoped<IBasketPricingService, BasketPricingService>();
 builder.Services.AddScoped<ILineCustomizationBuilder, LineCustomizationBuilder>();
 builder.Services.AddScoped<IBasketMappingService, BasketMappingService>();

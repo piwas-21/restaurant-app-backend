@@ -2371,6 +2371,38 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerBasketOperation", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<DateTime>("AppliedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("applied_at");
+
+                    b.Property<Guid>("BasketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("basket_id");
+
+                    b.Property<string>("OwnerHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("owner_hash");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.HasKey("OperationId")
+                        .HasName("pk_customer_basket_operations");
+
+                    b.ToTable("customer_basket_operations", (string)null);
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerDiscountRule", b =>
                 {
                     b.Property<Guid>("Id")

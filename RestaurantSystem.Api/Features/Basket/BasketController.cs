@@ -70,7 +70,8 @@ public class BasketController : BasketControllerBase
             request.IngredientQuantities,
             request.SelectedSideItems,
             request.SelectedMenuOptions,
-            request.CustomizationSelections);
+            request.CustomizationSelections,
+            request.OperationId);
 
         return Ok(await Mediator.SendCommand(command));
     }
