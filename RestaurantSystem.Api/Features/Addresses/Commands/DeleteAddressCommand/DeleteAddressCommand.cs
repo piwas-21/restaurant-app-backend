@@ -7,7 +7,10 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Addresses.Commands.DeleteAddressCommand;
 
-public record DeleteAddressCommand(Guid Id) : ICommand<ApiResponse<string>>;
+public record DeleteAddressCommand(Guid Id) : ICommand<ApiResponse<string>>
+{
+    internal bool RequireCustomer { get; init; }
+}
 
 public class DeleteAddressCommandHandler : ICommandHandler<DeleteAddressCommand, ApiResponse<string>>
 {
@@ -33,7 +36,7 @@ public class DeleteAddressCommandHandler : ICommandHandler<DeleteAddressCommand,
             return ApiResponse<string>.Failure("User not authenticated");
         }
 
-        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken);
+        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken, command.RequireCustomer);
 
         var address = await _context.UserAddresses
             .FirstOrDefaultAsync(a => a.Id == command.Id && a.UserId == userId.Value && !a.IsDeleted, cancellationToken);

@@ -16,9 +16,11 @@ public static class CustomerAccountAccess
             throw new ForbiddenException("This account action requires its customer.");
         return owner;
     }
+    public static IQueryable<ApplicationUser> ForOwner(ApplicationDbContext context, Guid owner) =>
+        context.Users.Where(user => user.Id == owner && !user.IsDeleted && user.Role == UserRole.Customer);
+
     public static IQueryable<ApplicationUser> Current(ApplicationDbContext context, ICurrentUserService currentUser)
     {
-        var owner = RequireOwner(currentUser);
-        return context.Users.Where(user => user.Id == owner && !user.IsDeleted && user.Role == UserRole.Customer);
+        return ForOwner(context, RequireOwner(currentUser));
     }
 }

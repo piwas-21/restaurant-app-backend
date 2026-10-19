@@ -7,7 +7,10 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Addresses.Commands.SetDefaultAddressCommand;
 
-public record SetDefaultAddressCommand(Guid AddressId) : ICommand<ApiResponse<string>>;
+public record SetDefaultAddressCommand(Guid AddressId) : ICommand<ApiResponse<string>>
+{
+    internal bool RequireCustomer { get; init; }
+}
 
 public class SetDefaultAddressCommandHandler : ICommandHandler<SetDefaultAddressCommand, ApiResponse<string>>
 {
@@ -33,7 +36,7 @@ public class SetDefaultAddressCommandHandler : ICommandHandler<SetDefaultAddress
             return ApiResponse<string>.Failure("User not authenticated");
         }
 
-        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken);
+        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken, command.RequireCustomer);
 
         try
         {
