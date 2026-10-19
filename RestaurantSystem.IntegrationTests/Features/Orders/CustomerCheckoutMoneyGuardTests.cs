@@ -18,7 +18,8 @@ public sealed class CustomerCheckoutMoneyGuardTests
         {
             UnitPrice = -2m, ItemTotal = 0m, ParentOrderItemId = Guid.NewGuid(), CreatedBy = "quote-money"
         }];
-        CustomerCheckoutMoneyGuard.Ensure(order);
+        var act = () => CustomerCheckoutMoneyGuard.Ensure(order);
+        act.Should().NotThrow();
     }
 
     [Fact]

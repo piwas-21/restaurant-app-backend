@@ -18,20 +18,7 @@ public partial class OrderItemFactory
         // component that picked one of its own variations; the older pair of product + fixed row
         // variation remains supported only when it resolves unambiguously.
         if (item.MenuSectionItemId.HasValue)
-        {
-            if (TryTrackedChoiceSection(parent, item, out var trackedSection)) return trackedSection;
-            var row = await _context.MenuSectionItems.AsNoTracking()
-                .Where(option => option.Id == item.MenuSectionItemId.Value
-                    && option.MenuSection.MenuDefinition.ProductId == parent.ProductId
-                    && option.ProductId == item.ProductId
-                    && (!item.SectionId.HasValue || option.MenuSectionId == item.SectionId))
-                .Select(option => new { option.MenuSectionId, option.ProductVariationId })
-                .SingleOrDefaultAsync(cancellationToken);
-            if (row is null || (row.ProductVariationId.HasValue
-                && row.ProductVariationId != item.ProductVariationId))
-                throw new BadRequestException("The selected choice section does not contain this bundle component.");
-            return row.MenuSectionId;
-        }
+            return await ResolveExactChoiceSectionAsync(parent, item, item.MenuSectionItemId.Value, cancellationToken);
 
         var sections = await _context.MenuSectionItems.AsNoTracking()
             .Where(option => option.MenuSection.MenuDefinition.ProductId == parent.ProductId
@@ -44,6 +31,23 @@ public partial class OrderItemFactory
             throw new BadRequestException("The selected choice section does not contain this bundle component.");
         return sections.Count == 1 ? sections[0] : null;
     }
+    private async Task<Guid?> ResolveExactChoiceSectionAsync(
+        OrderItem parent, CreateOrderItemDto item, Guid sectionItemId, CancellationToken cancellationToken)
+    {
+        if (TryTrackedChoiceSection(parent, item, out var trackedSection)) return trackedSection;
+        var row = await _context.MenuSectionItems.AsNoTracking()
+            .Where(option => option.Id == sectionItemId
+                && option.MenuSection.MenuDefinition.ProductId == parent.ProductId
+                && option.ProductId == item.ProductId
+                && (!item.SectionId.HasValue || option.MenuSectionId == item.SectionId))
+            .Select(option => new { option.MenuSectionId, option.ProductVariationId })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (row is null || (row.ProductVariationId.HasValue
+            && row.ProductVariationId != item.ProductVariationId))
+            throw new BadRequestException("The selected choice section does not contain this bundle component.");
+        return row.MenuSectionId;
+    }
+
     private bool TryTrackedChoiceSection(OrderItem parent, CreateOrderItemDto item, out Guid? sectionId)
     {
         sectionId = null;
