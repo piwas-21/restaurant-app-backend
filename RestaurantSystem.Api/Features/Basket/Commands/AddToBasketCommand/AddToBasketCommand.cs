@@ -21,7 +21,14 @@ public record AddToBasketCommand(
     List<SelectedMenuOptionDto>? SelectedMenuOptions,
     List<CustomizationGroupSelectionDto>? CustomizationSelections = null,
     Guid? OperationId = null
-) : ICommand<ApiResponse<BasketDto>>;
+) : ICommand<ApiResponse<BasketDto>>
+{
+    public static AddToBasketCommand FromRequest(string sessionId, AddToBasketDto request) => new(
+        sessionId, request.ProductId, request.ProductVariationId, request.MenuId, request.Quantity,
+        request.SpecialInstructions, request.SelectedIngredients, request.AddedIngredients,
+        request.IngredientQuantities, request.SelectedSideItems, request.SelectedMenuOptions,
+        request.CustomizationSelections, request.OperationId);
+}
 
 
 public class AddToBasketCommandHandler : ICommandHandler<AddToBasketCommand, ApiResponse<BasketDto>>

@@ -58,20 +58,7 @@ public class BasketController : BasketControllerBase
     {
         if (MissingSession<BasketDto>(sessionId) is { } error) return error;
 
-        var command = new AddToBasketCommand(
-            sessionId,
-            request.ProductId,
-            request.ProductVariationId,
-            request.MenuId,
-            request.Quantity,
-            request.SpecialInstructions,
-            request.SelectedIngredients,
-            request.AddedIngredients,
-            request.IngredientQuantities,
-            request.SelectedSideItems,
-            request.SelectedMenuOptions,
-            request.CustomizationSelections,
-            request.OperationId);
+        var command = AddToBasketCommand.FromRequest(sessionId, request);
 
         return Ok(await Mediator.SendCommand(command));
     }

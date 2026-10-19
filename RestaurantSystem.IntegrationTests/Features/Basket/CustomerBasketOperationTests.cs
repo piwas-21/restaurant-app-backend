@@ -56,7 +56,7 @@ public sealed class CustomerBasketOperationTests(DatabaseFixture databaseFixture
     {
         var request = Request(Guid.NewGuid());
         var first = await SendAsync(request);
-        var replay = await SendAsync(request);
+        var replay = await SendAsync(request, native: false);
         var firstBasket = await BasketAsync(first);
         var replayBasket = await BasketAsync(replay);
         replayBasket.Id.Should().Be(firstBasket.Id);
@@ -138,9 +138,18 @@ public sealed class CustomerBasketOperationTests(DatabaseFixture databaseFixture
     public async Task Empty_operation_is_rejected_and_legacy_adds_remain_independent()
     {
         (await SendAsync(Request(Guid.Empty))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        await BasketAsync(await SendAsync(Request(null)));
-        (await BasketAsync(await SendAsync(Request(null)))).Items.Single().Quantity.Should().Be(4);
+        await BasketAsync(await SendAsync(Request(null), native: false));
+        (await BasketAsync(await SendAsync(Request(null), native: false))).Items.Single().Quantity.Should().Be(4);
         (await OperationsAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Native_route_refuses_missing_operation_before_legacy_add_can_run()
+    {
+        (await SendAsync(Request(null))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await OperationsAsync()).Should().BeEmpty();
+        using var verify = Factory.Services.CreateScope();
+        (await verify.ServiceProvider.GetRequiredService<ApplicationDbContext>().Baskets.CountAsync()).Should().Be(0);
     }
 
     [Fact]
@@ -225,9 +234,10 @@ public sealed class CustomerBasketOperationTests(DatabaseFixture databaseFixture
 
     private AddToBasketDto Request(Guid? operationId) => new() { OperationId = operationId, ProductId = _productId, Quantity = 2 };
 
-    private async Task<HttpResponseMessage> SendAsync(AddToBasketDto request, string? session = null)
+    private async Task<HttpResponseMessage> SendAsync(AddToBasketDto request, string? session = null, bool native = true)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Post, new Uri("/api/basket/items", UriKind.Relative))
+        var path = native ? "/api/customer-mobile/basket/items" : "/api/basket/items";
+        using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative))
         {
             Content = JsonContent.Create(request, options: JsonOptions)
         };

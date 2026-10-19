@@ -1,6 +1,8 @@
 # Recoverable customer basket adds
 
-`POST /api/basket/items` accepts an optional `operationId` UUID. Legacy requests without it retain
+`POST /api/customer-mobile/basket/items` requires a non-empty `operationId` UUID. Native clients
+must use this dedicated route: older deployments return 404 instead of silently ignoring the retry
+identity. `POST /api/basket/items` also accepts the optional field for compatible existing callers. Legacy requests without it retain
 the existing add semantics. The operation rail requires a non-empty lower-case canonical UUID
 `X-Session-Id`, a guest or customer principal, and an enabled mobile ordering capability for new
 operations. Other roles and machine tokens cannot use it. A present but rejected Authorization
