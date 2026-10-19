@@ -202,6 +202,16 @@ public sealed class CustomerBasketOperationTests(DatabaseFixture databaseFixture
     }
 
     [Theory]
+    [InlineData("Bearer expired-customer-token")]
+    [InlineData("Basic rejected-customer-credentials")]
+    public async Task Failed_authentication_cannot_downgrade_a_customer_operation_to_a_guest(string authorization)
+    {
+        Client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", authorization).Should().BeTrue();
+        (await SendAsync(Request(Guid.NewGuid()))).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await OperationsAsync()).Should().BeEmpty();
+    }
+
+    [Theory]
     [InlineData(UserRole.Admin)]
     [InlineData(UserRole.Cashier)]
     [InlineData(UserRole.Server)]

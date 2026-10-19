@@ -3,7 +3,8 @@
 `POST /api/basket/items` accepts an optional `operationId` UUID. Legacy requests without it retain
 the existing add semantics. The operation rail requires a non-empty lower-case canonical UUID
 `X-Session-Id`, a guest or customer principal, and an enabled mobile ordering capability for new
-operations. Other roles and machine tokens cannot use it.
+operations. Other roles and machine tokens cannot use it. A present but rejected Authorization
+header returns HTTP 401; it cannot silently downgrade a customer operation into a guest add.
 
 Persist the operation ID, exact request and original environment/tenant/principal/session before
 sending. Reuse that identity only for a retry of the same logical add. A deliberate additional add
@@ -28,6 +29,7 @@ another context's result. The operation namespace is scoped by the tenant's exis
 | Same owned operation and request | Return current state of the original basket; do not add again |
 | Same operation, different request | HTTP 409; do not silently reinterpret the operation |
 | Another owner/session | HTTP 404; do not disclose the receipt or basket |
+| Rejected authentication header | HTTP 401 before effects; renew the original customer session |
 | Invalid operation/session | HTTP 400 before effects |
 | Rollout withdrawn | Existing owned receipt can recover; new operations return HTTP 404 |
 | Original basket erased or replaced | HTTP 409; receipt survives and the add cannot resurrect |
