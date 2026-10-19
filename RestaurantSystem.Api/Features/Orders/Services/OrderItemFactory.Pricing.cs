@@ -36,9 +36,11 @@ public partial class OrderItemFactory
     // as the client-declared BasketTotal that S0b removed, one level further down — closing only
     // the total would have left the line items to say the same untrue thing.
     private static (decimal unitPrice, string? variationName) ResolvePricing(
-        CreateOrderItemDto itemDto, Product product, bool pricesAreTrusted)
+        CreateOrderItemDto itemDto, Product product, bool pricesAreTrusted, bool signedComponentPriceVerified)
     {
-        if (pricesAreTrusted && itemDto.UnitPrice >= 0)
+        // A verified native component may carry a negative modifier; roots and legacy DTOs keep
+        // their existing nonnegative-price rule. This marker cannot come from request JSON.
+        if (pricesAreTrusted && (itemDto.UnitPrice >= 0 || signedComponentPriceVerified))
         {
             string? variationName = null;
             if (itemDto.ProductVariationId.HasValue)

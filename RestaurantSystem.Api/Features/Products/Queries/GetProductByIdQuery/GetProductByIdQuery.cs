@@ -38,6 +38,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
     public async Task<ApiResponse<ProductDto>> Handle(GetProductByIdQuery query, CancellationToken cancellationToken)
     {
         var product = await _context.Products
+            .WithBundleIngredientAnswers()
             // NOT for reaching soft-deleted products — the predicate below re-applies `!p.IsDeleted`,
             // so it does not. What it actually does is un-filter every INCLUDE, which is why deleted
             // categories reached the projection (§9.14) and why the side-item include below still
@@ -334,7 +335,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             // The "no X" answer marker (Sans Sauces, MC FOOD 2026-09-07): the guest sheet makes
             // such a row exclusive within its sauce step. Soft-deleted globals keep withholding
             // their translations (§9.14) and are not none-options either.
-            IsNoneOption = di.GlobalIngredient is { IsDeleted: false, IsNoneOption: true },
+            IsNoneOption = IngredientAnswerProjection.IsNoneOption(di),
             Kind = di.Kind,
             ExclusionGroup = di.ExclusionGroup,
             Content = content

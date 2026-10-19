@@ -28,6 +28,7 @@ public record CloseTableServiceSessionCommand : ICommand<ApiResponse<TableServic
 public sealed partial class CloseTableServiceSessionCommandHandler
     : ICommandHandler<CloseTableServiceSessionCommand, ApiResponse<TableServiceSessionDto>>
 {
+    private readonly RestaurantSystem.Api.Features.CashierPrinting.Services.ICashierPrintQueue? _cashierPrintQueue;
     private readonly decimal _paymentTolerance;
     private readonly ApplicationDbContext _context;
     private readonly ITableServiceSessionReader _reader;
@@ -41,9 +42,11 @@ public sealed partial class CloseTableServiceSessionCommandHandler
         ITableGuestVisitRevoker guestVisits,
         TimeProvider? timeProvider = null,
         IOptions<TableServiceSessionSettings>? settings = null,
-        ITenantFeatures? features = null)
+        ITenantFeatures? features = null,
+        RestaurantSystem.Api.Features.CashierPrinting.Services.ICashierPrintQueue? cashierPrintQueue = null)
     {
         _context = context;
+        _cashierPrintQueue = cashierPrintQueue;
         _guestVisits = guestVisits ?? throw new ArgumentNullException(nameof(guestVisits));
         _features = features;
         _reader = reader;
@@ -117,6 +120,7 @@ public sealed partial class CloseTableServiceSessionCommandHandler
             session.ClosedAt = now;
             session.RecordAccountChange();
             await _context.SaveChangesAsync(cancellationToken);
+            await QueueClosedBillAsync(session.Id, session.Version, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return await ReadResultAsync(session.Id, cancellationToken);
         }

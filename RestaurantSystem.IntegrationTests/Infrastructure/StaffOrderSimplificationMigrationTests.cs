@@ -11,7 +11,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 public sealed class StaffOrderSimplificationMigrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => MigrationTestSafety.RestoreCurrentSchemaAsync(fixture);
 
     [Fact]
     public async Task Qr_only_participant_refuses_downgrade_without_losing_guest_or_ancestry_schema()

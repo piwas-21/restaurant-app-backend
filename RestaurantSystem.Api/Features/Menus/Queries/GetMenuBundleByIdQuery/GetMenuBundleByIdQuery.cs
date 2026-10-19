@@ -1,3 +1,4 @@
+using RestaurantSystem.Api.Features.Catalog;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -31,6 +32,7 @@ public class GetMenuBundleByIdQueryHandler(
     public async Task<ApiResponse<MenuBundleDto>> Handle(GetMenuBundleByIdQuery query, CancellationToken cancellationToken)
     {
         var queryable = _context.Products
+            .WithBundleIngredientAnswers()
             .AsSplitQuery()
             // Load-bearing: inheritance resolves through the PRIMARY category and an unloaded
             // collection reads as UNRESTRICTED. See the same include on the list query.

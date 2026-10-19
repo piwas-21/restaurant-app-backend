@@ -14,11 +14,17 @@ public static class OrderDetailServiceExtensions
             .BindConfiguration(OrderWorkflowSettings.SectionName)
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<CashierPrintSettings>()
+            .BindConfiguration(CashierPrintSettings.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddScoped<IRetainedCustomerDataScrubber, RetainedCustomerDataScrubber>();
         services.AddScoped<IOrderStatusTransitionPolicy, OrderStatusTransitionPolicy>();
         services.AddScoped<IOrderStatusUpdateServices, OrderStatusUpdateServices>();
         services.AddScoped<IOrderPermittedActionsService, OrderPermittedActionsService>();
         services.AddScoped<IOrderResponseProjector, OrderResponseProjector>();
+        services.AddScoped<RestaurantSystem.Api.Features.CashierPrinting.Services.ICashierPrintQueue,
+            RestaurantSystem.Api.Features.CashierPrinting.Services.CashierPrintQueue>();
         return services;
     }
 }

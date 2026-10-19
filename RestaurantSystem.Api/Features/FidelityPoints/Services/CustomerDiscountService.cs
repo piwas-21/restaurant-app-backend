@@ -9,7 +9,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.FidelityPoints.Services;
 
-public class CustomerDiscountService : ICustomerDiscountService
+public partial class CustomerDiscountService : ICustomerDiscountService
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
@@ -165,32 +165,6 @@ public class CustomerDiscountService : ICustomerDiscountService
         {
             return rule.DiscountValue;
         }
-    }
-
-    public async Task<CustomerDiscountRule> ApplyDiscountAsync(
-        Guid discountRuleId,
-        CancellationToken cancellationToken = default)
-    {
-        var discount = await _context.CustomerDiscountRules
-            .FirstOrDefaultAsync(d => d.Id == discountRuleId, cancellationToken);
-
-        if (discount == null)
-            throw new NotFoundException($"Discount rule with ID {discountRuleId} not found");
-
-        // Increment usage count
-        discount.UsageCount++;
-        discount.UpdatedAt = DateTime.UtcNow;
-        discount.UpdatedBy = _currentUserService.GetAuditIdentifier();
-
-        // Deactivate if max usage reached
-        if (discount.MaxUsageCount.HasValue && discount.UsageCount >= discount.MaxUsageCount.Value)
-        {
-            discount.IsActive = false;
-        }
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return discount;
     }
 
     public async Task<CustomerDiscountRule?> GetDiscountByIdAsync(

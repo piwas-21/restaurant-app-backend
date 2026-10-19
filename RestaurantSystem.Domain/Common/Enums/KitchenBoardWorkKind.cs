@@ -5,4 +5,5 @@ public enum KitchenBoardWorkKind
 {
     InitialOrder = 1,
     AmendmentCorrection = 2,
+    StaffHandover = 3,
 }

@@ -6,7 +6,7 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// <summary>
 /// Applies pricing to an in-memory order based on item totals, the
 /// originating <see cref="CreateOrderCommand"/>, and the customer's
-/// discount eligibility. Mutates the order in place — does not persist.
+/// discount eligibility. Mutates the order in place; acceptance also consumes an individual discount.
 ///
 /// <para>
 /// <b>The server is the only authority on what an order costs.</b> There is one path: every money
@@ -17,13 +17,13 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// </para>
 ///
 /// <para>
-/// Tax is extracted from item prices for display only — it does not change what the customer pays
-/// (Swiss VAT is price-inclusive). <c>Tip</c> is added <i>after</i> price rounding: the rounding
+/// Pricing retains the existing zero-tax policy documented in <c>OrderPricingService</c>.
+/// <c>Tip</c> is added <i>after</i> price rounding: the rounding
 /// courtesy applies to the sale, never to an amount the customer chose to give.
 /// </para>
 ///
 /// Out of scope: subtotal aggregation (caller computes <c>itemsTotal</c> from <c>order.Items</c>)
-/// and any persistence.
+/// and order persistence. Discount usage is consumed only by ApplyAsync.
 ///
 /// Extracted from <c>CreateOrderCommandHandler</c> in Sprint 2 task 2.9.
 /// </summary>
@@ -36,6 +36,17 @@ public interface IOrderPricingService
     /// <c>Total</c>.
     /// </summary>
     Task ApplyAsync(
+        Order order,
+        decimal itemsTotal,
+        CreateOrderCommand command,
+        Guid? userId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prices a transient review aggregate with the same rules as acceptance, without consuming
+    /// discount usage, changing eligibility or persisting anything. No order is accepted here.
+    /// </summary>
+    Task PreviewAsync(
         Order order,
         decimal itemsTotal,
         CreateOrderCommand command,

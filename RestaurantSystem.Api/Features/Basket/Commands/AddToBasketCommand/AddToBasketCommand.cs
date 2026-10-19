@@ -19,22 +19,33 @@ public record AddToBasketCommand(
     Dictionary<Guid, int>? IngredientQuantities,
     List<SelectedSideItemDto>? SelectedSideItems,
     List<SelectedMenuOptionDto>? SelectedMenuOptions,
-    List<CustomizationGroupSelectionDto>? CustomizationSelections = null
-) : ICommand<ApiResponse<BasketDto>>;
+    List<CustomizationGroupSelectionDto>? CustomizationSelections = null,
+    Guid? OperationId = null
+) : ICommand<ApiResponse<BasketDto>>
+{
+    public static AddToBasketCommand FromRequest(string sessionId, AddToBasketDto request) => new(
+        sessionId, request.ProductId, request.ProductVariationId, request.MenuId, request.Quantity,
+        request.SpecialInstructions, request.SelectedIngredients, request.AddedIngredients,
+        request.IngredientQuantities, request.SelectedSideItems, request.SelectedMenuOptions,
+        request.CustomizationSelections, request.OperationId);
+}
 
 
 public class AddToBasketCommandHandler : ICommandHandler<AddToBasketCommand, ApiResponse<BasketDto>>
 {
     private readonly IBasketService _basketService;
+    private readonly ICustomerBasketOperationService? _operations;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<AddToBasketCommandHandler> _logger;
 
     public AddToBasketCommandHandler(
         IBasketService basketService,
         ICurrentUserService currentUserService,
-        ILogger<AddToBasketCommandHandler> logger)
+        ILogger<AddToBasketCommandHandler> logger,
+        ICustomerBasketOperationService? operations = null)
     {
         _basketService = basketService;
+        _operations = operations;
         _currentUserService = currentUserService;
         _logger = logger;
     }
@@ -58,13 +69,15 @@ public class AddToBasketCommandHandler : ICommandHandler<AddToBasketCommand, Api
                 CustomizationSelections = command.CustomizationSelections
             };
 
-            var basket = await _basketService.AddItemToBasketAsync(
+            var basket = command.OperationId is Guid operationId
+                ? await (_operations ?? throw new InvalidOperationException("Customer basket operations are not registered."))
+                    .AddAsync(command.SessionId, addToBasketDto, operationId, cancellationToken)
+                : await _basketService.AddItemToBasketAsync(
                 command.SessionId,
                 _currentUserService.UserId,
                 addToBasketDto);
 
-            _logger.LogInformation("Added product {ProductId} to basket for session {SessionId}",
-                command.ProductId, command.SessionId);
+            _logger.LogInformation("Added product {ProductId} to basket", command.ProductId);
 
             return ApiResponse<BasketDto>.SuccessWithData(basket, "Item added to basket successfully");
         }

@@ -43,11 +43,17 @@ RestaurantSystem.Api/        ← API layer (Controllers, CQRS handlers, Features
   └── RestaurantSystem.Domain/   ← pure domain (Entities, enums) — no EF, no ASP.NET
   └── RestaurantSystem.Infrastructure/  ← EF Core, persistence, migrations
        └── (depends on Domain)
+Sofra.MobileService/          ← independent shared native-app directory host (no tenant database/services)
 RestaurantSystem.IntegrationTests/  ← integration tests (xUnit)
 ```
 
 - **API → Domain → Infrastructure** dependency direction; never reversed.
 - Domain layer is **pure C#** — no `Microsoft.EntityFrameworkCore`, no `Microsoft.AspNetCore.*` references.
+- `Sofra.MobileService` is a separate deployable host from the customer mobile plan. Minimal HTTP
+  routes dispatch to a directory query handler; reviewed public settings supply all tenant origins.
+  Its current directory-only slice has no customer database, private registry or tenant-service dependency.
+  Read `Sofra.MobileService/README.md` for configuration and its remaining integration gates.
+
 
 ### Feature folder layout
 
@@ -159,6 +165,14 @@ For each DB column / DTO field referenced, name the source of truth:
 - **EF migration** path (`RestaurantSystem.Infrastructure/Persistence/Migrations/<timestamp>_<name>.cs`)
 - Field name + type as it appears there
 - For joins / nested DTOs, confirm both sides match.
+
+When adding a migration, update `TestDatabaseCluster.CurrentSchemaMigration` and run the historical
+downgrade tests. Every test that changes schema must restore the current migration in `finally` or
+teardown before the next Respawn reset; a guarded downgrade can remove newer empty tables first.
+
+A new anonymous write requires an exact entry and authorization rationale in
+`MutatingEndpointAuthorizationCoverageTests.AnonymousWrites`. Run its discrimination controls
+and the HTTP ownership/refusal tests; bound public write ingress across equivalent routes.
 
 ### 2. Sibling conventions
 List 2–3 sibling files in the directory you're adding to. Note their structure (DI registration, naming, base class). Confirm your new file matches.

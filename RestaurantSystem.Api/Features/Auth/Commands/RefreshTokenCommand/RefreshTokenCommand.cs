@@ -73,10 +73,5 @@ public class RefreshTokenCommandHandler : ICommandHandler<RefreshTokenCommand, A
             _logger.LogWarning(ex, "Security token exception during refresh");
             return ApiResponse<AuthResponse>.Failure("Invalid token", "Token refresh failed");
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error occurred while refreshing token");
-            return ApiResponse<AuthResponse>.Failure("Token refresh failed", "An unexpected error occurred");
-        }
     }
 }

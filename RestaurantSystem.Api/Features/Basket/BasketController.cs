@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using RestaurantSystem.Api.Features.Basket.Services.Operations;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Features.Basket.Commands.AddToBasketCommand;
@@ -52,25 +54,14 @@ public class BasketController : BasketControllerBase
     /// </summary>
     [HttpPost("items")]
     [AllowAnonymous]
+    [EnableRateLimiting(CustomerBasketOperationRegistration.AddPolicyName)]
     public async Task<ActionResult<ApiResponse<BasketDto>>> AddToBasket(
         [FromHeader(Name = SessionIdHeader)] string sessionId,
         [FromBody] AddToBasketDto request)
     {
         if (MissingSession<BasketDto>(sessionId) is { } error) return error;
 
-        var command = new AddToBasketCommand(
-            sessionId,
-            request.ProductId,
-            request.ProductVariationId,
-            request.MenuId,
-            request.Quantity,
-            request.SpecialInstructions,
-            request.SelectedIngredients,
-            request.AddedIngredients,
-            request.IngredientQuantities,
-            request.SelectedSideItems,
-            request.SelectedMenuOptions,
-            request.CustomizationSelections);
+        var command = AddToBasketCommand.FromRequest(sessionId, request);
 
         return Ok(await Mediator.SendCommand(command));
     }

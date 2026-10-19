@@ -56,9 +56,9 @@ public class MutatingEndpointAuthorizationCoverageTests
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// 197 with account payments, including the seven guest-checkout and signed-wakeup writes.
+    /// Floor 207 includes native root edits, durable cancellations and reviewed channel operations; account-payment and guest-checkout writes remain covered.
     /// </summary>
-    private const int KnownMutatingActionCount = 197;
+    private const int KnownMutatingActionCount = 207;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -87,6 +87,34 @@ public class MutatingEndpointAuthorizationCoverageTests
         "BasketController.RemoveFromBasket [DELETE]",
         "BasketController.RemovePromoCode [DELETE]",
         "BasketController.UpdateBasketItem [PUT]",
+        // Guest native baskets require the canonical session capability and durable operation ID.
+        // New effects also require mobile ordering opt-in; replay remains scoped to the original
+        // guest/customer owner. Staff, machine tokens and failed authentication are refused.
+        "CustomerMobileBasketController.AddItem [POST]",
+        // Absolute native root edits additionally bind the reviewed basket ID/fingerprint; the
+        // shared operation transaction checks owner, rollout and exact payload before mutation.
+        "CustomerMobileBasketController.MutateItem [POST]",
+        // Cancelling seals only the exact original owner/payload under the same operation/owner
+        // locks and shared ingress budget. It never applies/undoes a basket effect or resurrects
+        // an erased basket; present failed authentication and staff tokens remain refused.
+        "CustomerMobileBasketController.CancelAdd [POST]",
+        "CustomerMobileBasketController.CancelMutation [POST]",
+        // Native channel switches bind the reviewed basket and exact confirmed root removals;
+        // canonical owner/operation identity, enabled-channel rules and the shared ingress budget
+        // apply. Cancellation seals the exact original payload and cannot undo accepted effects.
+        "CustomerMobileBasketController.SwitchChannel [POST]",
+        "CustomerMobileBasketController.CancelChannel [POST]",
+        // Read-only quote: exact customer/guest owner, canonical session, enabled native ordering,
+        // reviewed basket revision and shared IP budget; no order, tender or discount usage is written.
+        "CustomerMobileCheckoutController.Quote [POST]",
+        // Prepare is read-only and binds contact/method to a reviewed quote. Submit revalidates
+        // server-owned basket/prices and atomically writes one owner/payload-bound order receipt.
+        // Recovery discloses only that owner's outcome; cancellation seals unseen work and never
+        // undoes acceptance. All share canonical session/JWT checks and the existing IP budget.
+        "CustomerMobileCheckoutController.Prepare [POST]",
+        "CustomerMobileCheckoutController.Submit [POST]",
+        "CustomerMobileCheckoutController.Recover [POST]",
+        "CustomerMobileCheckoutController.Cancel [POST]",
         // Each payment action validates the original visit's hashed participant capability,
         // typed attempt ownership and frozen scope/version. New writes also require feature,
         // module, gateway and configured contribution limits; recovery preserves original identity.

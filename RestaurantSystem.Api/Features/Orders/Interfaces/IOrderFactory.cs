@@ -8,17 +8,12 @@ namespace RestaurantSystem.Api.Features.Orders.Interfaces;
 /// Builds the <see cref="Order"/> row a <c>CreateOrderCommand</c> asks for — order number, quick-
 /// action token, the guest's language, the channel-override audit trail and the delivery-address
 /// snapshot — up to but not including <c>DbContext.Add</c>. Items, pricing, fidelity and payments
-/// stay in the handler: they need the order to exist first.
+/// are applied by the shared creation writer inside the caller-owned transaction.
 /// </summary>
-/// <remarks>
-/// Extracted from <c>CreateOrderCommandHandler</c> in GAP-2 S4. The handler was at its 200-LOC
-/// limit (CLAUDE.md §4) with thirteen constructor dependencies, and the language capture this
-/// slice adds belongs with the rest of the row's creation-time facts rather than as a fourteenth.
-/// </remarks>
 public interface IOrderFactory
 {
     /// <summary>
-    /// The order and the creation-time values the handler still needs, or an <c>Error</c> when the
+    /// The order and the creation-time values the shared writer needs, or an <c>Error</c> when the
     /// request cannot produce an order (a delivery with no resolvable address). Nothing is added to
     /// the change tracker here.
     /// </summary>
@@ -37,7 +32,7 @@ public interface IOrderFactory
 }
 
 /// <summary>
-/// A built-but-unsaved order plus the creation-time values the handler reuses. <see cref="Order"/>
+/// A built-but-unsaved order plus the creation-time values the caller and writer reuse. <see cref="Order"/>
 /// is null exactly when <see cref="Error"/> is not.
 /// </summary>
 public sealed record OrderDraft(

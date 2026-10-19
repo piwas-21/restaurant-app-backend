@@ -90,26 +90,9 @@ public class OrderChannelGuard : IOrderChannelGuard
             $"Not available for {orderType}: {names}. Please change your order type or remove these items.");
     }
 
-    private static IEnumerable<Guid> FlattenProductIds(IEnumerable<CreateOrderItemDto>? items)
-    {
-        if (items is null)
-        {
-            yield break;
-        }
-
-        foreach (var item in items)
-        {
-            if (item.ProductId.HasValue)
-            {
-                yield return item.ProductId.Value;
-            }
-
-            foreach (var childId in FlattenProductIds(item.ChildItems))
-            {
-                yield return childId;
-            }
-        }
-    }
+    private static IEnumerable<Guid> FlattenProductIds(IEnumerable<CreateOrderItemDto>? items) =>
+        items is null ? [] : OrderInputTree.Flatten(items)
+            .Where(item => item.ProductId.HasValue).Select(item => item.ProductId!.Value);
 
     // Any authenticated non-Customer account is staff. Role is null for anonymous callers.
     private bool IsStaff() =>

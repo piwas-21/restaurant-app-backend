@@ -8,65 +8,43 @@ using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Api.Common.Exceptions;
-using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
 
-public partial class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, ApiResponse<OrderDto>>
+public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, ApiResponse<OrderDto>>
 {
+    private readonly IOrderCreationWriter _writer;
+    private readonly IOrderPostCreationService _postCreation;
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<CreateOrderCommandHandler> _logger;
-    private readonly IOrderMappingService _mappingService;
-    private readonly IOrderItemFactory _itemFactory;
-    private readonly IOrderPricingService _pricingService;
-    private readonly IOrderPaymentBuilder _paymentBuilder;
-    private readonly IOrderTableReservationService _tableReservation;
     private readonly IOrderRoutingService _routing;
-    private readonly IOrderNativeBillingAcceptance _fidelity;
-    private readonly IOrderNotificationService _notifications;
-    private readonly IOrderPermittedActionsService _permittedActionsService;
     private readonly IOrderFactory _orderFactory;
     private readonly IPreferredLanguageCapture _languages;
-    private readonly IOrderPreparationService _preparation;
     private readonly ITableGuestRoundOperationStore? _guestRounds;
     private readonly ITenantFeatures? _features;
 
     public CreateOrderCommandHandler(
+        IOrderCreationWriter writer,
+        IOrderPostCreationService postCreation,
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
-        IOrderMappingService mappingService,
-        IOrderItemFactory itemFactory,
-        IOrderPricingService pricingService,
-        IOrderPaymentBuilder paymentBuilder,
-        IOrderTableReservationService tableReservation,
         IOrderRoutingService routing,
-        IOrderNativeBillingAcceptance fidelity,
-        IOrderNotificationService notifications,
-        IOrderPermittedActionsService permittedActionsService,
         IOrderFactory orderFactory,
         IPreferredLanguageCapture languages,
-        IOrderPreparationService preparation,
         ILogger<CreateOrderCommandHandler> logger,
         ITableGuestRoundOperationStore? guestRounds = null,
         ITenantFeatures? features = null)
     {
+        _writer = writer;
+        _postCreation = postCreation;
         _context = context;
         _currentUserService = currentUserService;
         _orderFactory = orderFactory;
         _languages = languages;
-        _preparation = preparation;
-        _mappingService = mappingService;
-        _itemFactory = itemFactory;
-        _pricingService = pricingService;
-        _paymentBuilder = paymentBuilder;
-        _tableReservation = tableReservation;
         _routing = routing;
-        _fidelity = fidelity;
-        _notifications = notifications;
-        _permittedActionsService = permittedActionsService;
         _logger = logger;
         _guestRounds = guestRounds;
         _features = features;
@@ -117,66 +95,25 @@ public partial class CreateOrderCommandHandler : ICommandHandler<CreateOrderComm
                     _context, order, guestSession, cancellationToken);
             }
 
-            var userId = draft.UserId;
-            var auditId = draft.AuditId;
-            var now = draft.Now;
-            var paysOnline = draft.PaysOnline;
-
-            _context.Orders.Add(order);
-
-            foreach (var itemDto in command.Items)
+            async Task RecordGuestRoundAsync()
             {
-                var error = await _itemFactory.AddItemAsync(
-                    order, itemDto, command.ItemsAreServerPriced, cancellationToken);
-                if (error != null)
+                if (guestSession is not null && guestParticipant is not null)
                 {
-                    return ApiResponse<OrderDto>.Failure(error);
+                    await _routing.EnsureRoutesAsync(order, cancellationToken);
+                    await GuestRoundOrderPolicy.RecordAcceptedRoundAsync(
+                        _context, _guestRounds ?? throw new InvalidOperationException(
+                            "Guest round operations are not registered."),
+                        guestContext!, guestSession, guestParticipant, order, cancellationToken);
                 }
             }
 
-            var itemsTotal = order.Items.Sum(i => i.ItemTotal);
-            await _pricingService.ApplyAsync(order, itemsTotal, command, userId, cancellationToken);
-
-            var earning = await _fidelity.CalculatePointsToEarnAsync(order, itemsTotal, userId, cancellationToken);
-
-            _paymentBuilder.AddPayments(order, command.Payments);
-            _paymentBuilder.UpdatePaymentSummary(order);
-
-            await _preparation.ApplyForNewOrderAsync(order, now, cancellationToken);
-
-            if (guestSession is not null && guestParticipant is not null)
-            {
-                await _routing.EnsureRoutesAsync(order, cancellationToken);
-                await GuestRoundOrderPolicy.RecordAcceptedRoundAsync(
-                    _context, _guestRounds ?? throw new InvalidOperationException(
-                        "Guest round operations are not registered."),
-                    guestContext!, guestSession, guestParticipant, order, cancellationToken);
-            }
-
-            order.StatusHistory.Add(new OrderStatusHistory
-            {
-                FromStatus = OrderStatus.Pending,
-                ToStatus = order.Status,
-                Notes = OnlinePaymentIntent.InitialStatusNote(command.Type, order.TableNumber, paysOnline),
-                ChangedAt = now,
-                ChangedBy = auditId,
-                CreatedAt = now,
-                CreatedBy = auditId,
-            });
-
-            await _context.SaveChangesAsync(cancellationToken);
-
-            var redemption = await _fidelity.RedeemAsync(order, command.PointsToRedeem, userId, cancellationToken);
-            await _fidelity.WriteAcceptedSnapshotAsync(
-                order, acceptedCurrency, earning, redemption, cancellationToken);
-
-            // Gated on the server-computed order.PaymentStatus: a caller cannot declare itself paid
-            // into an award, and an online order is not paid yet — the settle path awards instead.
-            await _fidelity.AwardEarnedPointsAsync(order, cancellationToken);
+            var error = await _writer.WriteAsync(command, draft, acceptedCurrency,
+                RecordGuestRoundAsync, cancellationToken);
+            if (error is not null) return ApiResponse<OrderDto>.Failure(error);
 
             await transaction.CommitAsync(cancellationToken);
 
-            return await CompletePostCreationAsync(order, paysOnline, cancellationToken);
+            return await _postCreation.CompleteAsync(order, draft.PaysOnline, cancellationToken);
         }
         catch (Exception ex)
         {

@@ -31,6 +31,8 @@ public partial class PrinterFeedQueryHandler
                     .ToList();
             }
 
+            if (order.ServiceSessionId.HasValue)
+                order.RoutingStates = order.RoutingStates.Where(state => state.Target != DevicePrintTarget.Cashier).ToList();
             var dto = _mappingService.MapToOrderDto(order);
             dto.GuestStatusToken = null;
             if (supplements.TryGetValue(order.Id, out var amendment))

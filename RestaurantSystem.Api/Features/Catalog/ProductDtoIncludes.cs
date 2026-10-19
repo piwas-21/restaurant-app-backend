@@ -31,6 +31,7 @@ public static class ProductDtoIncludes
         ArgumentNullException.ThrowIfNull(products);
 
         return products
+            .WithBundleIngredientAnswers()
             .Include(p => p.ProductCategories)
                 .ThenInclude(pc => pc.Category)
             .Include(p => p.Descriptions)
@@ -90,4 +91,12 @@ public static class ProductDtoIncludes
                             .ThenInclude(option => option.OptionProduct)
             .AsSplitQuery();
     }
+
+    /// <summary>Loads the library answer marker for every nested bundle recipe without per-row queries.</summary>
+    public static IQueryable<Product> WithBundleIngredientAnswers(this IQueryable<Product> products) =>
+        products.Include(product => product.MenuDefinition!.Sections)
+            .ThenInclude(section => section.Items)
+                .ThenInclude(item => item.Product.DetailedIngredients)
+                    .ThenInclude(ingredient => ingredient.GlobalIngredient);
+
 }

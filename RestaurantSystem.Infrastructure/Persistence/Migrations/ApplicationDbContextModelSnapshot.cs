@@ -1678,6 +1678,83 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("BasketItems", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CashierPrintJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime?>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("device_id");
+
+                    b.Property<bool>("IsAutomatic")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_automatic");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid?>("ServiceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_session_id");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot_json");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cashier_print_jobs");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_cashier_print_jobs_order_id");
+
+                    b.HasIndex("ServiceSessionId")
+                        .HasDatabaseName("ix_cashier_print_jobs_service_session_id");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("cashier_print_jobs", (string)null);
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CatalogueCuisinePreference", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2371,6 +2448,44 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerBasketOperation", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<DateTime>("AppliedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("applied_at");
+
+                    b.Property<Guid>("BasketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("basket_id");
+
+                    b.Property<bool>("IsCancelled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_cancelled");
+
+                    b.Property<string>("OwnerHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("owner_hash");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.HasKey("OperationId")
+                        .HasName("pk_customer_basket_operations");
+
+                    b.ToTable("customer_basket_operations", (string)null);
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerDiscountRule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2520,6 +2635,45 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("CustomerFormFieldConfigurations", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerOrderOperation", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<bool>("IsCancelled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_cancelled");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("OwnerHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("owner_hash");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.HasKey("OperationId")
+                        .HasName("pk_customer_order_operations");
+
+                    b.ToTable("customer_order_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_order_operations_outcome", "(is_cancelled AND order_id IS NULL) OR (NOT is_cancelled AND order_id IS NOT NULL AND order_id <> '00000000-0000-0000-0000-000000000000'::uuid)");
+                        });
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.DeviceEvent", b =>
@@ -11810,6 +11964,25 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("ProductVariation");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CashierPrintJob", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_cashier_print_jobs_orders_order_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", "ServiceSession")
+                        .WithMany()
+                        .HasForeignKey("ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_cashier_print_jobs_tableservicesessions_service_session_id");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("ServiceSession");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CatalogueImportSessionTemplate", b =>

@@ -16,7 +16,9 @@ public partial class OrderItemFactory
         CancellationToken cancellationToken)
     {
         var (unitPrice, variationName) = ResolvePricing(
-            itemDto, product, pricesAreTrusted && choice.Price is null);
+            itemDto, product, pricesAreTrusted && choice.Price is null,
+            metadataAreTrusted && parentItem is not null && itemDto.Kind == OrderItemKind.BundleChild
+                && itemDto.NativeBundlePriceVerified);
         var customization = choice.Price ?? ResolveCustomizationPrice(itemDto, pricesAreTrusted);
         if (choice.Price is not null && parentItem is not null && itemDto.Kind == OrderItemKind.SideItem)
             customization *= parentItem.Quantity;

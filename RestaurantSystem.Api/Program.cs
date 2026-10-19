@@ -1,3 +1,4 @@
+﻿using RestaurantSystem.Api.Features.Basket.Services.Operations;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -444,6 +445,12 @@ builder.Services.AddAppleAuthentication(builder.Configuration);
 builder.Services.Configure<ModuleSettings>(builder.Configuration.GetSection("Modules"));
 builder.Services.AddSingleton<ITenantModules, TenantModules>();
 
+// Native customer access requires a reviewed tenant identity and explicit capability activation.
+builder.Services.AddOptions<CustomerMobileSettings>()
+    .Bind(builder.Configuration.GetSection(CustomerMobileSettings.SectionName))
+    .Validate(settings => settings.IsValid(), "CustomerMobile settings are invalid.")
+    .ValidateOnStart();
+
 // Server Workspace V2 is an emergency-safe rollout switch, not an entitlement or an
 // authorization boundary. The deploy template maps TENANT_SERVER_WORKSPACE_V2 onto this
 // section, and the frontend reads the additive anonymous tenant-features endpoint. A
@@ -765,13 +772,13 @@ builder.Services.AddEmailSender(builder.Configuration);   // IEmailSender transp
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IEmailBrandingProvider, EmailBrandingProvider>();
 builder.Services.AddScoped<IProductCustomizationGroupSynchronizer, ProductCustomizationGroupSynchronizer>();
-builder.Services.AddScoped<IBasketService, BasketService>();
+builder.Services.AddBasketWriteCoordination();
+builder.Services.AddCustomerBasketOperations();
 builder.Services.AddScoped<IBasketPricingService, BasketPricingService>();
 builder.Services.AddScoped<ILineCustomizationBuilder, LineCustomizationBuilder>();
 builder.Services.AddScoped<IBasketMappingService, BasketMappingService>();
 builder.Services.AddScoped<IBasketItemFactory, BasketItemFactory>();
 builder.Services.AddScoped<IBasketRepository, BasketRepository>();
-builder.Services.AddScoped<IBasketChannelService, BasketChannelService>();
 builder.Services.AddScoped<IOrderChannelGuard, OrderChannelGuard>();
 builder.Services.AddScoped<IOrderAvailabilityGuard, OrderAvailabilityGuard>();
 builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
@@ -816,7 +823,9 @@ builder.Services.AddAccountPaymentServices();
 builder.Services.AddAccountCheckoutServices();
 builder.Services.AddAccountCheckoutWebhookServices();
 builder.Services.AddOrderDetailServices();
+builder.Services.AddOrderCreationServices();
 builder.Services.AddStaffOrderServices();
+builder.Services.AddCustomerCheckoutServices();
 builder.Services.AddServerWorkspaceServices();
 builder.Services.AddKitchenBoardServices();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();

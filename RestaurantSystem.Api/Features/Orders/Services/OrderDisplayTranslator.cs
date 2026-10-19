@@ -43,6 +43,7 @@ public class OrderDisplayTranslator : IOrderDisplayTranslator
 
             foreach (var item in order.Items)
             {
+                item.SpecialInstructions = KitchenInstructionText.For(item);
                 TranslateItem(item, lang);
             }
         }
