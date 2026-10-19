@@ -1,35 +1,20 @@
 using RestaurantSystem.Api.Common.Exceptions;
-using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
-using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Orders.Services.CustomerCheckout;
 
-public sealed class CustomerCheckoutAcceptance(ICustomerCheckoutGuard guard, IBasketWriteCoordinator coordinator,
-    ICustomerCheckoutDraft draft, ICustomerCheckoutIntentPolicy policy, ICustomerOrderOperationStore operations,
-    IOrderFactory orders, IOrderCreationWriter writer, IBasketService baskets, IPreferredLanguageCapture languages,
+public sealed class CustomerCheckoutAcceptance(ICustomerCheckoutGuard guard, ICustomerCheckoutPreparation preparation,
+    ICustomerOrderOperationStore operations, ICustomerCheckoutOrderCreator creator,
     IOrderPostCreationService postCreation, ILogger<CustomerCheckoutAcceptance> logger) : ICustomerCheckoutAcceptance
 {
     public Task<CustomerCheckoutPreparationDto> PrepareAsync(string sessionId, CustomerCheckoutIntentDto intent,
-        CancellationToken cancellationToken)
-    {
-        var owner = guard.EnsureOwner(sessionId);
-        return coordinator.RunAsync(sessionId, owner, async () =>
-        {
-            var context = await guard.ReviewAsync(sessionId, owner, intent.Review, cancellationToken);
-            var prepared = await draft.PrepareAsync(context, intent.Review, cancellationToken);
-            var quote = CustomerCheckoutProjection.Create(context, intent.Review, prepared.Order);
-            await policy.EnsureAsync(intent, quote, cancellationToken);
-            return new CustomerCheckoutPreparationDto(1, CustomerCheckoutIntentHash.Compute(intent), quote);
-        }, cancellationToken);
-    }
+        CancellationToken cancellationToken) => preparation.PrepareAsync(sessionId, intent, cancellationToken);
 
     public async Task<CustomerOrderResolutionDto> SubmitAsync(string sessionId, CustomerCheckoutSubmissionDto submission,
         CancellationToken cancellationToken)
     {
-        var owner = guard.EnsureOwner(sessionId);
+        guard.EnsureOwner(sessionId);
         if (!string.Equals(submission.PayloadHash, CustomerCheckoutIntentHash.Compute(submission.Intent), StringComparison.Ordinal))
             throw new ConflictException("The prepared order details changed. Review checkout again.");
         Order? accepted = null;
@@ -38,24 +23,9 @@ public sealed class CustomerCheckoutAcceptance(ICustomerCheckoutGuard guard, IBa
         {
             // Receipt replay precedes availability, repricing and number allocation. A withdrawal
             // after commit must never disguise an accepted order as a fresh submission.
-            var intent = submission.Intent;
-            var context = await guard.ReviewAsync(sessionId, owner, intent.Review, cancellationToken);
-            var prepared = await draft.PrepareAsync(context, intent.Review, cancellationToken);
-            var quote = CustomerCheckoutProjection.Create(context, intent.Review, prepared.Order);
-            await policy.EnsureAsync(intent, quote, cancellationToken);
-            var command = CustomerCheckoutCommandFactory.Create(intent, prepared, quote);
-            var language = await languages.ForUserAsync(owner, cancellationToken);
-            var orderDraft = await orders.CreateAsync(command, owner, language, cancellationToken);
-            if (orderDraft.IsFailed) throw new BadRequestException(orderDraft.Error);
-            var error = await writer.WriteNativeAsync(command, orderDraft, context.Currency, cancellationToken);
-            if (error is not null) throw new BadRequestException(error);
-            CustomerCheckoutMoneyGuard.Ensure(orderDraft.Order);
-            var actual = CustomerCheckoutProjection.Create(context, intent.Review, orderDraft.Order);
-            if (!string.Equals(actual.QuoteFingerprint, quote.QuoteFingerprint, StringComparison.Ordinal))
-                throw new ConflictException("Checkout changed during acceptance. Review the current total.");
-            await baskets.ClearBasketAsync(sessionId);
-            accepted = orderDraft.Order;
-            paysOnline = orderDraft.PaysOnline;
+            var draft = await creator.CreateUnderLockAsync(sessionId, submission.Intent, cancellationToken);
+            accepted = draft.Order;
+            paysOnline = draft.PaysOnline;
             return accepted.Id;
         }, cancellationToken);
         if (accepted is not null)

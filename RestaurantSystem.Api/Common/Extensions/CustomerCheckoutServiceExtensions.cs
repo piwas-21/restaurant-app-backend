@@ -11,6 +11,8 @@ public static class CustomerCheckoutServiceExtensions
         services.AddScoped<ICustomerCheckoutDraft, CustomerCheckoutDraft>();
         services.AddScoped<ICustomerCheckoutQuoteService, CustomerCheckoutQuoteService>();
         services.AddScoped<ICustomerCheckoutIntentPolicy, CustomerCheckoutIntentPolicy>();
+        services.AddScoped<ICustomerCheckoutPreparation, CustomerCheckoutPreparation>();
+        services.AddScoped<ICustomerCheckoutOrderCreator, CustomerCheckoutOrderCreator>();
         services.AddScoped<ICustomerCheckoutAcceptance, CustomerCheckoutAcceptance>();
         return services;
     }
