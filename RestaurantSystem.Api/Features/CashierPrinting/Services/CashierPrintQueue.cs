@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Settings;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
@@ -12,8 +14,10 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.CashierPrinting.Services;
 
 public sealed partial class CashierPrintQueue(ApplicationDbContext context,
-    ITableBillAssembler bills, IOrderMappingService mapping, ICurrentUserService currentUser) : ICashierPrintQueue
+    ITableBillAssembler bills, IOrderMappingService mapping, ICurrentUserService currentUser, IOptions<CashierPrintSettings> settings) : ICashierPrintQueue
 {
+    private readonly CashierPrintSettings _settings = settings.Value;
+
     public async Task<CashierPrintJobDto> QueueAsync(QueueCashierPrintRequest request,
         bool automatic, CancellationToken cancellationToken)
     {
@@ -58,8 +62,8 @@ public sealed partial class CashierPrintQueue(ApplicationDbContext context,
         ToDto(await context.CashierPrintJobs.AsNoTracking().SingleOrDefaultAsync(job => job.Id == jobId,
             cancellationToken) ?? throw new NotFoundException("Print request not found."));
 
-    private static CashierPrintJobDto ToDto(CashierPrintJob job, bool includeReceipt = false) =>
-        new(job.Id, job.Status == "Queued" && job.CreatedAt < DateTime.UtcNow.AddDays(-QueueLifetimeDays)
+    private CashierPrintJobDto ToDto(CashierPrintJob job, bool includeReceipt = false) =>
+        new(job.Id, job.Status == "Queued" && job.CreatedAt < DateTime.UtcNow.AddDays(-_settings.QueueLifetimeDays)
             ? "Expired" : job.Status, job.IsAutomatic, job.CreatedAt, includeReceipt
             ? JsonSerializer.Deserialize<RestaurantSystem.Api.Features.Orders.Dtos.OrderDto>(
                 job.SnapshotJson, CashierReceiptSnapshot.Json) : null);

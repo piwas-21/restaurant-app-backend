@@ -14,6 +14,10 @@ public static class OrderDetailServiceExtensions
             .BindConfiguration(OrderWorkflowSettings.SectionName)
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<CashierPrintSettings>()
+            .BindConfiguration(CashierPrintSettings.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddScoped<IRetainedCustomerDataScrubber, RetainedCustomerDataScrubber>();
         services.AddScoped<IOrderStatusTransitionPolicy, OrderStatusTransitionPolicy>();
         services.AddScoped<IOrderStatusUpdateServices, OrderStatusUpdateServices>();

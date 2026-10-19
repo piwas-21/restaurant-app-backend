@@ -8,19 +8,17 @@ namespace RestaurantSystem.Api.Features.CashierPrinting.Services;
 
 public sealed partial class CashierPrintQueue
 {
-    private const int CapabilityFreshnessMinutes = 5;
-    private const int QueueLifetimeDays = 1;
     public async Task<CashierPrintJobDto?> ClaimAsync(string deviceId, CancellationToken cancellationToken, bool allowAutomatic = true)
     {
         RequireDeviceId(deviceId);
-        var cutoff = DateTime.UtcNow.AddMinutes(-CapabilityFreshnessMinutes);
+        var cutoff = DateTime.UtcNow.AddMinutes(-_settings.CapabilityFreshnessMinutes);
         var capability = await context.PrinterDeviceTargetCapabilities.AsNoTracking()
             .SingleOrDefaultAsync(capability => capability.DeviceId == deviceId
                 && capability.Target == DevicePrintTarget.Cashier && capability.IsSupported
                 && capability.IsConfigured && capability.ReportedAt >= cutoff, cancellationToken);
         if (capability is null) return null;
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-        var expiry = DateTime.UtcNow.AddDays(-QueueLifetimeDays);
+        var expiry = DateTime.UtcNow.AddDays(-_settings.QueueLifetimeDays);
         var autoEnabled = capability.AutoPrintEnabled && allowAutomatic;
         // The claim is committed BEFORE bytes leave the server. A lost response/crash holds this
         // job as Claimed; no lease expiry can silently print an ambiguous bill a second time.

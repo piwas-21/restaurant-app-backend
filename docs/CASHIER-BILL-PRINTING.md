@@ -15,7 +15,9 @@ The printer app claims work through `POST /api/cashier-print-jobs/claim`, authen
 tenant API key and installation ID. Claims require a recently reported configured cashier target.
 A database row lock assigns a job once across devices. Manual requests ignore auto-print toggles;
 automatic close jobs honor both auto-print and quiet hours (`allowAutomatic=false` keeps manual
-claims available during restrictions). Jobs expire from claim eligibility after one day.
+claims available during restrictions). Defaults require a capability report from the past five minutes and expire jobs from claim
+eligibility after one day. Configure `CashierPrinting:CapabilityFreshnessMinutes` and
+`CashierPrinting:QueueLifetimeDays` through backend options; invalid ranges fail startup.
 
 A claim commits before returning a receipt. A crash or lost response leaves it `Claimed` and
 never automatically replays possible output. The owning device reports `Sent`, `Failed` or
