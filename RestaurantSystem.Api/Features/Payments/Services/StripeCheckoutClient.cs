@@ -38,6 +38,8 @@ public class StripeCheckoutClient : IStripeCheckoutClient
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        request.NativeRouting?.RequireCurrent(_gateway, _stripe, request.OrderId);
+
         var options = new SessionCreateOptions
         {
             Mode = "payment",
@@ -81,9 +83,10 @@ public class StripeCheckoutClient : IStripeCheckoutClient
             // The success trip carries the session id — it is what S9 settles on. The cancel trip
             // carries only the order id: Stripe substitutes the placeholder on success ONLY, so
             // asking for it on the cancel URL would return the literal `{CHECKOUT_SESSION_ID}`.
-            SuccessUrl = BuildReturnUrl(
+            SuccessUrl = request.NativeRouting?.ReturnUrl ?? BuildReturnUrl(
                 _stripe.SuccessPath, request.OrderId, $"sessionId={StripeSessionIdPlaceholder}"),
-            CancelUrl = BuildReturnUrl(_stripe.CancelPath, request.OrderId, "canceled=1"),
+            CancelUrl = request.NativeRouting?.ReturnUrl
+                ?? BuildReturnUrl(_stripe.CancelPath, request.OrderId, "canceled=1"),
         };
 
         // Deliberately conditional rather than always assigning PaymentIntentData with a possibly-
@@ -98,10 +101,19 @@ public class StripeCheckoutClient : IStripeCheckoutClient
             };
         }
 
+        if (request.NativeRouting is { } routing)
+        {
+            options.Metadata = routing.Metadata();
+            options.PaymentIntentData ??= new SessionPaymentIntentDataOptions();
+            options.PaymentIntentData.Metadata = routing.Metadata();
+        }
+
         var session = await new SessionService(_gateway.Client)
             .CreateAsync(options, _gateway.BuildRequestOptions(request.IdempotencyKey), cancellationToken);
 
-        return Map(session);
+        var result = Map(session);
+        if (request.NativeRouting is not null) NativeCheckoutSessionEvidence.Require(request, result);
+        return result;
     }
 
     public async Task ExpireAsync(string sessionId, CancellationToken cancellationToken)
@@ -147,7 +159,7 @@ public class StripeCheckoutClient : IStripeCheckoutClient
         }
     }
 
-    private static StripeCheckoutSession Map(Session session) => new()
+    private StripeCheckoutSession Map(Session session) => new()
     {
         Id = session.Id,
         Url = session.Url,
@@ -157,6 +169,10 @@ public class StripeCheckoutClient : IStripeCheckoutClient
         // only present when explicitly requested, and we never need more than the id.
         PaymentIntentId = session.PaymentIntentId,
         AmountTotalMinor = session.AmountTotal,
+        Currency = session.Currency,
+        ProviderContext = new StripeProviderContext(_gateway.ConnectedAccountId, session.Livemode),
+        ClientReferenceId = session.ClientReferenceId,
+        Metadata = session.Metadata ?? new Dictionary<string, string>(),
     };
 
     /// <summary>

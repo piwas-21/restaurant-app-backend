@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.AccountPayments.Interfaces;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
+using RestaurantSystem.Api.Features.Payments.Services;
 using RestaurantSystem.Api.Settings;
 using Stripe;
 using Stripe.Checkout;
@@ -23,16 +24,8 @@ public sealed class AccountStripeCheckoutClient(
 
     public AccountStripeContext ReadContext()
     {
-        if (!gateway.IsConfigured)
-            throw new BadRequestException("Online payment is not available for this restaurant.");
-        var key = stripeOptions.Value.PlatformApiKey;
-        var liveMode = key.StartsWith("sk_live_", StringComparison.Ordinal)
-            || key.StartsWith("rk_live_", StringComparison.Ordinal);
-        var testMode = key.StartsWith("sk_test_", StringComparison.Ordinal)
-            || key.StartsWith("rk_test_", StringComparison.Ordinal);
-        if (!liveMode && !testMode)
-            throw new BadRequestException("The online payment environment requires configuration.");
-        return new AccountStripeContext(gateway.ConnectedAccountId, liveMode);
+        var context = StripeProviderContext.Read(gateway, stripeOptions.Value);
+        return new AccountStripeContext(context.ConnectedAccountId, context.LiveMode);
     }
 
     public async Task<AccountStripeSession> CreateAsync(

@@ -92,6 +92,9 @@ public record CheckoutSessionRequest
     /// the built request identical to before this property existed.
     /// </summary>
     public long? ApplicationFeeMinor { get; init; }
+
+    /// <summary>Absent on legacy web requests. Present only after the native request is frozen.</summary>
+    public Services.NativeCheckoutRouting? NativeRouting { get; init; }
 }
 
 /// <summary>
@@ -116,6 +119,11 @@ public record StripeCheckoutSession
 
     /// <summary>What Stripe will charge. S5 asserts this equals the amount we recorded.</summary>
     public long? AmountTotalMinor { get; init; }
+
+    public string? Currency { get; init; }
+    public Services.StripeProviderContext? ProviderContext { get; init; }
+    public string? ClientReferenceId { get; init; }
+    public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
 
     /// <summary>
     /// Still payable. The URL is part of the test rather than a separate check because Stripe stops
