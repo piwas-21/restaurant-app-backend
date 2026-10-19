@@ -37,12 +37,25 @@ public static class ExplicitCustomizationSelection
             throw new BadRequestException("Stored customization quantities are unreadable");
         }
 
+        Resolve(product, RestoreSelections(product, row.SelectedIngredients, quantities,
+            children.Where(child => child.ProductCustomizationOptionId.HasValue)
+                .Select(child => child.ProductCustomizationOptionId!.Value).ToHashSet()));
+    }
+
+    public static List<CustomizationGroupSelectionDto> RestoreSelections(Product product,
+        IReadOnlyCollection<Guid>? selectedIngredients, IReadOnlyDictionary<Guid, int>? quantities,
+        IReadOnlySet<Guid> productOptionIds)
+    {
+        var knownOptions = product.CustomizationGroups.Where(group => group.IsActive)
+            .SelectMany(group => group.ProductOptions).Select(option => option.Id).ToHashSet();
+        if (!productOptionIds.IsSubsetOf(knownOptions))
+            throw new BadRequestException("A stored product customization is no longer available");
         var selections = product.CustomizationGroups.Where(group => group.IsActive)
             .Select(group => new CustomizationGroupSelectionDto
             {
                 GroupId = group.Id,
                 Options = group.IngredientOptions
-                    .Where(option => row.SelectedIngredients?.Contains(option.ProductIngredientId) == true)
+                    .Where(option => selectedIngredients?.Contains(option.ProductIngredientId) == true)
                     .Select(option => new CustomizationOptionSelectionDto
                     {
                         Kind = CustomizationOptionKind.Ingredient,
@@ -50,7 +63,7 @@ public static class ExplicitCustomizationSelection
                         Quantity = quantities?.GetValueOrDefault(option.ProductIngredientId) ?? 1
                     })
                     .Concat(group.ProductOptions
-                        .Where(option => children.Any(child => child.ProductCustomizationOptionId == option.Id))
+                        .Where(option => productOptionIds.Contains(option.Id))
                         .Select(option => new CustomizationOptionSelectionDto
                         {
                             Kind = CustomizationOptionKind.Product,
@@ -60,7 +73,10 @@ public static class ExplicitCustomizationSelection
                     .ToList()
             }).ToList();
 
-        Resolve(product, selections);
+        var restored = Resolve(product, selections);
+        if (selectedIngredients is not null && selectedIngredients.Except(restored.SelectedIngredientIds).Any())
+            throw new BadRequestException("A stored ingredient customization is no longer available");
+        return selections;
     }
 
     public static ExplicitCustomizationResolution Resolve(
@@ -154,7 +170,7 @@ public static class ExplicitCustomizationSelection
     {
         var membership = group.ProductOptions.FirstOrDefault(option => option.Id == requested.OptionId)
             ?? throw new BadRequestException("A product option does not belong to the selected group");
-        if (requested.Quantity != 1 || !membership.OptionProduct.IsActive
+        if (requested.Quantity != 1 || membership.OptionProduct is null || !membership.OptionProduct.IsActive
             || !membership.OptionProduct.IsAvailable || membership.OptionProduct.IsDeleted)
             throw new BadRequestException("A product option is unavailable or has an invalid quantity");
         productOptions.Add(new(membership.Id, membership.OptionProduct,

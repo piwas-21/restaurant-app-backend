@@ -46,6 +46,8 @@ public sealed class CustomerBasketAddRateLimitTests(DatabaseFixture fixture) : I
     [Theory]
     [InlineData("/api/customer-mobile/basket/items", "/api/basket/items")]
     [InlineData("/api/basket/items", "/api/customer-mobile/basket/items")]
+    [InlineData("/api/customer-mobile/checkout/quote", "/api/customer-mobile/basket/items")]
+    [InlineData("/api/basket/items", "/api/customer-mobile/checkout/quote")]
     [InlineData("/api/customer-mobile/basket/channel", "/api/basket/items")]
     [InlineData("/api/basket/items", "/api/customer-mobile/basket/channel")]
     [InlineData("/api/customer-mobile/basket/channel/cancel", "/api/customer-mobile/basket/items")]

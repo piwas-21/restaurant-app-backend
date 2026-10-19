@@ -56,9 +56,9 @@ public class MutatingEndpointAuthorizationCoverageTests
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 202 includes native root edits, durable cancellations and reviewed channel operations; account-payment and guest-checkout writes remain covered.
+    /// Floor 203 includes native root edits, durable cancellations and reviewed channel operations; account-payment and guest-checkout writes remain covered.
     /// </summary>
-    private const int KnownMutatingActionCount = 202;
+    private const int KnownMutatingActionCount = 203;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -104,6 +104,9 @@ public class MutatingEndpointAuthorizationCoverageTests
         // apply. Cancellation seals the exact original payload and cannot undo accepted effects.
         "CustomerMobileBasketController.SwitchChannel [POST]",
         "CustomerMobileBasketController.CancelChannel [POST]",
+        // Read-only quote: exact customer/guest owner, canonical session, enabled native ordering,
+        // reviewed basket revision and shared IP budget; no order, tender or discount usage is written.
+        "CustomerMobileCheckoutController.Quote [POST]",
         // Each payment action validates the original visit's hashed participant capability,
         // typed attempt ownership and frozen scope/version. New writes also require feature,
         // module, gateway and configured contribution limits; recovery preserves original identity.
