@@ -2,6 +2,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using RestaurantSystem.Api.Common;
+using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Features.Basket.Commands.SwitchCustomerBasketChannelCommand;
+using RestaurantSystem.Api.Features.Basket.Commands.CancelCustomerBasketChannelCommand;
+using RestaurantSystem.Api.Features.Basket.Queries.GetCustomerBasketChannelQuery;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Commands.AddToBasketCommand;
@@ -59,4 +63,24 @@ public sealed class CustomerMobileBasketController(CustomMediator mediator) : Co
         [FromHeader(Name = "X-Session-Id")] string sessionId, Guid basketItemId,
         [FromBody] CustomerBasketItemMutationDto request) =>
         Ok(await mediator.SendCommand(new CancelCustomerBasketItemCommand(sessionId, basketItemId, request)));
+
+    [HttpGet("channel-preview")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<CustomerBasketChannelPreviewDto>>> PreviewChannel(
+        [FromHeader(Name = "X-Session-Id")] string sessionId, [FromQuery] OrderType orderType) =>
+        Ok(await mediator.SendQuery(new GetCustomerBasketChannelQuery(sessionId, orderType)));
+
+    [HttpPost("channel")]
+    [AllowAnonymous]
+    [EnableRateLimiting(CustomerBasketOperationRegistration.AddPolicyName)]
+    public async Task<ActionResult<ApiResponse<BasketDto>>> SwitchChannel(
+        [FromHeader(Name = "X-Session-Id")] string sessionId, [FromBody] CustomerBasketChannelDto request) =>
+        Ok(await mediator.SendCommand(new SwitchCustomerBasketChannelCommand(sessionId, request)));
+
+    [HttpPost("channel/cancel")]
+    [AllowAnonymous]
+    [EnableRateLimiting(CustomerBasketOperationRegistration.AddPolicyName)]
+    public async Task<ActionResult<ApiResponse<CustomerBasketOperationResolutionDto>>> CancelChannel(
+        [FromHeader(Name = "X-Session-Id")] string sessionId, [FromBody] CustomerBasketChannelDto request) =>
+        Ok(await mediator.SendCommand(new CancelCustomerBasketChannelCommand(sessionId, request)));
 }

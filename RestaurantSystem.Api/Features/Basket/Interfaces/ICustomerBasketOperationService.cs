@@ -11,6 +11,8 @@ public interface ICustomerBasketOperationService
         CancellationToken cancellationToken);
     Task<CustomerBasketOperationResolutionDto> CancelMutationAsync(string sessionId, Guid basketItemId,
         CustomerBasketItemMutationDto request, CancellationToken cancellationToken);
+    Task<CustomerBasketOperationResolutionDto> CancelChannelAsync(string sessionId, CustomerBasketChannelDto request,
+        CancellationToken cancellationToken);
     Task<BasketDto> ExecuteAsync(string sessionId, Guid operationId, string payload,
         Func<Task<BasketDto>> apply, CancellationToken cancellationToken);
 }

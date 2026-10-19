@@ -6,7 +6,6 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
-using RestaurantSystem.Api.Features.Tenant.Queries.GetCustomerMobileBootstrapQuery;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -32,9 +31,7 @@ public sealed class CustomerBasketOperationService(
                     ?? throw new ConflictException("This operation was already applied, but its basket is no longer available. Refresh your basket.");
             }
             // Accepted operations remain recoverable after native rollout is withdrawn.
-            var bootstrap = await mediator.SendQuery(new GetCustomerMobileBootstrapQuery(1), cancellationToken);
-            if (bootstrap.Data?.Capabilities.GetValueOrDefault("ordering") != "enabled")
-                throw new NotFoundException("Customer mobile ordering is unavailable.");
+            await CustomerBasketAvailability.EnsureOrderingAsync(mediator, cancellationToken);
             var basket = await apply();
             context.Set<CustomerBasketOperation>().Add(Receipt(sessionId, operationId, payload, basket.Id, false));
             return basket;
@@ -47,6 +44,10 @@ public sealed class CustomerBasketOperationService(
     public Task<CustomerBasketOperationResolutionDto> CancelMutationAsync(string sessionId, Guid basketItemId,
         CustomerBasketItemMutationDto request, CancellationToken cancellationToken) =>
         CancelAsync(sessionId, request.OperationId, CustomerBasketPayload.Mutation(basketItemId, request), cancellationToken);
+
+    public Task<CustomerBasketOperationResolutionDto> CancelChannelAsync(string sessionId, CustomerBasketChannelDto request,
+        CancellationToken cancellationToken) =>
+        CancelAsync(sessionId, request.OperationId, CustomerBasketPayload.Channel(request), cancellationToken);
 
     private Task<CustomerBasketOperationResolutionDto> CancelAsync(string sessionId, Guid operationId,
         string payload, CancellationToken cancellationToken) =>

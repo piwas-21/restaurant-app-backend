@@ -12,6 +12,11 @@ public sealed class SerializedBasketChannelService(BasketChannelService inner, I
         writes.RunAsync(sessionId, userId,
             () => inner.SetOrderTypeAsync(sessionId, userId, orderType, removeConflicts, cancellationToken), cancellationToken);
 
+    public Task<BasketChannelSwitchDto> SetReviewedOrderTypeAsync(string sessionId, Guid? userId,
+        OrderType orderType, IReadOnlySet<Guid> reviewedConflicts, CancellationToken cancellationToken = default) =>
+        writes.RunAsync(sessionId, userId,
+            () => inner.SetReviewedOrderTypeAsync(sessionId, userId, orderType, reviewedConflicts, cancellationToken), cancellationToken);
+
     public Task<BasketDto?> ClearOrderTypeAsync(string sessionId, Guid? userId,
         CancellationToken cancellationToken = default) =>
         writes.RunAsync(sessionId, userId,

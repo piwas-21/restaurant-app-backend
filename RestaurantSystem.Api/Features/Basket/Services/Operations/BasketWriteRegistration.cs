@@ -9,6 +9,7 @@ public static class BasketWriteRegistration
         services.AddScoped<IBasketWriteCoordinator, BasketWriteCoordinator>();
         services.AddScoped<BasketService>();
         services.AddScoped<BasketChannelService>();
+        services.AddScoped<IBasketChannelConflictService, BasketChannelConflictService>();
         services.AddScoped<IBasketService, SerializedBasketService>();
         services.AddScoped<IBasketChannelService, SerializedBasketChannelService>();
         return services;

@@ -20,8 +20,7 @@ public sealed class CustomerBasketItemMutationService(
     {
         var current = await baskets.GetBasketAsync(sessionId, currentUser.UserId)
             ?? throw new NotFoundException("Basket unavailable.");
-        if (current.Id != request.ExpectedBasketId
-            || !BasketPurchaseFingerprint.Matches(request.ExpectedPurchaseFingerprint, current.PurchaseFingerprint))
+        if (!CustomerBasketRevision.Matches(current, request.ExpectedBasketId, request.ExpectedPurchaseFingerprint))
             throw new ConflictException("Your basket changed. Refresh it before editing this item.");
         if (!current.Items.Any(item => item.Id == basketItemId))
             throw new NotFoundException("Basket item unavailable.");
