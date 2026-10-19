@@ -44,6 +44,7 @@ public sealed partial class StaffCounterOrderPricing
             pricedChildren.Add(pricedChild with
             {
                 UnitPrice = childUnitPrice,
+                NativeBundlePriceVerified = sourceIsBasket,
                 MenuSectionItemId = sourceIsBasket ? sectionItem.Id : child.MenuSectionItemId,
                 Kind = OrderItemKind.BundleChild
             });

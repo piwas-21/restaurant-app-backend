@@ -31,6 +31,10 @@ budgets are 1,000 rows and eight nested levels; an unsupported review is refused
 
 The response contains basket/purchase identity, `quoteFingerprint`, currency, type, money breakdown,
 root lines with nested selections and frozen ingredient presentation, and available payment methods.
+A component unit price may be negative when a verified current bundle selection has a negative
+variation modifier. Its item total remains zero because the root includes that modifier. The native
+pricer marks these rows internally; JSON cannot enable signed-price trust for legacy or root rows.
+
 Only roots carry `basketItemId`; transient draft order/item UUIDs are omitted. `priceChanged` compares
 current root totals, delivery fee and discounts with the persisted basket. Tips and requested points
 are explicit review choices. Current tax policy, customer discount rounding, points credit and tip

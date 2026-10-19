@@ -89,4 +89,45 @@ public sealed class CustomerCheckoutBundleIdentityTests(DatabaseFixture fixture)
         (await QuoteResponseAsync(Review(basket))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         await AssertNoFinancialEffectsAsync();
     }
+    [Fact]
+    public async Task Negative_component_modifier_keeps_its_signed_row_price_and_correct_root_total()
+    {
+        Guid variationId;
+        Guid rowId;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var variation = new ProductVariation
+            {
+                ProductId = ProductId,
+                Name = "Smaller portion",
+                PriceModifier = -2m,
+                CreatedBy = "quote-fixture"
+            };
+            context.ProductVariations.Add(variation);
+            var row = await context.MenuSectionItems.SingleAsync(item => item.MenuSectionId == _sectionId);
+            row.AdditionalPrice = 0;
+            await context.SaveChangesAsync();
+            (variationId, rowId) = (variation.Id, row.Id);
+        }
+        var basket = await PrepareAsync(new()
+        {
+            OperationId = Guid.NewGuid(),
+            ProductId = _bundleId,
+            Quantity = 2,
+            SelectedMenuOptions = [new()
+            {
+                SectionId = _sectionId, MenuSectionItemId = rowId, ItemId = ProductId,
+                ComponentProductVariationId = variationId, Quantity = 1, CustomizationSelections = Options(false)
+            }]
+        });
+        var quote = await QuoteAsync(Review(basket, 0));
+        quote.Money.SubTotal.Should().Be(12m); // (8 base + 0 row surcharge - 2 chosen modifier) * 2.
+        quote.Money.Total.Should().Be(12m);
+        var component = quote.Items[0].Children.Should().ContainSingle().Subject;
+        component.UnitPrice.Should().Be(-2m, "a component surcharge must not become its standalone catalogue price");
+        component.ItemTotal.Should().Be(0m);
+        await AssertNoFinancialEffectsAsync();
+    }
+
 }

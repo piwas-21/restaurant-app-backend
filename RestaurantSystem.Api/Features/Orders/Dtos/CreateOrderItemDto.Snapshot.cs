@@ -4,6 +4,9 @@ namespace RestaurantSystem.Api.Features.Orders.Dtos;
 
 public partial record CreateOrderItemDto
 {
+    // Set only after native checkout validates the exact bundle row and reprices its component.
+    internal bool NativeBundlePriceVerified { get; init; }
+
     // Server-owned presentation from a persisted basket, keyed by exact customization membership.
     internal IReadOnlyDictionary<Guid, CreateOrderItemDto>? CustomizationOptionPresentation { get; set; }
     internal Guid? ParentComponentMenuSectionItemId { get; init; }
