@@ -5,6 +5,8 @@ namespace RestaurantSystem.Api.Features.Orders.Services.CustomerCheckout;
 
 public interface ICustomerCheckoutDraft
 {
+    Task<CustomerCheckoutPrepared> PrepareAsync(CustomerCheckoutReviewContext context, CustomerCheckoutReviewDto review,
+        CancellationToken cancellationToken);
     Task<Order> BuildAsync(CustomerCheckoutReviewContext context, CustomerCheckoutReviewDto review,
         CancellationToken cancellationToken);
 }

@@ -12,6 +12,13 @@ public sealed class OrderCreationWriter(ApplicationDbContext context, IOrderItem
 {
     public async Task<string?> WriteAsync(CreateOrderCommand command, OrderDraft draft,
         string? acceptedCurrency, Func<Task>? beforeSave, CancellationToken cancellationToken)
+        => await WriteCoreAsync(command, draft, acceptedCurrency, beforeSave, false, cancellationToken);
+
+    public Task<string?> WriteNativeAsync(CreateOrderCommand command, OrderDraft draft, string acceptedCurrency,
+        CancellationToken cancellationToken) => WriteCoreAsync(command, draft, acceptedCurrency, null, true, cancellationToken);
+
+    private async Task<string?> WriteCoreAsync(CreateOrderCommand command, OrderDraft draft,
+        string? acceptedCurrency, Func<Task>? beforeSave, bool strictRedemption, CancellationToken cancellationToken)
     {
         if (context.Database.CurrentTransaction is null)
             throw new InvalidOperationException("Order creation requires the caller's transaction.");
@@ -41,7 +48,7 @@ public sealed class OrderCreationWriter(ApplicationDbContext context, IOrderItem
             CreatedBy = draft.AuditId
         });
         await context.SaveChangesAsync(cancellationToken);
-        var redemption = await fidelity.RedeemAsync(order, command.PointsToRedeem, draft.UserId, cancellationToken);
+        var redemption = await fidelity.RedeemAsync(order, command.PointsToRedeem, draft.UserId, cancellationToken, failOnError: strictRedemption);
         await fidelity.WriteAcceptedSnapshotAsync(order, acceptedCurrency, earning, redemption, cancellationToken);
         // Only the server-computed payment status permits earned points to be awarded.
         await fidelity.AwardEarnedPointsAsync(order, cancellationToken);

@@ -10,7 +10,8 @@ namespace RestaurantSystem.Api.Features.Orders.Services.CustomerCheckout;
 public sealed class CustomerCheckoutItems(IBasketToOrderTranslator translator, IStaffCounterOrderPricing pricing,
     IOrderItemFactory items, IOrderChannelGuard channels, ApplicationDbContext context) : ICustomerCheckoutItems
 {
-    public async Task PopulateAsync(Order order, BasketDto basket, OrderType type, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<Dtos.CreateOrderItemDto>> PopulateAsync(Order order, BasketDto basket, OrderType type,
+        CancellationToken cancellationToken)
     {
         var translated = translator.Translate(basket.Items);
         CheckedLines(translated);
@@ -31,6 +32,7 @@ public sealed class CustomerCheckoutItems(IBasketToOrderTranslator translator, I
                 cancellationToken, allowStaffPrices: false);
             if (error is not null) throw new BadRequestException(error);
         }
+        return priced;
     }
     private static void EnsureProduct(Guid? id, Dictionary<Guid, Product> products)
     {

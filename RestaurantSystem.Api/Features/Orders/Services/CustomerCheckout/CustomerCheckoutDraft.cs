@@ -11,6 +11,9 @@ public sealed class CustomerCheckoutDraft(ICustomerCheckoutItems items, IOrderPr
     IOrderFidelityCoordinator fidelity, ICurrentUserService currentUser) : ICustomerCheckoutDraft
 {
     public async Task<Order> BuildAsync(CustomerCheckoutReviewContext context, CustomerCheckoutReviewDto review,
+        CancellationToken cancellationToken) => (await PrepareAsync(context, review, cancellationToken)).Order;
+
+    public async Task<CustomerCheckoutPrepared> PrepareAsync(CustomerCheckoutReviewContext context, CustomerCheckoutReviewDto review,
         CancellationToken cancellationToken)
     {
         var order = new Order
@@ -21,11 +24,11 @@ public sealed class CustomerCheckoutDraft(ICustomerCheckoutItems items, IOrderPr
             Tip = review.Tip,
             CreatedBy = currentUser.GetAuditIdentifier()
         };
-        await items.PopulateAsync(order, context.Basket, review.Type, cancellationToken);
+        var prepared = await items.PopulateAsync(order, context.Basket, review.Type, cancellationToken);
         var command = new CreateOrderCommand { Type = review.Type, Tip = review.Tip };
         await pricing.PreviewAsync(order, order.Items.Sum(item => item.ItemTotal), command, context.UserId, cancellationToken);
         await fidelity.PreviewRedemptionAsync(order, review.PointsToRedeem, context.UserId, cancellationToken);
         CustomerCheckoutMoneyGuard.Ensure(order);
-        return order;
+        return new(order, prepared);
     }
 }
