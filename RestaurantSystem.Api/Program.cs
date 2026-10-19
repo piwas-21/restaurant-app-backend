@@ -823,6 +823,7 @@ builder.Services.AddAccountPaymentServices();
 builder.Services.AddAccountCheckoutServices();
 builder.Services.AddAccountCheckoutWebhookServices();
 builder.Services.AddOrderDetailServices();
+builder.Services.AddOrderCreationServices();
 builder.Services.AddStaffOrderServices();
 builder.Services.AddCustomerCheckoutServices();
 builder.Services.AddServerWorkspaceServices();
