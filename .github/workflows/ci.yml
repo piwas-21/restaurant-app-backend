@@ -108,8 +108,8 @@ jobs:
   # splits the work across three runners, each with its own postgres service container
   # (services are per-job, so cross-shard contamination is impossible by construction).
   #
-  # The split is BY NAMESPACE. Shard 1 owns its six listed prefixes, shard 3 owns
-  # Orders, and shard 2 excludes both sets and catches the remaining namespaces.
+  # The split is BY NAMESPACE. Shard 1 owns its five listed prefixes, shard 3 owns
+  # Orders, and shard 2 includes Basket and catches the remaining namespaces.
   # Together these filters are a disjoint, exhaustive partition: new tests under a
   # listed prefix follow that shard, and other namespaces fall into shard 2. The
   # aggregate job below re-verifies this against `dotnet test --list-tests` and merged
@@ -150,10 +150,10 @@ jobs:
         include:
           - shard: 1
             filter: >-
-              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Basket.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.
+              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.
           - shard: 2
             filter: >-
-              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.
+              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.
           - shard: 3
             filter: >-
               FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.
