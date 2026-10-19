@@ -6,6 +6,10 @@
 > **This file is the contract.** It is assembled from the code on the four feature branches, not from a
 > plan. Where a design note and the code disagreed, the code won.
 
+The shared customer app's additive, rollout-gated basket operation contract is documented in
+[Recoverable customer basket adds](../customer-basket-operations.md). Its source/migration needs a
+backend release before dependent native submission; the audit release table below concerns the older contracts.
+
 ## Release state — read this first
 
 The four audit changes below were **released to production on 2026-08-24** (release PR

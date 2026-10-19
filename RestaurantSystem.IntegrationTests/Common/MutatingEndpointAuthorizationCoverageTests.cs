@@ -87,6 +87,10 @@ public class MutatingEndpointAuthorizationCoverageTests
         "BasketController.RemoveFromBasket [DELETE]",
         "BasketController.RemovePromoCode [DELETE]",
         "BasketController.UpdateBasketItem [PUT]",
+        // Guest native baskets require the canonical session capability and durable operation ID.
+        // New effects also require mobile ordering opt-in; replay remains scoped to the original
+        // guest/customer owner. Staff, machine tokens and failed authentication are refused.
+        "CustomerMobileBasketController.AddItem [POST]",
         // Each payment action validates the original visit's hashed participant capability,
         // typed attempt ownership and frozen scope/version. New writes also require feature,
         // module, gateway and configured contribution limits; recovery preserves original identity.

@@ -5,14 +5,16 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Persistence.Migrations;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
 
 [Collection("Database Lane 2")]
 public sealed class StaffBillChargeMigrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
+    private const string ChargeMigration = "20261016224309_" + nameof(AddStaffBillCharges);
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => MigrationTestSafety.RestoreCurrentSchemaAsync(fixture);
 
     [Theory]
     [InlineData(5, "[]")]
@@ -42,7 +44,7 @@ public sealed class StaffBillChargeMigrationTests(DatabaseFixture fixture) : IAs
         var retained = await context.Orders.AsNoTracking().SingleAsync(value => value.Id == order.Id);
         retained.BillChargeAmount.Should().Be(amount);
         retained.BillChargesJson.Should().Be(audit);
-        (await context.Database.GetAppliedMigrationsAsync()).Should().Contain(TestDatabaseCluster.CurrentSchemaMigration);
+        (await context.Database.GetAppliedMigrationsAsync()).Should().Contain(ChargeMigration);
     }
     [Fact]
     public async Task Concurrent_charge_commit_is_seen_before_downgrade_can_remove_columns()
@@ -75,7 +77,7 @@ public sealed class StaffBillChargeMigrationTests(DatabaseFixture fixture) : IAs
         var committed = false;
         try
         {
-            (await WaitForBlockedMigrationAsync(migrationPid)).Should().BeTrue(
+            (await MigrationTestSafety.WaitForBlockedMigrationAsync(fixture.ConnectionString, migrationPid)).Should().BeTrue(
                 "the migration must reach a lock barrier while the fee write remains uncommitted");
             await transaction.CommitAsync();
             committed = true;
@@ -92,22 +94,6 @@ public sealed class StaffBillChargeMigrationTests(DatabaseFixture fixture) : IAs
             catch (PostgresException) { /* The expected preservation guard may have refused downgrade. */ }
             await migrator.MigrateAsync();
         }
-    }
-
-    private async Task<bool> WaitForBlockedMigrationAsync(int pid)
-    {
-        await using var monitor = new NpgsqlConnection(fixture.ConnectionString);
-        await monitor.OpenAsync();
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (DateTime.UtcNow < deadline)
-        {
-            await using var check = new NpgsqlCommand(
-                "SELECT wait_event_type = 'Lock' FROM pg_stat_activity WHERE pid = @pid", monitor);
-            check.Parameters.AddWithValue("pid", pid);
-            if (await check.ExecuteScalarAsync() is true) return true;
-            await Task.Delay(50);
-        }
-        return false;
     }
 
 }

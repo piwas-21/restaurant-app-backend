@@ -166,6 +166,14 @@ For each DB column / DTO field referenced, name the source of truth:
 - Field name + type as it appears there
 - For joins / nested DTOs, confirm both sides match.
 
+When adding a migration, update `TestDatabaseCluster.CurrentSchemaMigration` and run the historical
+downgrade tests. Every test that changes schema must restore the current migration in `finally` or
+teardown before the next Respawn reset; a guarded downgrade can remove newer empty tables first.
+
+A new anonymous write requires an exact entry and authorization rationale in
+`MutatingEndpointAuthorizationCoverageTests.AnonymousWrites`. Run its discrimination controls
+and the HTTP ownership/refusal tests; bound public write ingress across equivalent routes.
+
 ### 2. Sibling conventions
 List 2–3 sibling files in the directory you're adding to. Note their structure (DI registration, naming, base class). Confirm your new file matches.
 

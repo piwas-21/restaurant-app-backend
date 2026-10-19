@@ -4,6 +4,8 @@ namespace RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 
 public record AddToBasketDto
 {
+    /// <summary>Optional durable retry identity. Reuse only for the exact same logical add.</summary>
+    public Guid? OperationId { get; set; }
     public Guid ProductId { get; set; } = Guid.Empty;
     public Guid? ProductVariationId { get; set; }
     public Guid? MenuId { get; set; }
