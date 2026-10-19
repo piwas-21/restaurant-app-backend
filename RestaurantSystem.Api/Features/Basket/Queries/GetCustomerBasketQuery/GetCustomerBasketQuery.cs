@@ -6,7 +6,6 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using BasketReadQuery = RestaurantSystem.Api.Features.Basket.Queries.GetBasketQuery.GetBasketQuery;
 using RestaurantSystem.Api.Features.Basket.Services.Operations;
-using RestaurantSystem.Api.Features.Tenant.Queries.GetCustomerMobileBootstrapQuery;
 
 namespace RestaurantSystem.Api.Features.Basket.Queries.GetCustomerBasketQuery;
 
@@ -20,9 +19,7 @@ public sealed class GetCustomerBasketQueryHandler(
     {
         CustomerBasketAccess.EnsureCustomerOrGuest(currentUser, httpContext.HttpContext);
         CustomerBasketOperationHash.Session(query.SessionId);
-        var bootstrap = await mediator.SendQuery(new GetCustomerMobileBootstrapQuery(1), cancellationToken);
-        if (bootstrap.Data?.Capabilities.GetValueOrDefault("ordering") != "enabled")
-            throw new NotFoundException("Customer mobile ordering is unavailable.");
+        await CustomerBasketAvailability.EnsureOrderingAsync(mediator, cancellationToken);
         return await mediator.SendQuery(new BasketReadQuery(query.SessionId), cancellationToken);
     }
 }

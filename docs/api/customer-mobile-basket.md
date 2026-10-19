@@ -12,6 +12,9 @@ address only their own basket. Reads/effects use `ApiResponse<BasketDto>`; cance
 | `POST /api/customer-mobile/basket/items/{basketItemId}/operations` | Recoverable absolute quantity/instruction update or root removal |
 | `POST /api/customer-mobile/basket/items/cancel` | Seal an unresolved original add, or prove it was already applied |
 | `POST /api/customer-mobile/basket/items/{basketItemId}/operations/cancel` | Seal an unresolved original root edit/removal, or prove it was already applied |
+| `GET /api/customer-mobile/basket/channel-preview?orderType=Takeaway` | Read owned basket revision and root-level conflicts without creating or changing a basket |
+| `POST /api/customer-mobile/basket/channel` | Durably switch to an enabled channel using an exact reviewed revision and confirmed conflict set |
+| `POST /api/customer-mobile/basket/channel/cancel` | Seal the exact original channel request, or prove it was already applied |
 
 New reads/effects require native ordering opt-in. Existing accepted operations remain recoverable after
 withdrawal. All native writes share the configured add ingress budget with the legacy add endpoint;
@@ -32,6 +35,25 @@ Remove requires quantity and instructions to be absent/null. It removes the root
 children cannot be independently updated/deleted. Prices, totals, owner IDs and staff flags are never taken from the request.
 The reviewed basket ID/digest must still match inside the native operation transaction. A missing root
 returns 404; a changed basket returns 409. Neither failure creates an acceptance receipt.
+
+## Reviewed channel switches
+
+Preview returns `basketId`, `purchaseFingerprint`, the requested `orderType`, and `conflicts` using the
+same whole-line/category/side scan as web switching. A missing basket has nil ID, empty digest and no
+conflicts; preview never creates a basket or receipt. Enabled order types remain available through
+`GET /api/OrderTypeConfiguration/enabled` and are checked again on a new native switch.
+
+Channel requests require `operationId`, `expectedBasketId`, `expectedPurchaseFingerprint`, `orderType`
+and an explicit `confirmedConflictItemIds` array. Empty basket identity/digest is allowed only when
+there is no current owned basket. Otherwise the reviewed ID and purchase digest must match. The
+current root conflict set must exactly equal the confirmed IDs at the authoritative removal scan;
+new, removed or changed conflicts cause 409 without dropping any line or creating a receipt.
+Children and sides stay root-granular. A confirmed root and all descendants are removed together.
+
+Native switches use the same effect/receipt transaction, owner lock, recovery and cancellation rules
+as item mutations, with a distinct channel payload kind. Existing web switch contracts are unchanged.
+No independent native clear-channel action or new database schema is introduced. Replay and sealing
+remain possible after channel availability or native ordering is withdrawn.
 
 ## Recovery and atomicity
 

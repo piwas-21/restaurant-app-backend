@@ -16,6 +16,8 @@ public static class CustomerBasketOperationRegistration
             .ValidateDataAnnotations().ValidateOnStart();
         services.AddScoped<ICustomerBasketOperationService, CustomerBasketOperationService>();
         services.AddScoped<ICustomerBasketItemMutationService, CustomerBasketItemMutationService>();
+        services.AddScoped<ICustomerBasketChannelService, CustomerBasketChannelService>();
+        services.AddScoped<ICustomerBasketChannelPreviewService, CustomerBasketChannelPreviewService>();
         services.Configure<RateLimiterOptions>(options => options.AddPolicy(AddPolicyName, context =>
             RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions

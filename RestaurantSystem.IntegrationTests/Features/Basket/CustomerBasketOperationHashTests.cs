@@ -73,4 +73,19 @@ public sealed class CustomerBasketOperationHashTests
         CustomerBasketOperationHash.OwnerLock(session, null).Should().NotBe(CustomerBasketOperationHash.OwnerLock(otherSession, null));
         CustomerBasketOperationHash.OperationLock(session).Should().NotBe(CustomerBasketOperationHash.OwnerLock(session, null));
     }
+
+    [Fact]
+    public void Channel_request_identity_preserves_the_independent_durable_digest()
+    {
+        var request = new CustomerBasketChannelDto
+        {
+            OperationId = Guid.Parse("11111111-1111-4111-8111-111111111111"),
+            ExpectedBasketId = Guid.Parse("22222222-2222-4222-8222-222222222222"),
+            ExpectedPurchaseFingerprint = new string('A', 64),
+            OrderType = Domain.Common.Enums.OrderType.Takeaway,
+            ConfirmedConflictItemIds = [Guid.Parse("33333333-3333-4333-8333-333333333333")]
+        };
+        // Public vector independently derived with Python sorted PascalCase JSON, numeric enum and SHA-256.
+        CustomerBasketPayload.Channel(request).Should().Be("d8945bfc10e954a14f07db472994572ba117b98cecfaee13fb5ab23dcaf0bc24"); // pragma: allowlist secret
+    }
 }

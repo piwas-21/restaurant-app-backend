@@ -21,6 +21,10 @@ public interface IBasketChannelService
         bool removeConflicts,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Apply only when the current conflict set exactly matches the reviewed root removals.</summary>
+    Task<BasketChannelSwitchDto> SetReviewedOrderTypeAsync(string sessionId, Guid? userId,
+        OrderType orderType, IReadOnlySet<Guid> reviewedConflicts, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Clears the basket's channel, returning the basket afterwards (<c>null</c> when there was no
     /// basket to clear). Idempotent, and never destructive.

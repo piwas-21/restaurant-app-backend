@@ -10,4 +10,6 @@ internal static class CustomerBasketPayload
 
     public static string Mutation(Guid basketItemId, CustomerBasketItemMutationDto request) =>
         CustomerBasketOperationHash.Payload(new { Kind = "root-item-mutation-v1", BasketItemId = basketItemId, Request = request });
+    public static string Channel(CustomerBasketChannelDto request) =>
+        CustomerBasketOperationHash.Payload(new { Kind = "basket-channel-v1", Request = request });
 }
