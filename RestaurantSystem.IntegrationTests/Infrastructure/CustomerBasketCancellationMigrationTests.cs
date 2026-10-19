@@ -12,6 +12,8 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 public sealed class CustomerBasketCancellationMigrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private const string PreviousMigration = "20261019001953_" + nameof(AddCustomerBasketOperations);
+    // EF may commit removal of newer empty tables before reaching this migration's receipt guard.
+    private const string RefusingMigration = "20261019045735_" + nameof(AddCustomerBasketCancellation);
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => MigrationTestSafety.RestoreCurrentSchemaAsync(fixture);
 
@@ -36,7 +38,7 @@ public sealed class CustomerBasketCancellationMigrationTests(DatabaseFixture fix
             original.IsCancelled.Should().BeFalse();
             var refusal = async () => await migrator.MigrateAsync(PreviousMigration);
             (await refusal.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
-            (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
+            (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(RefusingMigration);
         }
         finally { await migrator.MigrateAsync(); }
     }
@@ -89,7 +91,7 @@ public sealed class CustomerBasketCancellationMigrationTests(DatabaseFixture fix
             saved.OperationId.Should().Be(id);
             saved.IsCancelled.Should().BeTrue();
             saved.BasketId.Should().BeEmpty();
-            (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
+            (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(RefusingMigration);
         }
         finally
         {
