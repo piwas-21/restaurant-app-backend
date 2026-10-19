@@ -40,7 +40,8 @@ public interface ICustomerDiscountService
     decimal CalculateDiscountAmount(CustomerDiscountRule rule, decimal orderAmount);
 
     /// <summary>
-    /// Apply a discount and increment its usage count
+    /// Atomically consume one currently eligible use, refusing exhausted or inactive rules.
+    /// Joins the caller transaction when present; the returned rule bypasses stale tracked state.
     /// </summary>
     Task<CustomerDiscountRule> ApplyDiscountAsync(Guid discountRuleId, CancellationToken cancellationToken = default);
 
