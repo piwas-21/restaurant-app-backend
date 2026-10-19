@@ -97,7 +97,7 @@ public partial class OrderMappingService
             Quantity = item.Quantity,
             UnitPrice = item.UnitPrice,
             ItemTotal = item.ItemTotal,
-            SpecialInstructions = item.SpecialInstructions,
+            SpecialInstructions = KitchenInstructionText.For(item),
             KitchenType = kitchenType,
             IngredientCustomizations = ingredientCustomizations,
             SideItems = sideItems

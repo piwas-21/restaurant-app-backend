@@ -25,7 +25,7 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 namespace RestaurantSystem.IntegrationTests.Features.KitchenBoard;
 
 [Collection("Database Lane 3")]
-public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
+public sealed partial class KitchenBoardWorkflowTests : IntegrationTestBase
 {
     private static readonly DateTime TestNow = new(2026, 10, 8, 12, 0, 0, DateTimeKind.Utc);
     private readonly KitchenBoardTestFeatures _features = new();

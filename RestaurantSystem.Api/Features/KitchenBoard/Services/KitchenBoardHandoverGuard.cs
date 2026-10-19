@@ -44,6 +44,10 @@ internal static class KitchenBoardHandoverGuard
                 && work.Kind == KitchenBoardWorkKind.InitialOrder)
             .Select(work => work.OrderId)
             .ToHashSetAsync(cancellationToken);
+        var staffAcknowledgedIds = await context.KitchenBoardWorkCompletions.AsNoTracking()
+            .Where(work => ids.Contains(work.OrderId) && work.WorkItemId == work.OrderId
+                && work.Kind == KitchenBoardWorkKind.StaffHandover)
+            .Select(work => work.OrderId).ToHashSetAsync(cancellationToken);
         var printedReceipts = await context.DeviceOrderReceipts.AsNoTracking()
             .Where(receipt => ids.Contains(receipt.OrderId)
                 && receipt.Status == DevicePrintStatus.Printed)
@@ -72,10 +76,11 @@ internal static class KitchenBoardHandoverGuard
 
         return orders.ToDictionary(order => order.Id, order =>
         {
-            var baseWorkComplete = HasCompletedBaseWork(order, completedIds, printedKeys);
+            var staffAcknowledged = staffAcknowledgedIds.Contains(order.Id);
+            var baseWorkComplete = staffAcknowledged || HasCompletedBaseWork(order, completedIds, printedKeys);
             return new KitchenBoardHandoverState(true, baseWorkComplete,
                 unresolvedOrderIds.Contains(order.Id),
-                KitchenBoardWorkRules.CanResolveRoutingExceptionWithBoard(order, baseWorkComplete));
+                staffAcknowledged || KitchenBoardWorkRules.CanResolveRoutingExceptionWithBoard(order, baseWorkComplete));
         });
     }
 

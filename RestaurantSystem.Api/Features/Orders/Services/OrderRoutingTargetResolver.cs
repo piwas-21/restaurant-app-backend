@@ -17,7 +17,8 @@ internal static class OrderRoutingTargetResolver
         // The cashier receipt is an independent operational destination. Keeping it in the
         // durable route set prevents a device-aware printer client from suppressing the cashier
         // copy merely because the kitchen also has a routed job.
-        targets.Add(DevicePrintTarget.Cashier);
+        if (!order.ServiceSessionId.HasValue)
+            targets.Add(DevicePrintTarget.Cashier);
         return targets;
     }
 

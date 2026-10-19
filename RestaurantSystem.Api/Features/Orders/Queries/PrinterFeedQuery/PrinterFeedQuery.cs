@@ -151,6 +151,7 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
                         && work.Kind == KitchenBoardWorkKind.InitialOrder))
                 || (order.Status != OrderStatus.Cancelled
                     && order.Status != OrderStatus.Refunded
+                    && !order.ServiceSessionId.HasValue
                     && order.RoutingStates.Any(state => state.Target == DevicePrintTarget.Cashier
                     && state.DeviceId == routing.DeviceId
                     && state.Status == DevicePrintStatus.Queued)));

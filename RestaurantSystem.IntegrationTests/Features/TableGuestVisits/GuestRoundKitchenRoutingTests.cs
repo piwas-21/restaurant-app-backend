@@ -144,11 +144,11 @@ public sealed class GuestRoundKitchenRoutingTests : IntegrationTestBase
                 .Select(value => value.AccountRevision).SingleAsync()).Should().Be(2);
             var routes = await verify.OrderRoutingStates.Where(value => value.OrderId == orderId).ToListAsync();
             routes.Select(Identity).OrderBy(value => value.Target).Should().Equal(committedRoutes);
-            routes.Should().HaveCount(2);
+            routes.Should().HaveCount(1);
             routes.Should().ContainSingle(value => value.IsRequired && value.Target == DevicePrintTarget.General
                 && value.Status == DevicePrintStatus.NotConfigured && value.DeviceId == null);
-            routes.Should().ContainSingle(value => !value.IsRequired && value.Target == DevicePrintTarget.Cashier
-                && value.Status == DevicePrintStatus.NotConfigured && value.DeviceId == null);
+            routes.Should().NotContain(value => value.Target == DevicePrintTarget.Cashier,
+                "the full table cashier bill is deferred until session closure");
             routes.Should().NotContain(value => value.Status == DevicePrintStatus.Printed);
         }
 

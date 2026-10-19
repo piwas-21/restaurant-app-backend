@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text.Json.Serialization;
 using RestaurantSystem.Api.Abstraction.Messaging;
@@ -25,6 +25,7 @@ public record UpdateOrderStatusCommand : ICommand<ApiResponse<OrderDto>>
     /// <summary>Optional detail version; old clients may omit it.</summary>
     public int? ExpectedVersion { get; set; }
     public int? EstimatedPreparationMinutes { get; set; }
+    public bool AcknowledgeCompletedWork { get; set; }
 
     /// <summary>Set only by the token-validated operator email-link handler.</summary>
     [JsonIgnore]
@@ -87,12 +88,17 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
             return validationFailure;
         }
 
-        if (_transitionPolicy?.RequiresKitchenBoardHandover(command.NewStatus) == true)
+        if (_transitionPolicy?.RequiresKitchenBoardHandover(command.NewStatus) == true || command.AcknowledgeCompletedWork)
         {
             var workStates = await KitchenBoardHandoverGuard.ReadAsync(
                 _context, [order], true, cancellationToken);
             var blockingReason = workStates[order.Id].BlockReason(order);
-            if (blockingReason is not null)
+            if (blockingReason is not null && command.AcknowledgeCompletedWork)
+            {
+                await StaffHandoverAcknowledgement.RecordAsync(
+                    _context, order, _currentUserService.GetAuditIdentifier(), cancellationToken);
+            }
+            else if (blockingReason is not null)
             {
                 return ApiResponse<OrderDto>.FailureWithCode(
                     blockingReason == ErrorCodes.KitchenCorrectionUnresolved

@@ -19,6 +19,8 @@ public static class OrderDetailServiceExtensions
         services.AddScoped<IOrderStatusUpdateServices, OrderStatusUpdateServices>();
         services.AddScoped<IOrderPermittedActionsService, OrderPermittedActionsService>();
         services.AddScoped<IOrderResponseProjector, OrderResponseProjector>();
+        services.AddScoped<RestaurantSystem.Api.Features.CashierPrinting.Services.ICashierPrintQueue,
+            RestaurantSystem.Api.Features.CashierPrinting.Services.CashierPrintQueue>();
         return services;
     }
 }

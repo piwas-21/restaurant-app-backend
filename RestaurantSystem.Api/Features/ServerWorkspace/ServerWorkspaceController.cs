@@ -37,10 +37,11 @@ public sealed class ServerWorkspaceController : ControllerBase
         [FromBody] DeliverServerTaskRequest request,
         CancellationToken cancellationToken) =>
         Ok(await _mediator.SendCommand(
-            new DeliverServerTaskCommand(orderId, request.ExpectedVersion), cancellationToken));
+            new DeliverServerTaskCommand(orderId, request.ExpectedVersion, request.AcknowledgeCompletedWork), cancellationToken));
 }
 
 public sealed record DeliverServerTaskRequest
 {
     public required int ExpectedVersion { get; init; }
+    public bool AcknowledgeCompletedWork { get; init; }
 }
