@@ -118,7 +118,7 @@ public abstract class CustomerOrderCheckoutJournalFixture(DatabaseFixture databa
         guard.Setup(value => value.EnsureOwner(It.IsAny<string>())).Returns(owner);
         var bootstrap = new Mock<IQueryHandler<GetCustomerMobileBootstrapQuery, ApiResponse<CustomerMobileBootstrapDto>>>();
         bootstrap.Setup(value => value.Handle(It.IsAny<GetCustomerMobileBootstrapQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ApiResponse<CustomerMobileBootstrapDto>.SuccessWithData(new(1, Guid.NewGuid(), "CHF", "en",
+            .ReturnsAsync(() => ApiResponse<CustomerMobileBootstrapDto>.SuccessWithData(new(1, Guid.NewGuid(), "CHF", "en",
                 "Europe/Zurich", "active", "supported", [], true, new Dictionary<string, bool>(),
                 new Dictionary<string, string> { ["ordering"] = "enabled", ["online-payments"] = OnlineCapability })));
         using var services = new ServiceCollection().AddSingleton(bootstrap.Object).BuildServiceProvider();
