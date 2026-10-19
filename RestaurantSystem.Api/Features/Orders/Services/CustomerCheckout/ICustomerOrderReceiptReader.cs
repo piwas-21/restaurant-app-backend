@@ -6,4 +6,5 @@ public interface ICustomerOrderReceiptReader
 {
     Task<CustomerOrderReceiptDto> ReadAsync(string sessionId, CustomerOrderRecoveryDto proof,
         CancellationToken cancellationToken);
+    Task<CustomerOrderReceiptDto> ReadCustomerAsync(Guid orderId, CancellationToken cancellationToken);
 }

@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Api.Features.Orders.Queries.GetCustomerOrderHistoryQuery;
+using RestaurantSystem.Api.Features.Orders.Queries.GetCustomerHistoryReceiptQuery;
 using RestaurantSystem.Api.Features.Basket.Services.Operations;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Queries.GetCustomerOrderReceiptQuery;
@@ -23,6 +24,13 @@ public sealed class CustomerMobileOrdersController(CustomMediator mediator) : Co
     public async Task<ActionResult<ApiResponse<CustomerOrderHistoryPageDto>>> History(
         [FromQuery] GetCustomerOrderHistoryQuery query, CancellationToken cancellationToken) =>
         Ok(await mediator.SendQuery(query, cancellationToken));
+
+    [HttpGet("{orderId:guid}")]
+    [RequireRole(UserRole.Customer)]
+    [EnableRateLimiting(CustomerBasketOperationRegistration.AddPolicyName)]
+    public async Task<ActionResult<ApiResponse<CustomerOrderReceiptDto>>> HistoryReceipt(Guid orderId,
+        [FromQuery] int? schemaVersion, CancellationToken cancellationToken) =>
+        Ok(await mediator.SendQuery(new GetCustomerHistoryReceiptQuery(schemaVersion, orderId), cancellationToken));
 
     // Read-only POST keeps the original operation capability out of URL/history/access logs.
     [HttpPost("receipt")]

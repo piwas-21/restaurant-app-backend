@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.User.Services;
+using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -9,7 +11,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.Orders.Services.CustomerCheckout;
 
 public sealed class CustomerOrderReceiptReader(ApplicationDbContext context, ICustomerCheckoutGuard guard,
-    ICustomerOrderOperationStore operations, ITenantClock clock) : ICustomerOrderReceiptReader
+    ICustomerOrderOperationStore operations, ITenantClock clock, ICurrentUserService currentUser) : ICustomerOrderReceiptReader
 {
     public async Task<CustomerOrderReceiptDto> ReadAsync(string sessionId, CustomerOrderRecoveryDto proof,
         CancellationToken cancellationToken)
@@ -21,8 +23,30 @@ public sealed class CustomerOrderReceiptReader(ApplicationDbContext context, ICu
         // A retained operation never bypasses deleted/anonymized order ownership.
         var order = await context.Orders.AsNoTracking().SingleOrDefaultAsync(value => value.Id == orderId
             && value.UserId == userId && !value.IsDeleted, cancellationToken) ?? throw Unavailable();
-        var currency = await context.OrderBillingSnapshots.AsNoTracking().Where(value => value.OrderId == orderId)
-            .Select(value => value.Currency).SingleOrDefaultAsync(cancellationToken) ?? throw Unavailable();
+        return await ReadOrderAsync(order, requireCurrency: true, cancellationToken);
+    }
+
+    public async Task<CustomerOrderReceiptDto> ReadCustomerAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        var owner = CustomerAccountAccess.RequireOwner(currentUser);
+        var account = CustomerAccountAccess.ForOwner(context, owner);
+        var order = await context.Orders.AsNoTracking().SingleOrDefaultAsync(value => value.Id == orderId
+            && value.UserId == owner && !value.IsDeleted
+            && account.Any(user => user.Id == value.UserId), cancellationToken)
+            ?? throw Unavailable();
+        return await ReadOrderAsync(order, requireCurrency: false, cancellationToken);
+    }
+
+    private async Task<CustomerOrderReceiptDto> ReadOrderAsync(Order order, bool requireCurrency,
+        CancellationToken cancellationToken)
+    {
+        var orderId = order.Id;
+        var recordedCurrency = await context.OrderBillingSnapshots.AsNoTracking().Where(value => value.OrderId == orderId)
+            .Select(value => value.Currency).SingleOrDefaultAsync(cancellationToken);
+        var currency = CurrencyCode.IsValid(recordedCurrency) ? CurrencyCode.Normalize(recordedCurrency) : null;
+        // Legacy history retains frozen composition without relabeling it in today's currency.
+        // Operation receipts still require their original billing snapshot.
+        if (requireCurrency && currency is null) throw Unavailable();
         var items = await context.OrderItems.AsNoTracking().Where(item => item.OrderId == orderId)
             .OrderBy(item => item.PresentationOrder).ThenBy(item => item.CreatedAt).ThenBy(item => item.Id)
             .Take(CustomerCheckoutLimits.MaximumLines + 1).ToArrayAsync(cancellationToken);

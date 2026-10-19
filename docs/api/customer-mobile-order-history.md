@@ -26,3 +26,24 @@ remain separate customer journeys.
 
 This source adds no migration, retention change, order/payment write or native activation. Source
 review/CI, deployed contract readback and installed customer acceptance are separate requirements.
+
+
+## Owned receipt detail
+
+GET /api/customer-mobile/orders/{orderId}?schemaVersion=1 requires the current database Customer
+and matches the order owner in the same no-tracking query. Missing/deleted/anonymized/foreign orders
+and withdrawn accounts return404. The native receipt controller applies no-store and bounded rate
+policy; a UUID is navigation, never an ownership capability. No local operation proof is needed for
+an order owned by the authenticated account.
+
+The existing receipt reader shares bounded frozen composition and money/status projection. It reads
+at most1001 order lines and10001 ingredient snapshots, refusing unsupported/oversized composition
+rather than truncating it. No current catalogue graph, provider identity, contact or guest token is
+returned. This adds no payment/order write, migration or notification.
+
+Currency comes only from OrderBillingSnapshot. A legacy owned detail can return currency:null;
+clients must hide every monetary label and line price and explain that the historical amount is
+unavailable. Frozen names, quantities, options, instructions and separate current fulfillment/payment
+status remain available. The existing proof-bound native operation receipt still requires recorded
+currency and retains its original route/proof behavior. Cancellation/reorder and installed acceptance
+remain separate work.
