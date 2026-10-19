@@ -17,5 +17,6 @@ selection clears other active defaults, including legacy duplicates; this is not
 
 The concurrency fixture holds an external account guard and observes two database lock waiters
 before releasing simultaneous HTTP writes. It checks each writer, the final default cardinality,
-foreign/missing addresses, deleted/missing owners and transaction ownership. Native CRUD controls,
+foreign/missing addresses, deleted/missing owners, transaction ownership and concurrent KEY SHARE
+compatibility. Native CRUD controls,
 write recovery and installed-device acceptance remain separate delivery work.

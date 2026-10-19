@@ -122,6 +122,25 @@ public sealed class AddressWriteConcurrencyTests(DatabaseFixture fixture) : Inte
     }
 
     [Fact]
+    public async Task Address_guard_allows_unrelated_account_foreign_key_checks()
+    {
+        var owner = Guid.Parse(TestAuthHandler.UserId);
+        await using var guarded = DatabaseFixture.CreateContext();
+        await using var transaction = await AddressWriteTransaction.BeginAsync(guarded, owner, CancellationToken.None);
+        await using var unrelated = DatabaseFixture.CreateContext();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+        // Order.UserId inserts acquire this PostgreSQL foreign-key lock. Keep the fixture
+        // independent of order creation, its journal and the address writer under test.
+        var referenced = await unrelated.Database.SqlQuery<Guid>($"""
+            SELECT id AS "Value" FROM "Users" WHERE id = {owner} FOR KEY SHARE
+            """).ToArrayAsync(timeout.Token);
+
+        referenced.Should().Equal(new[] { owner }, "address changes must allow unrelated account FK checks");
+        await transaction.RollbackAsync();
+    }
+
+    [Fact]
     public async Task Missing_owner_releases_its_short_transaction_without_creating_rows()
     {
         await using var context = DatabaseFixture.CreateContext();
