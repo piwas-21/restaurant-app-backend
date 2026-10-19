@@ -33,10 +33,12 @@ returns 404; a changed basket returns 409. Neither failure creates an acceptance
 
 ## Recovery and atomicity
 
-Operation and owner advisory locks serialize native operations; owner locks span a customer's devices.
+Operation advisory locks serialize replay. Shared owner locks cover native and legacy basket/channel
+service writes, including login merge; customer locks span devices. Merge locks both guest and customer
+owners in deterministic order. Read-only service calls take no write lock.
 The basket effect and receipt commit in one transaction, including the existing basket service's saves.
 A failure before commit rolls both back. Receipts retain only UUIDs/hashes/time, survive basket cleanup
-and cannot be removed by the guarded historical downgrade. No new migration accompanies root edits.
+and cannot be removed by the guarded historical downgrade. No new migration accompanies root edits or write coordination.
 
 Exact owned replay returns the current original basket without repeating the effect. Changed payloads
 or route IDs conflict; a different principal/session cannot recover the receipt. A deleted/replaced

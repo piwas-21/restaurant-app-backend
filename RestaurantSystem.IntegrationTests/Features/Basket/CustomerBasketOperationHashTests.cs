@@ -33,6 +33,18 @@ public sealed class CustomerBasketOperationHashTests
     }
 
     [Fact]
+    public void Legacy_and_native_writers_share_owner_locks_without_changing_legacy_session_lookup()
+    {
+        var session = Guid.NewGuid(); var user = Guid.NewGuid();
+        CustomerBasketOperationHash.WriteOwnerLock(session.ToString("D"), null)
+            .Should().Be(CustomerBasketOperationHash.OwnerLock(session, null));
+        CustomerBasketOperationHash.WriteOwnerLock("legacy-session", user)
+            .Should().Be(CustomerBasketOperationHash.OwnerLock(Guid.NewGuid(), user));
+        CustomerBasketOperationHash.WriteOwnerLock("legacy-session", null)
+            .Should().NotBe(CustomerBasketOperationHash.WriteOwnerLock("other-session", null));
+    }
+
+    [Fact]
     public void Owner_binding_uses_session_and_principal_but_customer_basket_lock_spans_devices()
     {
         var session = Guid.NewGuid(); var otherSession = Guid.NewGuid(); var user = Guid.NewGuid();

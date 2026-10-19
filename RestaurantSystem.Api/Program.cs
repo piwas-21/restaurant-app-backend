@@ -772,14 +772,13 @@ builder.Services.AddEmailSender(builder.Configuration);   // IEmailSender transp
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IEmailBrandingProvider, EmailBrandingProvider>();
 builder.Services.AddScoped<IProductCustomizationGroupSynchronizer, ProductCustomizationGroupSynchronizer>();
-builder.Services.AddScoped<IBasketService, BasketService>();
+builder.Services.AddBasketWriteCoordination();
 builder.Services.AddCustomerBasketOperations();
 builder.Services.AddScoped<IBasketPricingService, BasketPricingService>();
 builder.Services.AddScoped<ILineCustomizationBuilder, LineCustomizationBuilder>();
 builder.Services.AddScoped<IBasketMappingService, BasketMappingService>();
 builder.Services.AddScoped<IBasketItemFactory, BasketItemFactory>();
 builder.Services.AddScoped<IBasketRepository, BasketRepository>();
-builder.Services.AddScoped<IBasketChannelService, BasketChannelService>();
 builder.Services.AddScoped<IOrderChannelGuard, OrderChannelGuard>();
 builder.Services.AddScoped<IOrderAvailabilityGuard, OrderAvailabilityGuard>();
 builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
