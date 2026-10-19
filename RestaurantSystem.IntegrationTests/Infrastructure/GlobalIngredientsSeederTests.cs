@@ -26,12 +26,12 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// coincidental names and admin-created sauces (<c>LibraryOrigin.Custom</c>) do not move.</item>
 /// </list>
 ///
-/// This is a plain fixture class — no per-test Respawn reset runs inside it — so each test
-/// reaches a bare table itself (a leading ExecuteDelete purge plus an emptiness assertion)
-/// instead of assuming one. Nothing in the suite re-seeds the library.
+/// Each test resets the disposable lane, including unrelated guarded history left by a sibling.
+/// Teardown restores the current schema even when a migration assertion fails. Explicit library
+/// purges and emptiness assertions retain the seeder's independent precondition checks.
 /// </summary>
 [Collection("Database Lane 4")]
-public class GlobalIngredientsSeederTests
+public class GlobalIngredientsSeederTests : IAsyncLifetime
 {
     /// <summary>The migration immediately before <c>ReclassifySeededSauces</c> — the revert target.</summary>
     // The literal is split only so detect-secrets' base64-entropy heuristic does not flag the
@@ -74,12 +74,14 @@ public class GlobalIngredientsSeederTests
         _fixture = fixture;
     }
 
+    public Task InitializeAsync() => _fixture.ResetDatabaseAsync();
+    public Task DisposeAsync() => MigrationTestSafety.RestoreCurrentSchemaAsync(_fixture);
+
     [Fact]
     public async Task FreshSeed_StampsExactlyTheSauceFamilyAsSauce()
     {
         await using var context = _fixture.CreateContext();
-        // Start from a bare table. xUnit may run the migration test of this class first and it
-        // leaves its probe rows behind, so "empty" cannot be assumed — only asserted.
+        // Keep the seeder's bare-table precondition explicit, independently of the lane reset.
         // soft-delete-bypass: permanent purge of throwaway fixture rows to reach the pre-seed
         // state the skip guard requires.
         await context.GlobalIngredients.ExecuteDeleteAsync();

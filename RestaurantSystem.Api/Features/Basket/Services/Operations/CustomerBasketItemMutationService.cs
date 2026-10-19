@@ -13,7 +13,7 @@ public sealed class CustomerBasketItemMutationService(
     public Task<BasketDto> MutateAsync(string sessionId, Guid basketItemId, CustomerBasketItemMutationDto request,
         CancellationToken cancellationToken) =>
         operations.ExecuteAsync(sessionId, request.OperationId,
-            CustomerBasketOperationHash.Payload(new { Kind = "root-item-mutation-v1", BasketItemId = basketItemId, Request = request }),
+            CustomerBasketPayload.Mutation(basketItemId, request),
             () => ApplyAsync(sessionId, basketItemId, request), cancellationToken);
 
     private async Task<BasketDto> ApplyAsync(string sessionId, Guid basketItemId, CustomerBasketItemMutationDto request)

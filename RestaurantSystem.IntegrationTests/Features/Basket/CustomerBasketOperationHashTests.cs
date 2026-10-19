@@ -12,6 +12,25 @@ public sealed class CustomerBasketOperationHashTests
         var request = new AddToBasketDto { ProductId = Guid.Parse("11111111-1111-4111-8111-111111111111"), Quantity = 2 };
         // Independently derived from sorted PascalCase JSON with explicit null fields and SHA-256.
         CustomerBasketOperationHash.Payload(request).Should().Be("d59d30e77079ee8b427257d1b61d2774b6d0c33db467924854fb27b3a21d8e23"); // pragma: allowlist secret
+        CustomerBasketPayload.Add(request with { OperationId = Guid.NewGuid() })
+            .Should().Be(CustomerBasketOperationHash.Payload(request));
+    }
+
+    [Fact]
+    public void Root_mutation_normalization_preserves_the_independent_accepted_digest()
+    {
+        var request = new CustomerBasketItemMutationDto
+        {
+            OperationId = Guid.Parse("22222222-2222-4222-8222-222222222222"),
+            ExpectedBasketId = Guid.Parse("33333333-3333-4333-8333-333333333333"),
+            ExpectedPurchaseFingerprint = new string('a', 64),
+            Action = CustomerBasketItemAction.Update,
+            Quantity = 3,
+            SpecialInstructions = "No salt"
+        };
+        // Public vector independently derived from sorted PascalCase JSON and numeric enum serialization.
+        CustomerBasketPayload.Mutation(Guid.Parse("11111111-1111-4111-8111-111111111111"), request)
+            .Should().Be("bab4ac8d1752c653e161580d8a2ac36fab2a4d70d44f287db799a8a76b6c2495"); // pragma: allowlist secret
     }
 
     [Fact]

@@ -15,6 +15,7 @@ public sealed class CustomerBasketOperationConfiguration : IEntityTypeConfigurat
         builder.Property(operation => operation.PayloadHash).HasColumnName("payload_hash").HasMaxLength(64).IsRequired();
         // No basket FK: cleanup must not erase the receipt and make a replay add the item again.
         builder.Property(operation => operation.BasketId).HasColumnName("basket_id").IsRequired();
+        builder.Property(operation => operation.IsCancelled).HasColumnName("is_cancelled").HasDefaultValue(false);
         builder.Property(operation => operation.AppliedAt).HasColumnName("applied_at").IsRequired();
     }
 }

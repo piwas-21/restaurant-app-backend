@@ -48,6 +48,10 @@ public sealed class CustomerBasketAddRateLimitTests(DatabaseFixture fixture) : I
     [InlineData("/api/basket/items", "/api/customer-mobile/basket/items")]
     [InlineData("/api/customer-mobile/basket/items", "/api/customer-mobile/basket/items/11111111-1111-4111-8111-111111111111/operations")]
     [InlineData("/api/customer-mobile/basket/items/11111111-1111-4111-8111-111111111111/operations", "/api/basket/items")]
+    [InlineData("/api/customer-mobile/basket/items/cancel", "/api/basket/items")]
+    [InlineData("/api/basket/items", "/api/customer-mobile/basket/items/cancel")]
+    [InlineData("/api/customer-mobile/basket/items/11111111-1111-4111-8111-111111111111/operations/cancel", "/api/customer-mobile/basket/items")]
+    [InlineData("/api/basket/items", "/api/customer-mobile/basket/items/11111111-1111-4111-8111-111111111111/operations/cancel")]
     public async Task Native_mutations_and_both_add_routes_share_an_ip_budget_that_rotating_sessions_cannot_escape(string first, string second)
     {
         AuthenticateAsAnonymous();
