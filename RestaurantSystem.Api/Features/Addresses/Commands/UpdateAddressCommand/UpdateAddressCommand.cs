@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Addresses.Services;
 using RestaurantSystem.Api.Features.Addresses.Dtos;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -37,7 +38,7 @@ public class UpdateAddressCommandHandler : ICommandHandler<UpdateAddressCommand,
         }
 
         var isDefault = command.IsDefault ?? false;
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken);
 
         try
         {
