@@ -30,13 +30,28 @@ public class OrderPricingService : IOrderPricingService
         _logger = logger;
     }
 
-    public async Task ApplyAsync(
+    public Task ApplyAsync(
         Order order,
         decimal itemsTotal,
         CreateOrderCommand command,
         Guid? userId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        PriceAsync(order, itemsTotal, command, userId, consumeDiscount: true, cancellationToken);
+
+    public Task PreviewAsync(
+        Order order,
+        decimal itemsTotal,
+        CreateOrderCommand command,
+        Guid? userId,
+        CancellationToken cancellationToken) =>
+        PriceAsync(order, itemsTotal, command, userId, consumeDiscount: false, cancellationToken);
+
+    private async Task PriceAsync(
+        Order order, decimal itemsTotal, CreateOrderCommand command, Guid? userId,
+        bool consumeDiscount, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(order);
+        ArgumentNullException.ThrowIfNull(command);
         // TAX IS DELIBERATELY LEFT AT 0 — do not "fix" this by calling ITaxConfigurationService here
         // without first reading §6 of SOFRA-PAYMENTS-PLAN.
         //
@@ -55,7 +70,7 @@ public class OrderPricingService : IOrderPricingService
         order.DeliveryFee = command.Type == OrderType.Delivery ? _orderSettings.DeliveryFee : 0;
 
         await ApplyUserLimitDiscountAsync(order, command, userId, itemsTotal, cancellationToken);
-        await ApplyCustomerDiscountAsync(order, userId, itemsTotal, cancellationToken);
+        await ApplyCustomerDiscountAsync(order, userId, itemsTotal, consumeDiscount, cancellationToken);
 
         RecalculateTotal(order);
     }
@@ -93,7 +108,7 @@ public class OrderPricingService : IOrderPricingService
     }
 
     private async Task ApplyCustomerDiscountAsync(
-        Order order, Guid? userId, decimal itemsTotal, CancellationToken ct)
+        Order order, Guid? userId, decimal itemsTotal, bool consumeDiscount, CancellationToken ct)
     {
         if (!userId.HasValue)
         {
@@ -120,12 +135,16 @@ public class OrderPricingService : IOrderPricingService
         if (isIndividualDiscount)
         {
             order.CustomerDiscountRuleId = customerDiscount.Id;
-            await _customerDiscountService.ApplyDiscountAsync(customerDiscount.Id, ct);
+            if (consumeDiscount)
+                await _customerDiscountService.ApplyDiscountAsync(customerDiscount.Id, ct);
         }
 
-        _logger.LogInformation(
-            "Applied customer discount {DiscountName} of ${Amount} to order",
-            customerDiscount.Name, discountAmount);
+        if (consumeDiscount)
+        {
+            _logger.LogInformation(
+                "Applied customer discount {DiscountName} of ${Amount} to order",
+                customerDiscount.Name, discountAmount);
+        }
     }
 
     public void RecalculateTotal(Order order)
