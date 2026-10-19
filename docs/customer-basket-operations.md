@@ -15,6 +15,7 @@ and enabled native ordering rollout. It rejects a present failed Authorization h
 using the same access guard as durable adds. Staff and API tokens are forbidden. It delegates the
 existing owned read: customers are matched by customer ID, guests by an unowned exact session.
 Reads create no basket or receipt and do not acknowledge a pending add.
+The shared read logs the operation without recording its raw basket-session capability.
 
 A missing basket returns the existing nil-ID, null-user, zero-total, empty-items envelope with the
 request session. Clients must use the native URL: the legacy anonymous read can return that same

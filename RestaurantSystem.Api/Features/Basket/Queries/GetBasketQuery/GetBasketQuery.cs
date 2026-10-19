@@ -47,7 +47,7 @@ public class GetBasketQueryHandler : IQueryHandler<GetBasketQuery, ApiResponse<B
                 };
             }
 
-            _logger.LogInformation("Retrieved basket for session {SessionId}", query.SessionId);
+            _logger.LogInformation("Retrieved basket");
 
             return ApiResponse<BasketDto>.SuccessWithData(basket);
         }
