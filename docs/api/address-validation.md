@@ -26,3 +26,6 @@ establish default-address concurrency, native write recovery or installed-device
 
 `AddressFieldValidationTests` exercises both HTTP writers, exact-limit PostgreSQL persistence,
 per-field overflow rejection without row changes, requiredness, nullable fields and Unicode/NUL cases.
+
+The optional isDefault input is nullable and resolves omitted/null to false before persistence;
+stored and response defaults remain non-null booleans. Existing omitted-field behavior is preserved.

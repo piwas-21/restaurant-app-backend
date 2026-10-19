@@ -34,12 +34,13 @@ public class CreateAddressCommandHandler : ICommandHandler<CreateAddressCommand,
             return ApiResponse<AddressDto>.Failure("User not authenticated");
         }
 
+        var isDefault = command.IsDefault ?? false;
         using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         try
         {
             // If this is set as default, unset other default addresses
-            if (command.IsDefault)
+            if (isDefault)
             {
                 await _context.UserAddresses
                     .Where(a => a.UserId == userId.Value && a.IsDefault && !a.IsDeleted)
@@ -57,7 +58,7 @@ public class CreateAddressCommandHandler : ICommandHandler<CreateAddressCommand,
                 PostalCode = command.PostalCode,
                 Country = command.Country,
                 Phone = command.Phone,
-                IsDefault = command.IsDefault,
+                IsDefault = isDefault,
                 Latitude = command.Latitude,
                 Longitude = command.Longitude,
                 DeliveryInstructions = command.DeliveryInstructions,

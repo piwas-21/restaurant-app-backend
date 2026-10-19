@@ -96,6 +96,32 @@ public sealed class AddressFieldValidationTests(DatabaseFixture fixture) : Integ
         (await Client.PostAsJsonAsync("/api/Addresses", payload)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Theory]
+    [InlineData("omitted", false)]
+    [InlineData("null", false)]
+    [InlineData("false", false)]
+    [InlineData("true", true)]
+    public async Task Optional_default_input_resolves_to_a_non_nullable_stored_boolean(string mode, bool expected)
+    {
+        AuthenticateAsUser();
+        var payload = Valid();
+        if (mode != "omitted") payload["isDefault"] = mode == "null" ? null : expected;
+        using var created = await Client.PostAsJsonAsync("/api/Addresses", payload);
+        created.StatusCode.Should().Be(HttpStatusCode.OK, await created.Content.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        body.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+        var data = body.RootElement.GetProperty("data");
+        var id = data.GetProperty("id").GetGuid();
+        data.GetProperty("isDefault").GetBoolean().Should().Be(expected);
+        payload["id"] = id;
+        using var updated = await Client.PutAsJsonAsync("/api/Addresses/" + id, payload);
+        updated.StatusCode.Should().Be(HttpStatusCode.OK, await updated.Content.ReadAsStringAsync());
+        using var updateBody = JsonDocument.Parse(await updated.Content.ReadAsStringAsync());
+        updateBody.RootElement.GetProperty("data").GetProperty("isDefault").GetBoolean().Should().Be(expected);
+        await using var verify = DatabaseFixture.CreateContext();
+        (await verify.UserAddresses.AsNoTracking().SingleAsync(value => value.Id == id)).IsDefault.Should().Be(expected);
+    }
+
     private static Dictionary<string, object?> Valid() => new()
     {
         ["label"] = "Home",

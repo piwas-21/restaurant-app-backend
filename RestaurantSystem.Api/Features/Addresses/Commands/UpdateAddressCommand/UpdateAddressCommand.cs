@@ -36,6 +36,7 @@ public class UpdateAddressCommandHandler : ICommandHandler<UpdateAddressCommand,
             return ApiResponse<AddressDto>.Failure("User not authenticated");
         }
 
+        var isDefault = command.IsDefault ?? false;
         using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         try
@@ -49,7 +50,7 @@ public class UpdateAddressCommandHandler : ICommandHandler<UpdateAddressCommand,
             }
 
             // If setting as default, unset other defaults
-            if (command.IsDefault && !address.IsDefault)
+            if (isDefault && !address.IsDefault)
             {
                 await _context.UserAddresses
                     .Where(a => a.UserId == userId.Value && a.IsDefault && a.Id != command.Id && !a.IsDeleted)
@@ -65,7 +66,7 @@ public class UpdateAddressCommandHandler : ICommandHandler<UpdateAddressCommand,
             address.PostalCode = command.PostalCode;
             address.Country = command.Country;
             address.Phone = command.Phone;
-            address.IsDefault = command.IsDefault;
+            address.IsDefault = isDefault;
             address.Latitude = command.Latitude;
             address.Longitude = command.Longitude;
             address.DeliveryInstructions = command.DeliveryInstructions;
