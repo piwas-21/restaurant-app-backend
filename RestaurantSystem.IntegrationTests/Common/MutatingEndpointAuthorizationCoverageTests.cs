@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Filters;
 using RestaurantSystem.Api.Common.Modules;
+using Xunit.Abstractions;
 
 namespace RestaurantSystem.IntegrationTests.Common;
 
@@ -43,22 +44,23 @@ namespace RestaurantSystem.IntegrationTests.Common;
 /// construction.
 /// </para>
 /// </summary>
-public class MutatingEndpointAuthorizationCoverageTests
+public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output)
 {
     private static readonly Assembly Api = typeof(RequireAdminAttribute).Assembly;
 
     private static readonly string[] MutatingVerbs = ["POST", "PUT", "PATCH", "DELETE"];
 
     /// <summary>
-    /// The measured size of the write surface, 2026-09-04. A RATCHET, and its stated end is that it
+    /// The measured size of the write surface, 2026-10-19. A RATCHET, and its stated end is that it
     /// only ever goes up: it exists to catch the scan losing its corpus (a namespace move, a
     /// changed discovery predicate, the wrong assembly), which is the one failure that turns
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 208 includes native root edits, durable cancellations and reviewed channel operations; account-payment and guest-checkout writes remain covered.
+    /// Floor 231 includes owned native receipt reads and account-deletion requests alongside native
+    /// root edits, durable cancellations, channel operations, account payments and guest checkout.
     /// </summary>
-    private const int KnownMutatingActionCount = 208;
+    private const int KnownMutatingActionCount = 231;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -273,6 +275,7 @@ public class MutatingEndpointAuthorizationCoverageTests
     public void The_scan_reaches_the_real_controllers()
     {
         var actions = MutatingActions(DiscoveredControllers(Api)).Select(Describe).ToArray();
+        output.WriteLine("Discovered {0} state-changing controller actions.", actions.Length);
 
         actions.Should().HaveCountGreaterThanOrEqualTo(KnownMutatingActionCount,
             "the scan lost part of its corpus — a 'no violations' result would mean nothing was looked at");
