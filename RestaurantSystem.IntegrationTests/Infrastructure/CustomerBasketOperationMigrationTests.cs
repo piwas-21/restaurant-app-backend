@@ -50,7 +50,9 @@ public sealed class CustomerBasketOperationMigrationTests(DatabaseFixture fixtur
         refusal.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
         refusal.MessageText.Should().Be("Customer basket operation history must be retained");
         (await context.Set<CustomerBasketOperation>().AsNoTracking().SingleAsync()).OperationId.Should().Be(operation.OperationId);
-        (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
+        // The newer empty order-operation table can be removed before the basket guard refuses.
+        (await context.Database.GetAppliedMigrationsAsync()).Last().Should()
+            .Be("20261019045735_" + nameof(AddCustomerBasketCancellation));
     }
 
     [Fact]

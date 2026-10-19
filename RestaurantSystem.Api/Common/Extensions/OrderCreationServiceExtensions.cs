@@ -8,6 +8,7 @@ public static class OrderCreationServiceExtensions
     {
         services.AddScoped<IOrderCreationWriter, OrderCreationWriter>();
         services.AddScoped<IOrderPostCreationService, OrderPostCreationService>();
+        services.AddScoped<ICustomerOrderOperationStore, CustomerOrderOperationStore>();
         return services;
     }
 }
