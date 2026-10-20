@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Features.Reservations.Services;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -66,6 +67,7 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
     {
         try
         {
+            await using var transaction = await ReservationWriteLock.BeginAsync(_context, cancellationToken);
             var reservation = await _context.Reservations
                 .FirstOrDefaultAsync(r => r.Id == command.ReservationId, cancellationToken);
 
@@ -97,6 +99,7 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
 
             reservation.Status = ReservationStatus.Cancelled;
             await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
             // Send rejection email to customer
             try

@@ -50,6 +50,7 @@ public class UpdateMyReservationCommandHandler
     public async Task<ApiResponse<ReservationDto>> Handle(
         UpdateMyReservationCommand command, CancellationToken cancellationToken)
     {
+        await using var transaction = await ReservationWriteLock.BeginAsync(_context, cancellationToken);
         var reservation = await LoadOwnReservationAsync(command.ReservationId, cancellationToken);
         var data = command.ReservationData;
 
@@ -86,6 +87,7 @@ public class UpdateMyReservationCommandHandler
         var edit = GuestReservationEdit.Apply(reservation, data, bookedDay);
 
         await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         // After the commit and never awaited into the response contract: the mails are a
         // consequence of the change, and a mail failure must not tell a guest their change failed.

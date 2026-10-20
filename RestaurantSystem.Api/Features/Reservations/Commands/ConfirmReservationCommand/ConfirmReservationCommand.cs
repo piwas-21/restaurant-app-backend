@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Features.Reservations.Services;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
@@ -34,8 +35,10 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
     {
         try
         {
+            await using var transaction = await ReservationWriteLock.BeginAsync(_context, cancellationToken);
             var reservation = await _context.Reservations
                 .Include(r => r.Table)
+                .Include(r => r.CombinedTables)
                 .FirstOrDefaultAsync(r => r.Id == command.ReservationId, cancellationToken);
 
             if (reservation == null)
@@ -58,8 +61,16 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                 return ApiResponse<bool>.Failure("Cannot confirm a completed reservation");
             }
 
+            var occupiedTableIds = reservation.CombinedTables.Select(row => row.TableId)
+                .Append(reservation.TableId).Distinct().ToArray();
+            if (await _context.Reservations.AnyAsync(ReservationSlotOccupancy.ConflictsWithAnyOf(
+                    occupiedTableIds, reservation.ReservationDate, reservation.StartTime,
+                    reservation.EndTime, reservation.Id), cancellationToken))
+                return ApiResponse<bool>.Failure("One or more of the selected tables is not available for the selected time slot");
+
             reservation.Status = ReservationStatus.Confirmed;
             await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
             // Send confirmation email to customer
             try
