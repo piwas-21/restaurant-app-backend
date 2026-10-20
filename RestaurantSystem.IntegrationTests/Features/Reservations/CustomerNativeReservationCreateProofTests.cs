@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
@@ -87,4 +89,34 @@ public sealed partial class CustomerNativeReservationCreateTests
         Assert.Equal("Cancelled", (await ResolveProofAsync(proof, true)).GetProperty("outcome").GetString());
         Assert.Empty(await db.Reservations.ToListAsync()); Assert.Equal(0, _mailCalls);
     }
+    [Theory]
+    [InlineData("/prepare", "operationId")]
+    [InlineData("/prepare", "tenantId")]
+    [InlineData("", "operationId")]
+    [InlineData("", "tenantId")]
+    [InlineData("/recover", "operationId")]
+    [InlineData("/recover", "tenantId")]
+    [InlineData("/cancel-attempt", "operationId")]
+    [InlineData("/cancel-attempt", "tenantId")]
+    public async Task Omitted_required_identity_fields_are_refused_before_booking_or_sealing(string suffix, string field)
+    {
+        var request = Request(); var proof = await PrepareAsync(request);
+        object body = suffix switch
+        {
+            "/prepare" => request,
+            "" => request with { PayloadHash = proof.PayloadHash, OwnerProof = proof.OwnerProof },
+            _ => proof
+        };
+        var payload = Assert.IsType<JsonObject>(JsonSerializer.SerializeToNode(body, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        Assert.True(payload.Remove(field));
+        using var message = new HttpRequestMessage(HttpMethod.Post, Route + suffix);
+        message.Headers.Add("X-Session-Id", _session); message.Content = JsonContent.Create(payload);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Client.SendAsync(message)).StatusCode);
+        await using var verify = DatabaseFixture.CreateContext();
+        Assert.Empty(await verify.Reservations.ToListAsync()); Assert.Empty(await verify.Set<CustomerReservationOperation>().ToListAsync());
+        Assert.Equal("Unseen", (await ResolveProofAsync(proof, false)).GetProperty("outcome").GetString());
+        Assert.Equal("Applied", (await ResolveAsync(request)).GetProperty("outcome").GetString());
+        Assert.Single(await verify.Reservations.ToListAsync()); Assert.Single(await verify.Set<CustomerReservationOperation>().ToListAsync());
+    }
+
 }

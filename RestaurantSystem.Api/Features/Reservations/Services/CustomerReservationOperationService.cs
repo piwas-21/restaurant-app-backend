@@ -67,7 +67,7 @@ public sealed class CustomerReservationOperationService(ApplicationDbContext con
         // Check original owner before full-body verification, retaining uniform foreign-owner404.
         verifyInput?.Invoke();
         // Cancel-attempt cannot cancel an applied booking, and recovery never replays mail.
-        if (previous is not null) return new(Resolution(previous), null);
+        if (previous is not null) return new(ToResolution(previous), null);
         if (create is null && !cancelAttempt)
             return new(new(1, proof.OperationId, CustomerReservationOperationOutcome.Unseen, null), null);
         var draft = create is null ? null : await create(owner);
@@ -84,7 +84,7 @@ public sealed class CustomerReservationOperationService(ApplicationDbContext con
         };
         context.Set<CustomerReservationOperation>().Add(receipt);
         await context.SaveChangesAsync(cancellationToken);
-        return new(Resolution(receipt), draft);
+        return new(ToResolution(receipt), draft);
     }
 
     private sealed record AttemptResult(CustomerReservationResolutionDto Resolution, ReservationCreationDraft? Draft);
@@ -102,7 +102,7 @@ public sealed class CustomerReservationOperationService(ApplicationDbContext con
         return previous;
     }
 
-    private static CustomerReservationResolutionDto Resolution(CustomerReservationOperation row) => new(1,
+    private static CustomerReservationResolutionDto ToResolution(CustomerReservationOperation row) => new(1,
         row.OperationId, row.IsCancelled ? CustomerReservationOperationOutcome.Cancelled : CustomerReservationOperationOutcome.Applied,
         row.ReservationId);
 }
