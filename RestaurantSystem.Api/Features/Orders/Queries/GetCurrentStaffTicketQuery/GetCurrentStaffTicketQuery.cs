@@ -34,19 +34,27 @@ public sealed class GetCurrentStaffTicketQueryHandler(
             ? members.Where(order => order.ServiceSessionId == sessionId)
             : members.Where(order => !order.ServiceSessionId.HasValue
                 && (order.AmendmentRootOrderId ?? order.Id) == source.RootId);
-        var orders = await members.IncludeOrderLineGraph()
+        var ids = await members.OrderBy(order => order.OrderDate).ThenBy(order => order.Id)
+            .Select(order => order.Id).Take(CurrentStaffTicketLimits.MaximumMembers + 1)
+            .ToArrayAsync(cancellationToken);
+        if (ids.Length > CurrentStaffTicketLimits.MaximumMembers) throw Oversized();
+        var amendments = await context.OrderAmendments.AsNoTracking()
+            .Where(amendment => ids.Contains(amendment.SourceOrderId)
+                && amendment.State == OrderAmendmentState.Committed)
+            .OrderBy(amendment => amendment.CommittedAt).ThenBy(amendment => amendment.CreatedAt)
+            .ThenBy(amendment => amendment.Id)
+            .Select(amendment => new { amendment.SourceOrderId, amendment.ChangesJson })
+            .Take(CurrentStaffTicketLimits.MaximumAmendments + 1)
+            .ToListAsync(cancellationToken);
+        if (amendments.Count > CurrentStaffTicketLimits.MaximumAmendments) throw Oversized();
+        var orders = await context.Orders.AsNoTracking().Where(order => ids.Contains(order.Id))
+            .IncludeOrderLineGraph()
             .Include(order => order.Items).ThenInclude(item => item.ProductVariation)
             .Include(order => order.Table)
             .Include(order => order.Payments).Include(order => order.ExternalReference)
             .Include(order => order.RoutingStates)
             .AsSplitQuery()
             .OrderBy(order => order.OrderDate).ThenBy(order => order.Id).ToListAsync(cancellationToken);
-        var ids = orders.Select(order => order.Id).ToArray();
-        var amendments = await context.OrderAmendments.AsNoTracking()
-            .Where(amendment => ids.Contains(amendment.SourceOrderId)
-                && amendment.State == OrderAmendmentState.Committed)
-            .OrderBy(amendment => amendment.CommittedAt).ThenBy(amendment => amendment.CreatedAt)
-            .ThenBy(amendment => amendment.Id).ToListAsync(cancellationToken);
         var changes = amendments.ToLookup(amendment => amendment.SourceOrderId);
         var results = new List<OrderDto>(orders.Count);
         foreach (var order in orders)
@@ -61,4 +69,7 @@ public sealed class GetCurrentStaffTicketQueryHandler(
         await snapshot.CommitAsync(cancellationToken);
         return ApiResponse<IReadOnlyList<OrderDto>>.SuccessWithData(results);
     }
+
+    private static ConflictException Oversized() =>
+        new("This ticket is too large to display safely. Ask an administrator for help.");
 }
