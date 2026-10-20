@@ -52,26 +52,26 @@ public sealed class ReservationQuickActionWaitTests(DatabaseFixture fixture) : I
     }
 
     [Theory]
-    [InlineData("approve", "unchanged", false)]
-    [InlineData("reject", "unchanged", false)]
-    [InlineData("approve", "status", false)]
-    [InlineData("reject", "status", false)]
-    [InlineData("approve", "expires", false)]
-    [InlineData("reject", "expires", false)]
-    [InlineData("approve", "deleted", false)]
-    [InlineData("reject", "deleted", false)]
-    [InlineData("approve", "unchanged", true)]
-    [InlineData("reject", "unchanged", true)]
-    [InlineData("approve", "status", true)]
-    [InlineData("reject", "status", true)]
-    [InlineData("approve", "expires", true)]
-    [InlineData("reject", "expires", true)]
+    [InlineData("approve", "unchanged")]
+    [InlineData("reject", "unchanged")]
+    [InlineData("approve", "status")]
+    [InlineData("reject", "status")]
+    [InlineData("approve", "expires")]
+    [InlineData("reject", "expires")]
+    [InlineData("approve", "deleted")]
+    [InlineData("reject", "deleted")]
+    [InlineData("approve", "status-aba")]
+    [InlineData("reject", "status-aba")]
+    [InlineData("approve", "same-values")]
+    [InlineData("reject", "same-values")]
     public async Task Quick_action_revalidates_its_original_proof_after_the_real_schedule_wait(
-        string action, string change, bool legacy)
+        string action, string change)
     {
         var intent = action == "approve" ? ReservationQuickAction.Approve : ReservationQuickAction.Reject;
         var links = Factory.Services.GetRequiredService<IReservationQuickActionLinks>();
-        var token = legacy ? null : links.Mint(_booking, intent, ReservationStatus.Pending);
+        await using var reader = DatabaseFixture.CreateContext();
+        var revision = await reader.Reservations.Where(row => row.Id == _booking).Select(row => row.Revision).SingleAsync();
+        var token = links.Mint(_booking, intent, ReservationStatus.Pending, revision);
         AuthenticateAsAnonymous();
         await using var holderDb = DatabaseFixture.CreateContext();
         await using var held = await ReservationWriteLock.BeginAsync(holderDb, default);
@@ -79,7 +79,7 @@ public sealed class ReservationQuickActionWaitTests(DatabaseFixture fixture) : I
         var expectedStatus = ReservationStatus.Pending;
         try
         {
-            Assert.Equal(legacy ? QuickActionLinkVerdict.Legacy : QuickActionLinkVerdict.SignatureValid,
+            Assert.Equal(QuickActionLinkVerdict.SignatureValid,
                 await _verified.Task.WaitAsync(TimeSpan.FromSeconds(30)));
             await AssertWaitingAsync(operation);
             if (change == "expires") _clock.Advance(TimeSpan.FromDays(30));
@@ -90,6 +90,13 @@ public sealed class ReservationQuickActionWaitTests(DatabaseFixture fixture) : I
                 row.Status = expectedStatus;
                 await holderDb.SaveChangesAsync();
             }
+            if (change == "status-aba")
+            {
+                await holderDb.Reservations.ExecuteUpdateAsync(update => update.SetProperty(row => row.Status, ReservationStatus.Confirmed));
+                await holderDb.Reservations.ExecuteUpdateAsync(update => update.SetProperty(row => row.Status, ReservationStatus.Pending));
+            }
+            if (change == "same-values")
+                await holderDb.Reservations.ExecuteUpdateAsync(update => update.SetProperty(row => row.NumberOfGuests, 2));
             if (change == "deleted")
                 await holderDb.Reservations.Where(row => row.Id == _booking).ExecuteDeleteAsync();
         }
@@ -149,10 +156,12 @@ public sealed class ReservationQuickActionWaitTests(DatabaseFixture fixture) : I
     private sealed class ObservedLinks(IReservationQuickActionLinks inner,
         TaskCompletionSource<QuickActionLinkVerdict> verified) : IReservationQuickActionLinks
     {
-        public string Mint(Guid id, ReservationQuickAction action, ReservationStatus status) => inner.Mint(id, action, status);
-        public QuickActionLinkVerdict Verify(Guid id, ReservationQuickAction action, ReservationStatus status, DateTime created, string? token)
+        public string Mint(Guid reservationId, ReservationQuickAction action, ReservationStatus status, Guid revision) =>
+            inner.Mint(reservationId, action, status, revision);
+        public QuickActionLinkVerdict Verify(Guid reservationId, ReservationQuickAction action, ReservationStatus currentStatus,
+            Guid currentRevision, string? token)
         {
-            var result = inner.Verify(id, action, status, created, token);
+            var result = inner.Verify(reservationId, action, currentStatus, currentRevision, token);
             verified.TrySetResult(result);
             return result;
         }

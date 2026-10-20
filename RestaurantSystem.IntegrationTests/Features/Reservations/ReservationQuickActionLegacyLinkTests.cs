@@ -1,4 +1,11 @@
 using System.Net;
+using System.Buffers.Text;
+using System.Security.Cryptography;
+using System.Text;
+using System.Globalization;
+using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Api.Features.Reservations.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,24 +16,7 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.Reservations;
 
-/// <summary>
-/// The migration path for alert mails that were already in the restaurant's inbox when link
-/// signing shipped (backend #402): they carry no <c>?token=</c> at all, and breaking every one of
-/// them on release day would strand whatever bookings were still undecided.
-/// </summary>
-/// <remarks>
-/// <para>
-/// The window is anchored on each reservation's own <c>CreatedAt</c>, not on a date somebody has to
-/// remember to remove: it closes booking by booking with nothing left to clean up. Its cost is
-/// stated plainly by the second test below — while the window is open, the id alone is still enough
-/// for a booking that young, which is exactly the hole #402 reported. Two settings close it:
-/// <c>LegacyLinkCutoffUtc</c> (recommended, set at release — proven in
-/// <c>ReservationQuickActionLinkAuthorizationTests</c>) and <c>LegacyLinkGraceDays: 0</c>.
-/// </para>
-/// <para>
-/// This class deliberately does NOT set a cutoff, so it exercises the window on its own.
-/// </para>
-/// </remarks>
+/// <summary>Old unsigned links never prove a current revision, regardless of historical grace settings.</summary>
 [Collection("Database Lane 4")]
 public class ReservationQuickActionLegacyLinkTests : IntegrationTestBase
 {
@@ -48,7 +38,7 @@ public class ReservationQuickActionLegacyLinkTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task A_link_from_a_mail_sent_before_signing_still_works_inside_the_window()
+    public async Task An_unsigned_link_is_refused_even_inside_the_former_window()
     {
         var id = await SeedReservationAsync(createdAt: DateTime.UtcNow.AddDays(-1));
         AuthenticateAsAnonymous();
@@ -56,8 +46,8 @@ public class ReservationQuickActionLegacyLinkTests : IntegrationTestBase
         var response = await Client.GetAsync($"/api/reservations/{id}/quick-approve");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await response.Content.ReadAsStringAsync()).Should().Contain("Reservation Approved");
-        (await StatusOfAsync(id)).Should().Be(ReservationStatus.Confirmed);
+        (await response.Content.ReadAsStringAsync()).Should().Contain(RefusalMarker);
+        (await StatusOfAsync(id)).Should().Be(ReservationStatus.Pending);
     }
 
     [Fact]
@@ -76,7 +66,7 @@ public class ReservationQuickActionLegacyLinkTests : IntegrationTestBase
     [Fact]
     public async Task A_token_less_link_cannot_be_replayed_after_the_booking_was_decided()
     {
-        // Inside the window a legacy link is no more reusable than a signed one.
+        // Neither unsigned action grants authority, even for a young Pending booking.
         var id = await SeedReservationAsync(createdAt: DateTime.UtcNow.AddDays(-1));
         AuthenticateAsAnonymous();
 
@@ -84,7 +74,34 @@ public class ReservationQuickActionLegacyLinkTests : IntegrationTestBase
         var replay = await Client.GetAsync($"/api/reservations/{id}/quick-reject");
 
         (await replay.Content.ReadAsStringAsync()).Should().Contain(RefusalMarker);
-        (await StatusOfAsync(id)).Should().Be(ReservationStatus.Confirmed, "the booking was already decided");
+        (await StatusOfAsync(id)).Should().Be(ReservationStatus.Pending, "neither unsigned action can decide the booking");
+    }
+
+    [Theory]
+    [InlineData("approve")]
+    [InlineData("reject")]
+    public async Task A_genuinely_signed_unexpired_version1_link_is_refused_with_a_current_version2_positive_control(string action)
+    {
+        var id = await SeedReservationAsync(DateTime.UtcNow.AddDays(-1));
+        var options = Factory.Services.GetRequiredService<IOptions<ReservationQuickActionSettings>>().Value;
+        var jwt = Factory.Services.GetRequiredService<IOptions<JwtSettings>>().Value;
+        var material = string.IsNullOrWhiteSpace(options.SigningKey) ? jwt.Secret : options.SigningKey;
+        var key = HKDF.DeriveKey(HashAlgorithmName.SHA256, Encoding.UTF8.GetBytes(material), 32, salt: null,
+            info: Encoding.UTF8.GetBytes("rumi:reservation-quick-action:v1"));
+        var expires = DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeSeconds();
+        var payload = string.Create(CultureInfo.InvariantCulture, $"v1|{id:N}|{action}|{(int)ReservationStatus.Pending}|{expires}");
+        var old = string.Create(CultureInfo.InvariantCulture, $"{expires}.{Base64Url.EncodeToString(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(payload)))}");
+        AuthenticateAsAnonymous();
+        var path = $"/api/reservations/{id}/quick-{action}?token=";
+        var oldPage = await Client.GetStringAsync(path + Uri.EscapeDataString(old));
+        Assert.Contains(RefusalMarker, oldPage, StringComparison.Ordinal); Assert.Equal(ReservationStatus.Pending, await StatusOfAsync(id));
+        await using var db = DatabaseFixture.CreateContext();
+        var revision = await db.Reservations.Where(row => row.Id == id).Select(row => row.Revision).SingleAsync();
+        var intent = action == "approve" ? ReservationQuickAction.Approve : ReservationQuickAction.Reject;
+        var fresh = Factory.Services.GetRequiredService<IReservationQuickActionLinks>().Mint(id, intent, ReservationStatus.Pending, revision);
+        Assert.Contains(action == "approve" ? "Reservation Approved" : "Reservation Rejected",
+            await Client.GetStringAsync(path + Uri.EscapeDataString(fresh)), StringComparison.Ordinal);
+        Assert.Equal(action == "approve" ? ReservationStatus.Confirmed : ReservationStatus.Cancelled, await StatusOfAsync(id));
     }
 
     private async Task<Guid> SeedReservationAsync(DateTime createdAt)

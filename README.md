@@ -125,37 +125,27 @@ Set the selected provider's cost fields for its model and processing tier before
 
 ### Reservation quick-action links
 
-`GET /api/reservations/{id}/quick-approve` and `.../quick-reject` are opened from the restaurant's
-alert mail, so they carry no session and stay `[AllowAnonymous]`. What authorises them is a `?token=`
-the mail puts on the link: an HMAC-SHA256 over the reservation id, the action, and the booking's
-**current status**, with an expiry (backend #402). Signing the status is what makes a link one-shot —
-once the booking is approved or rejected, both buttons in that mail stop working.
+`GET /api/reservations/{id}/quick-approve` and `.../quick-reject` remain anonymous email entry
+routes. Authority is a version2 HMAC-SHA256 token over booking ID, action, current status, expiry
+and the **actual saved database UUID revision**. Status returning to Pending cannot revive an old
+link. Both initial lookup and fresh locked dispatch verify the same original token.
 
-Before this, the bare reservation id was the whole authorisation, and `POST /api/Reservations` is
-anonymous and returns that id to whoever made the booking. A guest could approve their own table.
+All parent/combined-table saves finish before writers refresh the revision used by mailers. A
+Pending customer contact-only or no-op edit refreshes operator buttons; Confirmed contact-only
+edits retain confirmation and send no operator alert. Mail follows commit.
 
 | Key | Default | Meaning |
-|---|---|---|
-| `ReservationQuickActions:SigningKey` | `""` | HMAC key material. **Leave empty on an existing box:** the key is then derived (HKDF, purpose-labelled) from the already-required `JwtSettings:Secret`, so no new environment variable is needed to deploy. Set it to rotate link signatures independently of the JWT secret — every link already in an inbox stops working when you do |
-| `ReservationQuickActions:LinkLifetimeDays` | `7` | How long a freshly minted link is valid. After that the restaurant decides in the dashboard |
-| `ReservationQuickActions:LegacyLinkGraceDays` | `14` | Migration window for alert mails sent **before** signing shipped, which carry no token. Measured from each reservation's own `CreatedAt`, so it closes booking by booking. Every legacy use is logged at **warning** level |
-| `ReservationQuickActions:LegacyLinkCutoffUtc` | unset | Optional instant; a reservation created at or after it can never take the token-less path |
+| --- | --- | --- |
+| `ReservationQuickActions:SigningKey` | empty | Purpose-separated HKDF derivation uses the configured key, or the already-required `JwtSettings:Secret`. No new environment setting is required. |
+| `ReservationQuickActions:LinkLifetimeDays` | `7` | New link lifetime; after expiry the operator uses the reservations dashboard. |
+| `ReservationQuickActions:LegacyLinkGraceDays` | `14` | Accepted configuration compatibility only; cannot grant revisionless authority. |
+| `ReservationQuickActions:LegacyLinkCutoffUtc` | unset | Accepted configuration compatibility only; cannot grant revisionless authority. |
 
-**Closing the migration window.** The grace window is anchored per booking, so it needs no follow-up:
-once every reservation created before the release is older than `LegacyLinkGraceDays`, nothing can use
-a token-less link again. Two ways to close it sooner, both config-only — no code change, no redeploy of
-new code:
-
-1. **Recommended, at release:** set `ReservationQuickActions__LegacyLinkCutoffUtc` to the release
-   timestamp (e.g. `2026-08-24T00:00:00Z`). Mails already sent keep working; bookings made after the
-   release are signed-only from the first minute. Without it, the window also covers **new** bookings,
-   which leaves #402 open for its length.
-2. **Once the inbox is drained:** set `ReservationQuickActions__LegacyLinkGraceDays=0`. Every
-   token-less link then lands on the "this link can no longer be used" page, which links to the
-   reservations dashboard.
-
-Watch for `Accepted a LEGACY unsigned quick-…` warnings in the box logs to tell when the old mails have
-stopped being used.
+**Release compatibility:** unsigned and old status-only version1 links are refused conservatively,
+even inside their former grace window. Previously issued links, or current links invalidated by
+later staff/booking changes, open the uniform unavailable page with dashboard recovery. Do not
+restore an old signing/unsigned fallback to revive them. New version2 mail works after the revision
+migration already required by owned cancellation; this fix adds no migration or tenant activation.
 
 ## Pull requests
 

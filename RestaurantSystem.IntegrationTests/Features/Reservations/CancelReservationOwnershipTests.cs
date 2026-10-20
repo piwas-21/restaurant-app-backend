@@ -106,9 +106,10 @@ public class CancelReservationOwnershipTests : IntegrationTestBase
         // The link now carries the signature the alert mail puts on it (backend #402). What this
         // test still pins is the OWNERSHIP opt-out: a signed link works with no caller at all.
         // Everything about the signature itself is ReservationQuickActionLinkAuthorizationTests.
-        var token = Factory.Services
-            .GetRequiredService<IReservationQuickActionLinks>()
-            .Mint(id, ReservationQuickAction.Reject, ReservationStatus.Pending);
+        await using var observer = DatabaseFixture.CreateContext();
+        var revision = await observer.Reservations.Where(row => row.Id == id).Select(row => row.Revision).SingleAsync();
+        var token = Factory.Services.GetRequiredService<IReservationQuickActionLinks>()
+            .Mint(id, ReservationQuickAction.Reject, ReservationStatus.Pending, revision);
 
         var response = await Client.GetAsync($"/api/reservations/{id}/quick-reject?token={Uri.EscapeDataString(token)}");
 

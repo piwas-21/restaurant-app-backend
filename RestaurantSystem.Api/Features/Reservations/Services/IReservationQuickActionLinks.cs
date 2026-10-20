@@ -18,12 +18,11 @@ public enum QuickActionLinkVerdict
     /// <summary>No usable proof — missing, malformed, wrong, expired, or already spent. Refuse.</summary>
     Refused,
 
-    /// <summary>A valid signature over this reservation, this action and its CURRENT status.</summary>
+    /// <summary>A valid signature over this reservation, this action and its CURRENT status and database revision.</summary>
     SignatureValid,
 
     /// <summary>
-    /// No token at all, but the reservation is young enough to be covered by the migration grace
-    /// window: an alert mail sent before signing existed. Accepted and logged at warning level.
+    /// Retained source compatibility value; revisionless legacy links no longer grant authority.
     /// </summary>
     Legacy,
 }
@@ -40,22 +39,21 @@ public enum QuickActionLinkVerdict
 public interface IReservationQuickActionLinks
 {
     /// <summary>
-    /// The token to hang off one email button. Binds the reservation, the action and the status
-    /// the reservation is in RIGHT NOW, so the link dies the moment the booking is decided.
+    /// Binds the action to the actual saved booking revision and status. A later update permanently retires it.
     /// </summary>
-    string Mint(Guid reservationId, ReservationQuickAction action, ReservationStatus status);
+    string Mint(Guid reservationId, ReservationQuickAction action, ReservationStatus status, Guid revision);
 
     /// <summary>
     /// Decides whether a request may act. Never throws, never tells the caller which of the many
     /// reasons applied — the controller renders one page for every <see cref="QuickActionLinkVerdict.Refused"/>.
     /// </summary>
     /// <param name="currentStatus">The reservation's status as stored, not as the link claims.</param>
-    /// <param name="reservationCreatedAtUtc">Anchor of the legacy grace window — per reservation, not a global date.</param>
-    /// <param name="token">The <c>?token=</c> query value. Null or empty is the legacy case.</param>
+    /// <param name="currentRevision">Database-owned current revision; never a client claim.</param>
+    /// <param name="token">The <c>?token=</c> query value. Missing or revisionless proof is refused.</param>
     QuickActionLinkVerdict Verify(
         Guid reservationId,
         ReservationQuickAction action,
         ReservationStatus currentStatus,
-        DateTime reservationCreatedAtUtc,
+        Guid currentRevision,
         string? token);
 }

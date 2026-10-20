@@ -218,10 +218,13 @@ public class ReservationQuickActionLinkAuthorizationTests : IntegrationTestBase
     /// </summary>
     private string MintFor(Guid id, ReservationQuickAction action, DateTimeOffset? mintedAt = null)
     {
+        using var scope = Factory.Services.CreateScope();
+        var revision = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Reservations.AsNoTracking()
+            .Where(row => row.Id == id).Select(row => (Guid?)row.Revision).SingleOrDefault() ?? Guid.NewGuid();
         if (mintedAt is null)
         {
             return Factory.Services.GetRequiredService<IReservationQuickActionLinks>()
-                .Mint(id, action, ReservationStatus.Pending);
+                .Mint(id, action, ReservationStatus.Pending, revision);
         }
 
         var links = new ReservationQuickActionLinks(
@@ -230,7 +233,7 @@ public class ReservationQuickActionLinkAuthorizationTests : IntegrationTestBase
             new FrozenClock(mintedAt.Value),
             NullLogger<ReservationQuickActionLinks>.Instance);
 
-        return links.Mint(id, action, ReservationStatus.Pending);
+        return links.Mint(id, action, ReservationStatus.Pending, revision);
     }
 
     private sealed class FrozenClock(DateTimeOffset now) : TimeProvider

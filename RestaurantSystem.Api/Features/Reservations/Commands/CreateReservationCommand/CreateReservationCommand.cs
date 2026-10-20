@@ -24,6 +24,7 @@ public class CreateReservationCommandHandler(ApplicationDbContext context, IRese
             if (draft.Reservation is not { } reservation || draft.TableNumber is not { } tableNumber)
                 return ApiResponse<ReservationDto>.Failure(draft.Error ?? "Failed to create reservation");
             await context.SaveChangesAsync(cancellationToken);
+            await ReservationMailRevision.RefreshTrackedAsync(context, reservation, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             await mailer.SendAsync(reservation, tableNumber, cancellationToken);
             logger.LogInformation("Created reservation {ReservationId} for table {TableNumber} on {Date}",

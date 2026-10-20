@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using System.Text.RegularExpressions;
+using RestaurantSystem.Api.Features.Reservations.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,10 +28,8 @@ namespace RestaurantSystem.IntegrationTests.Features.Reservations;
 /// claim is about the WIRING — which mail fires for which edit, to which address, in which
 /// language — and not about the rendered copy (the golden snapshots own that).
 /// <para>
-/// The rule this class exists to pin is the negative one: a contact-detail fix must NOT alert the
-/// restaurant. The alert is a request for a decision, nothing about the decision changed, and an
-/// operator who learns that this mail sometimes means nothing stops opening the one that means
-/// something.
+/// Confirmed contact corrections stay quiet. Pending corrections must refresh operator authority
+/// because every database revision retires the previous email's buttons.
 /// </para>
 /// </remarks>
 [Collection("Database Lane 2")]
@@ -130,6 +130,46 @@ public class ReservationChangedMailTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Pending_contact_edits_refresh_buttons_and_never_revive_the_previous_email()
+    {
+        var id = await SeedReservationAsync(ReservationStatus.Pending);
+        var links = Factory.Services.GetRequiredService<IReservationQuickActionLinks>();
+        var before = await LoadAsync(id);
+        var old = links.Mint(id, ReservationQuickAction.Approve, before.Status, before.Revision);
+        await EditAsync(id, Body(name: "Grace B. Hopper"));
+        var current = await LoadAsync(id); Assert.NotEqual(before.Revision, current.Revision);
+        Assert.Equal(ReservationStatus.Pending, current.Status);
+        AuthenticateAsAnonymous();
+        var refusal = await Client.GetStringAsync($"/api/reservations/{id}/quick-approve?token={Uri.EscapeDataString(old)}");
+        Assert.Contains("This link can no longer be used", refusal, StringComparison.Ordinal);
+        var match = Regex.Match(AdminAlert(id), """quick-approve\?token=([^'"&<>\s]+)"""); Assert.True(match.Success);
+        var fresh = Uri.UnescapeDataString(match.Groups[1].Value);
+        var route = $"/api/reservations/{id}/quick-approve?token={Uri.EscapeDataString(fresh)}";
+        Assert.Contains("Reservation Approved", await Client.GetStringAsync(route), StringComparison.Ordinal);
+        Assert.Contains("This link can no longer be used", await Client.GetStringAsync(route), StringComparison.Ordinal);
+        _email.Verify(value => value.SendEmailAsync(AdminEmail, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task A_pending_email_never_authorizes_a_later_reshaped_proposal_after_confirmation()
+    {
+        var id = await SeedReservationAsync(ReservationStatus.Pending);
+        var row = await LoadAsync(id); var links = Factory.Services.GetRequiredService<IReservationQuickActionLinks>();
+        var approve = links.Mint(id, ReservationQuickAction.Approve, row.Status, row.Revision);
+        var reject = links.Mint(id, ReservationQuickAction.Reject, row.Status, row.Revision);
+        AuthenticateAsAnonymous();
+        Assert.Contains("Reservation Approved", await Client.GetStringAsync($"/api/reservations/{id}/quick-approve?token={Uri.EscapeDataString(approve)}"), StringComparison.Ordinal);
+        await EditAsync(id, Body(date: MovedDay, guests: 4));
+        Assert.Equal(ReservationStatus.Pending, (await LoadAsync(id)).Status);
+        AuthenticateAsAnonymous();
+        foreach (var (action, token) in new[] { ("approve", approve), ("reject", reject) })
+            Assert.Contains("This link can no longer be used", await Client.GetStringAsync($"/api/reservations/{id}/quick-{action}?token={Uri.EscapeDataString(token)}"), StringComparison.Ordinal);
+        Assert.Equal(ReservationStatus.Pending, (await LoadAsync(id)).Status);
+        var match = Regex.Match(AdminAlert(id), """quick-approve\?token=([^'"&<>\s]+)"""); Assert.True(match.Success);
+        Assert.Contains("Reservation Approved", await Client.GetStringAsync($"/api/reservations/{id}/quick-approve?token={Uri.EscapeDataString(Uri.UnescapeDataString(match.Groups[1].Value))}"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task The_guest_mail_is_written_in_the_language_frozen_on_the_booking()
     {
         var id = await SeedReservationAsync(ReservationStatus.Confirmed, language: "fr");
@@ -170,7 +210,7 @@ public class ReservationChangedMailTests : IntegrationTestBase
                 && string.Equals((string)i.Arguments[0], AdminEmail, StringComparison.Ordinal))
             .ToList();
 
-        sends.Should().ContainSingle("reservation {0} changed shape exactly once", reservationId);
+        sends.Should().ContainSingle("reservation {0} needs one current operator authority refresh", reservationId);
         return (string)sends[0].Arguments[2];
     }
 
