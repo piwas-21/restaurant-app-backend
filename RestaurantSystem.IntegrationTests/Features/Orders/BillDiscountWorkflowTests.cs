@@ -74,6 +74,20 @@ public sealed class BillDiscountWorkflowTests(DatabaseFixture fixture) : Integra
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
+    [Fact]
+    public async Task Percentage_fields_submitted_together_use_the_same_retained_item_basis()
+    {
+        AuthenticateAsAdmin();
+        var config = new BillChargeConfigurationDto("EUR", [Rule(), Rule() with { Key = "extra_discount" }]);
+        (await Client.PutAsJsonAsync("/api/bill-charges", config, JsonOptions)).EnsureSuccessStatusCode();
+        var response = await Client.PostAsJsonAsync(Route, new AddBillChargesRequest(Guid.NewGuid(), await Version(),
+            [new("discount", 10m, "Reduce", "Percentage"), new("extra_discount", 10m, "Reduce", "Percentage")]), JsonOptions);
+        response.EnsureSuccessStatusCode();
+        var order = (await response.Content.ReadFromJsonAsync<ApiResponse<OrderDto>>(JsonOptions))!.Data!;
+        order.PayableTotal.Should().Be(21m); // Two EUR 2 reductions of EUR 20 items; EUR 5 fees/tip retained.
+        order.BillCharges.Select(value => value.Amount).Should().Equal(-2m, -2m);
+    }
+
     [Theory]
     [InlineData(-1, HttpStatusCode.BadRequest)]
     [InlineData(101, HttpStatusCode.BadRequest)]

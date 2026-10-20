@@ -58,7 +58,7 @@ public sealed class BillChargeService(ApplicationDbContext context, ICurrentUser
             if (input.Amount == 0) continue;
             if (existing.Any(c => c.Key == input.Key))
                 throw new ConflictException("This charge is already on the bill. Refresh the order before collecting payment.");
-            var accepted = await CreateAsync(order, input, rule, food, basis, operationId, money, cancellationToken);
+            var accepted = await CreateAsync(order, input, rule, (food, basis), operationId, money, cancellationToken);
             if (accepted.Allocations is { Count: > 0 })
                 food = AccountDebtMath.Subtract(food, accepted.Allocations.Select(value => new AccountDebtSegment(order.Id,
                     value.OrderItemId, value.StartOrdinal, value.Count, value.MinorPerUnit)).ToArray());
@@ -70,12 +70,12 @@ public sealed class BillChargeService(ApplicationDbContext context, ICurrentUser
         order.RemainingAmount = order.PayableTotal - order.TotalPaid;
     }
     private async Task<OrderBillCharge> CreateAsync(Order order, BillChargeInputDto input, BillChargeRuleDto rule,
-        IReadOnlyList<AccountDebtSegment> food, long basis, Guid operationId, AccountMoney money, CancellationToken cancellationToken)
+        (IReadOnlyList<AccountDebtSegment> Food, long Basis) items, Guid operationId, AccountMoney money, CancellationToken cancellationToken)
     {
         if (order.Tax != 0 && (rule.Effect == "Reduce" || rule.Calculation == "Percentage"))
             throw new ConflictException("This bill has frozen tax. Use tax reconciliation before applying a discount or percentage adjustment.");
         var amount = rule.Calculation == "Percentage"
-            ? checked(decimal.ToInt64(decimal.Round(basis * input.Amount / 100m, 0, MidpointRounding.AwayFromZero)))
+            ? checked(decimal.ToInt64(decimal.Round(items.Basis * input.Amount / 100m, 0, MidpointRounding.AwayFromZero)))
             : money.ToMinor(input.Amount);
         if (amount == 0)
             throw new BadRequestException("The selected adjustment rounds to zero. Choose a larger amount.");
@@ -83,12 +83,12 @@ public sealed class BillChargeService(ApplicationDbContext context, ICurrentUser
         if (rule.Effect == "Reduce")
         {
             await RequireCanReduceAsync(order, cancellationToken);
-            allocations = BillDiscountMath.Allocate(food, amount);
+            allocations = BillDiscountMath.Allocate(items.Food, amount);
         }
         var signed = money.ToMajor(amount) * (rule.Effect == "Reduce" ? -1m : 1m);
         return new OrderBillCharge(operationId, rule.Key, rule.Label.Trim(), signed,
             money.Currency, DateTime.UtcNow, currentUser.GetAuditIdentifier(), input.Amount,
-            rule.Effect ?? "Increase", rule.Calculation ?? "Fixed", basis, allocations);
+            rule.Effect ?? "Increase", rule.Calculation ?? "Fixed", items.Basis, allocations);
     }
 
     private async Task RequireCanReduceAsync(Order order, CancellationToken cancellationToken)

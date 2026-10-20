@@ -42,9 +42,12 @@ internal static class OrderBillChargeReader
         if (magnitude != expected) return true;
         if (charge.Effect == "Increase") return charge.Allocations is { Count: > 0 };
         return charge.BasisMinor == 0 || charge.Allocations is not { Count: > 0 }
-            || charge.Allocations.Any(value => value is null || value.OrderItemId == Guid.Empty
-                || value.StartOrdinal < 1 || value.Count <= 0 || value.MinorPerUnit <= 0
-                || (long)value.StartOrdinal + value.Count > (long)int.MaxValue + 1)
+            || charge.Allocations.Any(InvalidAllocation)
             || charge.Allocations.Aggregate(BigInteger.Zero, (sum, value) => sum + (BigInteger)value.Count * value.MinorPerUnit) != magnitude;
     }
+
+    private static bool InvalidAllocation(BillDiscountAllocation value) =>
+        value is null || value.OrderItemId == Guid.Empty || value.StartOrdinal < 1 || value.Count <= 0 || value.MinorPerUnit <= 0
+        || (long)value.StartOrdinal + value.Count > (long)int.MaxValue + 1;
+
 }
