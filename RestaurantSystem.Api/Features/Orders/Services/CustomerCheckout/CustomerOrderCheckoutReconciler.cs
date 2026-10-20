@@ -51,7 +51,7 @@ public sealed class CustomerOrderCheckoutReconciler(ApplicationDbContext context
                 if (result.Outcome == CheckoutSessionStatus.Expired) expired++;
                 if (result.Effects) await effects.CompleteAsync(orderId, workToken);
             }
-            catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            catch (Exception error) when (ShouldReport(error, cancellationToken))
             {
                 context.ChangeTracker.Clear();
                 failures++;
@@ -73,6 +73,9 @@ public sealed class CustomerOrderCheckoutReconciler(ApplicationDbContext context
         var outcome = await RecordAsync(lease, remote, cancellationToken);
         return (outcome, outcome == CheckoutSessionStatus.Completed);
     }
+
+    private static bool ShouldReport(Exception error, CancellationToken cancellationToken) =>
+        error is not OperationCanceledException || !cancellationToken.IsCancellationRequested;
 
     private void ReportFailure(Guid orderId, Exception error)
     {
