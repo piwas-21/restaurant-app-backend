@@ -34,16 +34,10 @@ public sealed class GetCustomerReservationEditAvailabilityQueryHandler(ICustomer
         var slots = available.Data.TimeSlots.Where(slot => slot.StartTime >= TimeSpan.Zero
                 && slot.EndTime <= TimeSpan.FromDays(1) && slot.EndTime > slot.StartTime
                 && (day > today || day == today && slot.StartTime > now.TimeOfDay)
-                && Fits(slot, original.AssignedTables, guests))
+                && CustomerReservationAssignedSlots.Fits(slot.AvailableTables, original.AssignedTables, guests))
             .Select(slot => new CustomerReservationSlotDto(slot.StartTime, slot.EndTime)).Distinct()
             .OrderBy(slot => slot.StartTime).ThenBy(slot => slot.EndTime).Take(MaximumSlots).ToArray();
         return ApiResponse<CustomerReservationEditAvailabilityDto>.SuccessWithData(
             new(1, query.ReservationId, day, original.Context.TimeZone, guests, slots));
-    }
-    private static bool Fits(TimeSlotDto slot, IReadOnlyList<Guid> assigned, int guests)
-    {
-        var available = slot.AvailableTables.Where(table => assigned.Contains(table.Id) && table.IsActive && table.MaxGuests > 0)
-            .DistinctBy(table => table.Id).ToArray();
-        return available.Length == assigned.Count && available.Sum(table => (long)table.MaxGuests) >= guests;
     }
 }
