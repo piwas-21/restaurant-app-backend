@@ -1,5 +1,6 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
@@ -8,6 +9,7 @@ using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -16,7 +18,8 @@ namespace RestaurantSystem.Api.Features.Orders.Queries.GetCurrentStaffTicketQuer
 public sealed record GetCurrentStaffTicketQuery(Guid OrderId) : IQuery<ApiResponse<IReadOnlyList<OrderDto>>>;
 
 public sealed class GetCurrentStaffTicketQueryHandler(
-    ApplicationDbContext context, ICurrentUserService currentUser, IOrderQueueProjection projection)
+    ApplicationDbContext context, ICurrentUserService currentUser, IOrderQueueProjection projection,
+    IOptions<CurrentStaffTicketSettings> settings)
     : IQueryHandler<GetCurrentStaffTicketQuery, ApiResponse<IReadOnlyList<OrderDto>>>
 {
     public async Task<ApiResponse<IReadOnlyList<OrderDto>>> Handle(
@@ -35,18 +38,18 @@ public sealed class GetCurrentStaffTicketQueryHandler(
             : members.Where(order => !order.ServiceSessionId.HasValue
                 && (order.AmendmentRootOrderId ?? order.Id) == source.RootId);
         var ids = await members.OrderBy(order => order.OrderDate).ThenBy(order => order.Id)
-            .Select(order => order.Id).Take(CurrentStaffTicketLimits.MaximumMembers + 1)
+            .Select(order => order.Id).Take(settings.Value.MaximumMembers + 1)
             .ToArrayAsync(cancellationToken);
-        if (ids.Length > CurrentStaffTicketLimits.MaximumMembers) throw Oversized();
+        if (ids.Length > settings.Value.MaximumMembers) throw Oversized();
         var amendments = await context.OrderAmendments.AsNoTracking()
             .Where(amendment => ids.Contains(amendment.SourceOrderId)
                 && amendment.State == OrderAmendmentState.Committed)
             .OrderBy(amendment => amendment.CommittedAt).ThenBy(amendment => amendment.CreatedAt)
             .ThenBy(amendment => amendment.Id)
             .Select(amendment => new { amendment.SourceOrderId, amendment.ChangesJson })
-            .Take(CurrentStaffTicketLimits.MaximumAmendments + 1)
+            .Take(settings.Value.MaximumAmendments + 1)
             .ToListAsync(cancellationToken);
-        if (amendments.Count > CurrentStaffTicketLimits.MaximumAmendments) throw Oversized();
+        if (amendments.Count > settings.Value.MaximumAmendments) throw Oversized();
         var orders = await context.Orders.AsNoTracking().Where(order => ids.Contains(order.Id))
             .IncludeOrderLineGraph()
             .Include(order => order.Items).ThenInclude(item => item.ProductVariation)

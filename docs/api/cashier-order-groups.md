@@ -49,8 +49,11 @@ item view. Replacement/addition items belong to their supplement and appear once
 order items and financial records remain intact. This operational read includes staff
 preparation text; the separate audit-history response continues to redact free text.
 
-The interactive ticket budget is 100 member orders and 1,000 committed amendments per
-group. A bounded preflight reads at most one entry beyond each budget before loading the
+The default interactive ticket budget is 100 member orders and 1,000 committed amendments
+per group. Operators can configure `CurrentStaffTicket:MaximumMembers` (1–1,000) and
+`CurrentStaffTicket:MaximumAmendments` (1–10,000), or the corresponding double-underscore
+environment keys. Options validation rejects invalid budgets at startup. A bounded
+preflight reads at most one entry beyond each configured budget before loading the
 order/payment graph. An oversized group returns HTTP 409 with an explicit refusal; it
 never returns a partial ticket or bill. Both checks share the ticket's repeatable-read
 snapshot, so concurrent amendments cannot evade the history budget or yield mixed totals.

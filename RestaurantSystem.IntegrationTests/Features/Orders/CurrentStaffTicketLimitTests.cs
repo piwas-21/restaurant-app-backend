@@ -5,7 +5,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
-using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -16,6 +16,16 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 [Collection("Database Lane 2")]
 public sealed class CurrentStaffTicketLimitTests(DatabaseFixture fixture) : IntegrationTestBase(fixture)
 {
+    private const int MemberBudget = 3;
+    private const int AmendmentBudget = 4;
+
+    protected override void ConfigureTestServices(IServiceCollection services) =>
+        services.PostConfigure<CurrentStaffTicketSettings>(settings =>
+        {
+            settings.MaximumMembers = MemberBudget;
+            settings.MaximumAmendments = AmendmentBudget;
+        });
+
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
@@ -23,7 +33,7 @@ public sealed class CurrentStaffTicketLimitTests(DatabaseFixture fixture) : Inte
     {
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var count = CurrentStaffTicketLimits.MaximumMembers + excess;
+        var count = MemberBudget + excess;
         var orders = Enumerable.Range(0, count).Select(Order).ToArray();
         foreach (var member in orders.Skip(1)) member.AmendmentRootOrderId = orders[0].Id;
         context.Orders.AddRange(orders);
@@ -66,7 +76,7 @@ public sealed class CurrentStaffTicketLimitTests(DatabaseFixture fixture) : Inte
         OrderAmendmentChangeSnapshot[] changes =
         [new(item.Id, OrderAmendmentChangeKind.InstructionChange, 0, 0, true, before,
             before with { SpecialInstructions = "Last committed instruction" })];
-        var count = CurrentStaffTicketLimits.MaximumAmendments + excess;
+        var count = AmendmentBudget + excess;
         context.OrderAmendments.AddRange(Enumerable.Range(0, count).Select(index => new OrderAmendment
         {
             SourceOrderId = order.Id,
