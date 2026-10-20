@@ -98,9 +98,8 @@ public class CancelReservationOwnershipTests : IntegrationTestBase
     [Fact]
     public async Task The_restaurants_own_quick_reject_link_still_works_with_no_caller_at_all()
     {
-        // The [AllowAnonymous] link in the admin alert mail is the ONE documented opt-out
-        // (EnforceOwnership: false). If the ownership check reached it, the restaurant could no
-        // longer reject a booking from its own inbox.
+        // A freshly revalidated internal email proof is the only replacement for caller ownership.
+        // The restaurant can still reject a booking from its own inbox without a signed-in session.
         var id = await SeedReservationAsync(OtherUserId);
         AuthenticateAsAnonymous();
 

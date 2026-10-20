@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Features.Reservations.Services;
 using RestaurantSystem.Api.Abstraction.Messaging;
@@ -10,22 +12,29 @@ using RestaurantSystem.Api.Common.Templates;
 
 namespace RestaurantSystem.Api.Features.Reservations.Commands.ConfirmReservationCommand;
 
-public record ConfirmReservationCommand(Guid ReservationId) : ICommand<ApiResponse<bool>>;
+public record ConfirmReservationCommand(Guid ReservationId) : ICommand<ApiResponse<bool>>
+{
+    [BindNever, JsonIgnore]
+    internal ReservationQuickActionAuthority? QuickAction { get; init; }
+}
 
 public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservationCommand, ApiResponse<bool>>
 {
     private readonly ApplicationDbContext _context;
+    private readonly IReservationQuickActionLinks _quickActions;
     private readonly IEmailService _emailService;
     private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<ConfirmReservationCommandHandler> _logger;
 
     public ConfirmReservationCommandHandler(
         ApplicationDbContext context,
+        IReservationQuickActionLinks quickActions,
         IEmailService emailService,
         IEmailLanguageResolver languages,
         ILogger<ConfirmReservationCommandHandler> logger)
     {
         _context = context;
+        _quickActions = quickActions;
         _emailService = emailService;
         _languages = languages;
         _logger = logger;
@@ -40,6 +49,10 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                 .Include(r => r.Table)
                 .Include(r => r.CombinedTables)
                 .FirstOrDefaultAsync(r => r.Id == command.ReservationId, cancellationToken);
+
+            if (command.QuickAction is { } authority
+                && !authority.Allows(reservation, ReservationQuickAction.Approve, _quickActions))
+                return ReservationQuickActionAuthority.Refused();
 
             if (reservation == null)
             {

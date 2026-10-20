@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Features.Reservations.Services;
@@ -13,24 +14,20 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Reservations.Commands.CancelReservationCommand;
 
-/// <param name="ReservationId">Reservation to cancel.</param>
-/// <param name="EnforceOwnership">
-/// When true (the default, and the only value a user-facing route may use), a non-staff caller may
-/// cancel only a reservation they own; everyone else gets the not-found response. Set to false ONLY
-/// for the [AllowAnonymous] quick-reject link the restaurant's own alert mail carries, which has no
-/// caller at all. Defaulting to true keeps a new route secure unless it explicitly opts out.
-/// [BindNever] on both the parameter and the property so a future [FromQuery]/[FromBody] binding
-/// cannot reopen this from the wire (same guard as GetOrderByIdQuery).
-/// </param>
-public record CancelReservationCommand(
-    Guid ReservationId,
-    [BindNever][property: BindNever] bool EnforceOwnership = true) : ICommand<ApiResponse<bool>>;
+/// <summary>Signed-in cancellation. Only the email controller can attach an internal original
+/// proof instead of caller ownership, and the handler revalidates that proof after waiting.</summary>
+public record CancelReservationCommand(Guid ReservationId) : ICommand<ApiResponse<bool>>
+{
+    [BindNever, JsonIgnore]
+    internal ReservationQuickActionAuthority? QuickAction { get; init; }
+}
 
 public class CancelReservationCommandHandler : ICommandHandler<CancelReservationCommand, ApiResponse<bool>>
 {
     private const string NotFoundMessage = "Reservation not found";
 
     private readonly ApplicationDbContext _context;
+    private readonly IReservationQuickActionLinks _quickActions;
     private readonly ICurrentUserService _currentUser;
     private readonly IEmailService _emailService;
     private readonly IEmailBrandingProvider _brandingProvider;
@@ -40,6 +37,7 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
 
     public CancelReservationCommandHandler(
         ApplicationDbContext context,
+        IReservationQuickActionLinks quickActions,
         ICurrentUserService currentUser,
         IEmailService emailService,
         IEmailBrandingProvider brandingProvider,
@@ -48,6 +46,7 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
         ILogger<CancelReservationCommandHandler> logger)
     {
         _context = context;
+        _quickActions = quickActions;
         _currentUser = currentUser;
         _emailService = emailService;
         _brandingProvider = brandingProvider;
@@ -71,12 +70,16 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
             var reservation = await _context.Reservations
                 .FirstOrDefaultAsync(r => r.Id == command.ReservationId, cancellationToken);
 
+            if (command.QuickAction is { } authority
+                && !authority.Allows(reservation, ReservationQuickAction.Reject, _quickActions))
+                return ReservationQuickActionAuthority.Refused();
+
             if (reservation == null)
             {
                 return ApiResponse<bool>.Failure(NotFoundMessage);
             }
 
-            if (command.EnforceOwnership && !CanCurrentUserCancel(reservation))
+            if (command.QuickAction is null && !CanCurrentUserCancel(reservation))
             {
                 // Word for word the missing-reservation answer, on purpose: a distinct 403 would
                 // confirm the id exists and let anyone enumerate other guests' bookings. The real

@@ -13,7 +13,11 @@ Live dine-in table holds are a separate occupancy system.
 
 Pending and confirmed bookings occupy their primary and combined tables. Confirmation also checks
 that complete set before reactivating a no-show; adjacent half-open time intervals do not conflict.
-Existing ownership, required-field, capacity and error contracts still apply. This adds no schema,
+Email quick actions carry their original proof through an internal, non-bindable command property.
+After the schedule wait, the handler revalidates that proof against the fresh booking status,
+creation time and current signature/legacy clock. A changed, expired or deleted booking uses the
+same unusable-link page as an unknown ID. Authenticated staff commands retain their normal path.
+Existing ownership, required-field and capacity contracts still apply. This adds no schema,
 setting, native booking route, idempotency receipt or tenant activation.
 
 The helper owns a new ReadCommitted transaction. Do not dispatch these legacy commands inside an
