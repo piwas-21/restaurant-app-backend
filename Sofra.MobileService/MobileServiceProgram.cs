@@ -12,11 +12,13 @@ public sealed class MobileServiceProgram
         var builder = WebApplication.CreateBuilder(args);
         builder.Services.AddMobileDirectory(builder.Configuration);
         builder.Services.AddMobileLinks(builder.Configuration);
+        builder.Services.AddMobileAssociations(builder.Configuration);
         builder.Services.AddProblemDetails();
         var app = builder.Build();
         app.UseExceptionHandler();
         app.MapMobileDirectory();
         app.MapMobileLinks();
+        app.MapMobileAssociations();
         // Intentionally anonymous liveness for infrastructure probes. Fixed status only;
         // no configuration, tenant identities, dependency details or customer data are exposed.
         app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));

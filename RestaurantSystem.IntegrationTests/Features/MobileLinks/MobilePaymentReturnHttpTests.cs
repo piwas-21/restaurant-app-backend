@@ -1,11 +1,5 @@
 using System.Net;
-using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 using RestaurantSystem.IntegrationTests.Features.MobileDirectory;
-using Sofra.MobileService;
-using Sofra.MobileService.Links;
 
 namespace RestaurantSystem.IntegrationTests.Features.MobileLinks;
 
@@ -19,7 +13,7 @@ public sealed class MobilePaymentReturnHttpTests
     [InlineData("read-only")]
     public async Task LandingIsPublicNavigationOnlyWithNoFinancialOrPrivateReferences(string status)
     {
-        await using var factory = new LinkFactory(status: status);
+        await using var factory = new MobileLinksFactory(status: status);
         using var client = factory.CreateClient(new() { BaseAddress = new(Origin), AllowAutoRedirect = false });
         client.DefaultRequestHeaders.Add("Authorization", "Bearer invalid-navigation-control");
         using var response = await client.GetAsync(Path);
@@ -56,7 +50,7 @@ public sealed class MobilePaymentReturnHttpTests
     [InlineData("wrong-host")]
     public async Task MalformedOrUnapprovedNavigationIsRefused(string scenario)
     {
-        await using var factory = new LinkFactory();
+        await using var factory = new MobileLinksFactory();
         using var client = factory.CreateClient(new() { BaseAddress = new(Origin), AllowAutoRedirect = false });
         var path = scenario switch
         {
@@ -84,20 +78,10 @@ public sealed class MobilePaymentReturnHttpTests
     [InlineData(true, "active", 2)]
     public async Task LandingRemainsUnavailableUntilEveryNavigationGateAllowsIt(bool enabled, string status, int contract)
     {
-        await using var factory = new LinkFactory(enabled, status, contract);
+        await using var factory = new MobileLinksFactory(enabled, status, contract);
         using var client = factory.CreateClient(new() { BaseAddress = new(Origin) });
         using var response = await client.GetAsync(Path);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    private sealed class LinkFactory(bool enabled = true, string status = "active", int contract = 1)
-        : WebApplicationFactory<MobileServiceProgram>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder) =>
-            builder.ConfigureAppConfiguration((_, config) => config.AddJsonStream(new MemoryStream(JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                MobileDirectory = MobileDirectoryFixture.Settings([MobileDirectoryFixture.Alpha with { Status = status, ContractVersions = [contract] }]),
-                MobileLinks = new MobileLinkSettings { Enabled = enabled, Origin = Origin }
-            }))));
-    }
 }

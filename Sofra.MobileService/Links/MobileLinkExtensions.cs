@@ -35,7 +35,7 @@ public static class MobileLinkExtensions
                 var operations = context.Request.Query["operation"];
                 var input = new MobilePaymentReturnQuery(slug, reference, operations.FirstOrDefault(),
                     context.Request.Query.Count, operations.Count, context.Request.Host.ToUriComponent());
-                return query.Handle(input) ? (IResult)Results.Content(PaymentReturnHtml, "text/html; charset=utf-8")
+                return query.Handle(input) ? Results.Content(PaymentReturnHtml, "text/html; charset=utf-8")
                     : Results.NotFound();
             });
         return endpoints;
