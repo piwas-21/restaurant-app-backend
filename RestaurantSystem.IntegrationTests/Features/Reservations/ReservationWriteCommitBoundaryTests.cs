@@ -105,7 +105,7 @@ public sealed partial class ReservationWriteConcurrencyTests
             });
         await using var db = DatabaseFixture.CreateContext();
         using var scope = Factory.Services.CreateScope();
-        var result = await ActivatorUtilities.CreateInstance<CreateReservationCommandHandler>(scope.ServiceProvider, db, mailer.Object)
+        var result = await Creator(scope.ServiceProvider, db, mailer.Object)
             .Handle(new(Payload()), default);
         Assert.True(result.Success);
         Assert.True(mailed);
@@ -160,13 +160,13 @@ public sealed partial class ReservationWriteConcurrencyTests
         var mailer = new Mock<IReservationCreatedMailer>();
         using var scope = Factory.Services.CreateScope();
         await using var failedDb = DatabaseFixture.CreateContext(new FailAfterSave());
-        var failed = await ActivatorUtilities.CreateInstance<CreateReservationCommandHandler>(scope.ServiceProvider, failedDb, mailer.Object)
+        var failed = await Creator(scope.ServiceProvider, failedDb, mailer.Object)
             .Handle(new(Payload()), default);
         Assert.False(failed.Success);
         await using var nextDb = DatabaseFixture.CreateContext();
         Assert.False(await nextDb.Reservations.AnyAsync(row => row.ReservationDate == Day));
         mailer.Verify(value => value.SendAsync(It.IsAny<Reservation>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        var next = await ActivatorUtilities.CreateInstance<CreateReservationCommandHandler>(scope.ServiceProvider, nextDb)
+        var next = await Creator(scope.ServiceProvider, nextDb)
             .Handle(new(Payload()), default);
         Assert.True(next.Success);
         await using var verify = DatabaseFixture.CreateContext();

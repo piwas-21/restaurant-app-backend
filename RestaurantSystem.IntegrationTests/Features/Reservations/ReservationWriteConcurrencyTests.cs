@@ -10,6 +10,7 @@ using RestaurantSystem.Api.Features.Reservations.Commands.CreateReservationComma
 using RestaurantSystem.Api.Features.Reservations.Commands.UpdateMyReservationCommand;
 using RestaurantSystem.Api.Features.Reservations.Commands.UpdateReservationCommand;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
+using RestaurantSystem.Api.Features.Reservations.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -61,7 +62,7 @@ public sealed partial class ReservationWriteConcurrencyTests(DatabaseFixture fix
         await using var firstDb = DatabaseFixture.CreateContext(pause);
         await using var secondDb = DatabaseFixture.CreateContext(observe);
         using var scope = Factory.Services.CreateScope();
-        var first = ActivatorUtilities.CreateInstance<CreateReservationCommandHandler>(scope.ServiceProvider, firstDb)
+        var first = Creator(scope.ServiceProvider, firstDb)
             .Handle(new(Payload()), default);
         Task<bool>? second = null;
         try
@@ -85,11 +86,20 @@ public sealed partial class ReservationWriteConcurrencyTests(DatabaseFixture fix
         Assert.Equal(Day.AddDays(1), (await verify.Reservations.SingleAsync(row => row.Id == _existing)).ReservationDate);
     }
 
+    private static CreateReservationCommandHandler Creator(IServiceProvider services, ApplicationDbContext db,
+        IReservationCreatedMailer? mailer = null)
+    {
+        var writer = ActivatorUtilities.CreateInstance<ReservationDraftWriter>(services, db);
+        return mailer is null
+            ? ActivatorUtilities.CreateInstance<CreateReservationCommandHandler>(services, db, writer)
+            : ActivatorUtilities.CreateInstance<CreateReservationCommandHandler>(services, db, writer, mailer);
+    }
+
     private async Task<bool> RunWriterAsync(string writer, ApplicationDbContext db)
     {
         using var scope = Factory.Services.CreateScope();
         if (writer == "create")
-            return (await ActivatorUtilities.CreateInstance<CreateReservationCommandHandler>(scope.ServiceProvider, db)
+            return (await Creator(scope.ServiceProvider, db)
                 .Handle(new(Payload()), default)).Success;
         if (writer == "admin-edit")
             return (await ActivatorUtilities.CreateInstance<UpdateReservationCommandHandler>(scope.ServiceProvider, db)
