@@ -9,6 +9,6 @@ public sealed class GetCustomerReservationAvailabilityQueryValidator : AbstractV
         RuleFor(query => query.SchemaVersion).NotNull().Equal(1);
         RuleFor(query => query.Date).NotNull();
         // Same party-size range as the existing ReservationWriteDto contract.
-        RuleFor(query => query.NumberOfGuests).InclusiveBetween(1, 20);
+        RuleFor(query => query.NumberOfGuests).NotNull().InclusiveBetween(1, 20);
     }
 }

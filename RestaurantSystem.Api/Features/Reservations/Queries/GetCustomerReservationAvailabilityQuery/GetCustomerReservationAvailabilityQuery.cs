@@ -10,7 +10,7 @@ using RestaurantSystem.Api.Features.Reservations.Services;
 namespace RestaurantSystem.Api.Features.Reservations.Queries.GetCustomerReservationAvailabilityQuery;
 
 public sealed record GetCustomerReservationAvailabilityQuery(int? SchemaVersion, DateOnly? Date,
-    int NumberOfGuests) : IQuery<ApiResponse<CustomerReservationAvailabilityDto>>;
+    int? NumberOfGuests) : IQuery<ApiResponse<CustomerReservationAvailabilityDto>>;
 
 public sealed class GetCustomerReservationAvailabilityQueryHandler(CustomMediator mediator, ITenantClock clock)
     : IQueryHandler<GetCustomerReservationAvailabilityQuery, ApiResponse<CustomerReservationAvailabilityDto>>
@@ -21,11 +21,13 @@ public sealed class GetCustomerReservationAvailabilityQueryHandler(CustomMediato
         CancellationToken cancellationToken)
     {
         var original = await CustomerReservationReadAccess.RequireAvailableAsync(mediator, cancellationToken);
+        if (query.NumberOfGuests is not { } guests || guests is < 1 or > 20)
+            throw new BadRequestException("Choose a party size between 1 and 20.");
         if (query.Date is not { } date || date < DateOnly.FromDateTime(clock.Now.DateTime))
             throw new BadRequestException("Choose a current or future restaurant date.");
         // Calendar marker only: never convert through the device or restaurant timezone.
         var marker = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var result = await mediator.SendQuery(new LegacySlotsQuery(marker, query.NumberOfGuests), cancellationToken);
+        var result = await mediator.SendQuery(new LegacySlotsQuery(marker, guests), cancellationToken);
         if (!result.Success || result.Data is null)
             throw new BadRequestException("Reservation availability is unavailable. Choose another date or try again.");
         var current = await CustomerReservationReadAccess.RequireAvailableAsync(mediator, cancellationToken);
@@ -34,9 +36,9 @@ public sealed class GetCustomerReservationAvailabilityQueryHandler(CustomMediato
         var slots = result.Data.TimeSlots
             .Where(slot => slot.StartTime >= TimeSpan.Zero && slot.EndTime <= TimeSpan.FromDays(1)
                 && slot.EndTime > slot.StartTime
-                && slot.AvailableTables.Where(table => table.MaxGuests > 0).Sum(table => (long)table.MaxGuests) >= query.NumberOfGuests)
+                && slot.AvailableTables.Where(table => table.MaxGuests > 0).Sum(table => (long)table.MaxGuests) >= guests)
             .Select(slot => new CustomerReservationSlotDto(slot.StartTime, slot.EndTime))
             .Distinct().OrderBy(slot => slot.StartTime).ThenBy(slot => slot.EndTime).Take(MaximumSlots).ToArray();
-        return ApiResponse<CustomerReservationAvailabilityDto>.SuccessWithData(new(1, date, current.Timezone, query.NumberOfGuests, slots));
+        return ApiResponse<CustomerReservationAvailabilityDto>.SuccessWithData(new(1, date, current.Timezone, guests, slots));
     }
 }
