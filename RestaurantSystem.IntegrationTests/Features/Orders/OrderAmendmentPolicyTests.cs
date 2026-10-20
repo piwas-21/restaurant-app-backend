@@ -273,7 +273,7 @@ public sealed class OrderAmendmentPolicyTests
     }
 
     [Fact]
-    public void PreparingLineCorrection_AllowsServerOnlyAfterAcknowledgementAndReason()
+    public void PreparingLineCorrection_AllowsServerAfterAcknowledgementWithoutReason()
     {
         var source = SourceOrder();
         source.Status = OrderStatus.Preparing;
@@ -283,7 +283,6 @@ public sealed class OrderAmendmentPolicyTests
         var request = new OrderAmendmentQuoteRequest
         {
             ExpectedOrderVersion = source.Version,
-            Reason = "Guest requested a correction",
             Changes = [new OrderAmendmentLineChangeRequest
             {
                 OrderItemId = Guid.NewGuid(),
