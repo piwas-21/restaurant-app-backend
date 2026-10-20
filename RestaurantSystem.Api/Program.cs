@@ -832,6 +832,7 @@ builder.Services.AddOrderCreationServices();
 builder.Services.AddStaffOrderServices();
 builder.Services.AddCustomerCheckoutServices();
 builder.Services.AddCustomerNativeAccounts(builder.Configuration);
+builder.Services.AddCustomerNativeSocial(builder.Configuration);
 builder.Services.AddServerWorkspaceServices();
 builder.Services.AddKitchenBoardServices();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
@@ -889,6 +890,7 @@ builder.Services.Configure<DeviceTelemetryRetentionSettings>(builder.Configurati
 builder.Services.Configure<FleetPushSettings>(builder.Configuration.GetSection("FleetPush"));
 builder.Services.AddHostedService<BasketCleanupService>();
 builder.Services.AddHostedService<AccountCleanupService>();
+builder.Services.AddHostedService<NativeSocialChallengeCleanupService>();
 builder.Services.AddHostedService<TableReservationCleanupService>();
 builder.Services.AddHostedService<ReservationRetentionService>();
 builder.Services.AddHostedService<DeviceTelemetryRetentionService>();
