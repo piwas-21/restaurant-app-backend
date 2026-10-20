@@ -39,6 +39,7 @@ public sealed class GetCurrentStaffTicketQueryHandler(
             .Include(order => order.Table)
             .Include(order => order.Payments).Include(order => order.ExternalReference)
             .Include(order => order.RoutingStates)
+            .AsSplitQuery()
             .OrderBy(order => order.OrderDate).ThenBy(order => order.Id).ToListAsync(cancellationToken);
         var ids = orders.Select(order => order.Id).ToArray();
         var amendments = await context.OrderAmendments.AsNoTracking()

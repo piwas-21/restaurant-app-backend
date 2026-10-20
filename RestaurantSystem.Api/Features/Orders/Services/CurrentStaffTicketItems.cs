@@ -14,30 +14,33 @@ internal static class CurrentStaffTicketItems
         var result = new List<OrderItemDto>();
         foreach (var original in items)
         {
-            var current = original;
-            var removed = new HashSet<int>();
-            foreach (var change in changes.Where(change => change.OrderItemId == original.Id))
-            {
-                if (change.Kind == OrderAmendmentChangeKind.InstructionChange && change.Current is not null)
-                    current = change.Current;
-                else if (change.Kind is OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace)
-                    for (var unit = change.StartOrdinal; unit < change.StartOrdinal + change.Quantity; unit++)
-                        removed.Add(unit);
-            }
+            var lineChanges = changes.Where(change => change.OrderItemId == original.Id).ToArray();
+            var current = lineChanges.LastOrDefault(change =>
+                change.Kind == OrderAmendmentChangeKind.InstructionChange && change.Current is not null)?.Current
+                ?? original;
+            var removed = lineChanges
+                .Where(change => change.Kind is OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace)
+                .SelectMany(change => Enumerable.Range(change.StartOrdinal, change.Quantity)).ToHashSet();
             var quantity = original.Quantity - removed.Count;
             if (quantity <= 0) continue;
-            var amount = original.ItemTotal;
-            if (quantity != original.Quantity)
+            result.Add(current with
             {
-                var money = new AccountMoney(currency);
-                var minor = money.ToMinor(original.ItemTotal);
-                var perUnit = minor / original.Quantity;
-                var remainder = minor % original.Quantity;
-                var retained = Enumerable.Range(1, original.Quantity).Where(unit => !removed.Contains(unit));
-                amount = money.ToMajor(retained.Sum(unit => perUnit + (unit <= remainder ? 1 : 0)));
-            }
-            result.Add(current with { Id = original.Id, Quantity = quantity, ItemTotal = amount });
+                Id = original.Id,
+                Quantity = quantity,
+                ItemTotal = RetainedAmount(original, removed, currency)
+            });
         }
         return result;
+    }
+
+    private static decimal RetainedAmount(OrderItemDto original, HashSet<int> removed, string? currency)
+    {
+        if (removed.Count == 0) return original.ItemTotal;
+        var money = new AccountMoney(currency);
+        var minor = money.ToMinor(original.ItemTotal);
+        var perUnit = minor / original.Quantity;
+        var remainder = minor % original.Quantity;
+        var retained = Enumerable.Range(1, original.Quantity).Where(unit => !removed.Contains(unit));
+        return money.ToMajor(retained.Sum(unit => perUnit + (unit <= remainder ? 1 : 0)));
     }
 }
