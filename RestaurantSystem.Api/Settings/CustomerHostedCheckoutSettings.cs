@@ -6,8 +6,14 @@ namespace RestaurantSystem.Api.Settings;
 public sealed class CustomerHostedCheckoutSettings
 {
     public const string SectionName = "CustomerHostedCheckout";
+    public const int MaximumReconciliationBudgetSeconds = 30;
     public bool Enabled { get; set; }
+    public int ReconciliationBudgetSeconds { get; set; } = 5;
+    public string[] HostedPageOrigins { get; set; } = [];
     public string LinkOrigin { get; set; } = string.Empty;
     public string TenantSlug { get; set; } = string.Empty;
-    public bool IsValid() => !Enabled || NativeCheckoutRouting.IsValidConfiguration(LinkOrigin, TenantSlug);
+    public bool IsValid() => !Enabled || ReconciliationBudgetSeconds is >= 1 and <= MaximumReconciliationBudgetSeconds
+        && NativeCheckoutRouting.IsValidConfiguration(LinkOrigin, TenantSlug)
+        && HostedPageOrigins is { Length: > 0 and <= 4 } && HostedPageOrigins.Distinct(StringComparer.Ordinal).Count() == HostedPageOrigins.Length
+        && HostedPageOrigins.All(origin => NativeCheckoutRouting.IsValidConfiguration(origin, TenantSlug));
 }

@@ -23,7 +23,8 @@ public sealed class CustomerOrderCheckoutRecoveryTests(DatabaseFixture database)
     private Task<StripeCheckoutSession> RecoverAsync(Guid? owner = null) => WithCheckoutAsync(async (context, _, leases) =>
     {
         context.Database.CurrentTransaction.Should().BeNull();
-        var recovery = new CustomerOrderCheckoutRecovery(leases, _provider.Object, _gateway.Object, Options.Create(_stripe), Clock);
+        var recovery = new CustomerOrderCheckoutRecovery(leases, _provider.Object, _gateway.Object, Options.Create(_stripe), Clock, Mock.Of<ICustomerOrderCheckoutEffects>(),
+            new CustomerOrderCheckoutProviderReader(_provider.Object, _gateway.Object, Options.Create(_stripe)));
         return await recovery.RecoverAsync(Session, Proof, CancellationToken.None);
     }, owner);
 
@@ -238,7 +239,8 @@ public sealed class CustomerOrderCheckoutRecoveryTests(DatabaseFixture database)
                     return lease;
                 });
             var recovery = new CustomerOrderCheckoutRecovery(paused.Object, _provider.Object, _gateway.Object,
-                Options.Create(_stripe), Clock);
+                Options.Create(_stripe), Clock, Mock.Of<ICustomerOrderCheckoutEffects>(),
+            new CustomerOrderCheckoutProviderReader(_provider.Object, _gateway.Object, Options.Create(_stripe)));
             await FluentActions.Invoking(() => recovery.RecoverAsync(Session, Proof, CancellationToken.None))
                 .Should().ThrowAsync<ConflictException>();
             _provider.VerifyNoOtherCalls();

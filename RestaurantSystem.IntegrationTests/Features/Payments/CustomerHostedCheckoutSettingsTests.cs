@@ -16,7 +16,8 @@ public sealed class CustomerHostedCheckoutSettingsTests : NativeCheckoutProvider
         {
             Enabled = true,
             LinkOrigin = "https://links.example.test",
-            TenantSlug = "fixture"
+            TenantSlug = "fixture",
+            HostedPageOrigins = ["https://checkout.stripe.com"]
         };
         settings.IsValid().Should().BeTrue();
         NativeCheckoutRouting.Create(settings.LinkOrigin, settings.TenantSlug, OrderId, OperationId, new(Account, false))

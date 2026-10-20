@@ -2669,6 +2669,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency");
 
+                    b.Property<DateTime?>("EffectsCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effects_completed_at");
+
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");

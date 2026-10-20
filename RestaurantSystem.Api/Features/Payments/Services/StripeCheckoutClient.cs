@@ -150,7 +150,17 @@ public class StripeCheckoutClient : IStripeCheckoutClient
             var intent = await new PaymentIntentService(_gateway.Client)
                 .GetAsync(paymentIntentId, options: null, _gateway.BuildRequestOptions(), cancellationToken);
 
-            return new StripePaymentIntent { Id = intent.Id, Status = intent.Status ?? string.Empty };
+            return new StripePaymentIntent
+            {
+                Id = intent.Id,
+                Status = intent.Status ?? string.Empty,
+                AmountMinor = intent.Amount,
+                AmountReceivedMinor = intent.AmountReceived,
+                ApplicationFeeMinor = intent.ApplicationFeeAmount,
+                Currency = intent.Currency,
+                ProviderContext = new StripeProviderContext(_gateway.ConnectedAccountId, intent.Livemode),
+                Metadata = intent.Metadata ?? new Dictionary<string, string>()
+            };
         }
         catch (StripeException ex) when (ex.StripeError?.Code == "resource_missing")
         {

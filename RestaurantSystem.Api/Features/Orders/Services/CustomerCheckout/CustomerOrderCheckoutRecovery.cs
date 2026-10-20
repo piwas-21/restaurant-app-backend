@@ -9,7 +9,7 @@ namespace RestaurantSystem.Api.Features.Orders.Services.CustomerCheckout;
 
 /// <summary>Provider I/O happens between committed lease/evidence phases, always on the original request.</summary>
 public sealed class CustomerOrderCheckoutRecovery(ICustomerOrderCheckoutLeaseStore leases,
-    IStripeCheckoutClient provider, IStripeGateway gateway, IOptions<StripeSettings> stripe, TimeProvider clock) : ICustomerOrderCheckoutRecovery
+    IStripeCheckoutClient provider, IStripeGateway gateway, IOptions<StripeSettings> stripe, TimeProvider clock, ICustomerOrderCheckoutEffects effects, ICustomerOrderCheckoutProviderReader reader) : ICustomerOrderCheckoutRecovery
 {
     public async Task<StripeCheckoutSession> RecoverAsync(string sessionId, CustomerOrderRecoveryDto proof,
         CancellationToken cancellationToken)
@@ -32,11 +32,9 @@ public sealed class CustomerOrderCheckoutRecovery(ICustomerOrderCheckoutLeaseSto
         // or provider failure keeps the durable request and lease; no failure path rotates identity.
         routing.RequireCurrent(gateway, stripe.Value, request.OrderId);
         RequireLiveLease(lease);
-        var evidence = await provider.GetAsync(id, cancellationToken)
-            ?? throw new ConflictException("The original payment requires provider reconciliation.");
-        NativeCheckoutSessionEvidence.Require(request, evidence);
-        if (evidence.Id != id) throw new ConflictException("The provider returned a different payment session.");
+        var evidence = await reader.ReadAsync(request, id, cancellationToken);
         var mayContinue = await leases.RecordAsync(sessionId, proof, lease, evidence, cancellationToken);
+        if (evidence.IsComplete && evidence.IsPaid) await effects.CompleteAsync(request.OrderId, cancellationToken);
         return mayContinue ? evidence : evidence with { Url = null };
     }
 

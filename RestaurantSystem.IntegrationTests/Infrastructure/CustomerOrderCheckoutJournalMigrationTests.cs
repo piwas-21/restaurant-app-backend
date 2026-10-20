@@ -49,6 +49,8 @@ public sealed class CustomerOrderCheckoutJournalMigrationTests(DatabaseFixture f
         var error = (await downgrade.Should().ThrowAsync<PostgresException>()).Which;
         error.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
         error.MessageText.Should().Be("Native checkout recovery history must be retained");
+        // Earlier successful Down steps may remove newer nullable columns before this guard refuses.
+        await context.GetService<IMigrator>().MigrateAsync();
         (await context.Set<CustomerOrderCheckoutJournal>().AsNoTracking().SingleAsync())
             .Should().BeEquivalentTo(journal);
     }
@@ -125,6 +127,7 @@ public sealed class CustomerOrderCheckoutJournalMigrationTests(DatabaseFixture f
             var error = (await FluentActions.Invoking(async () => await downgrade)
                 .Should().ThrowAsync<PostgresException>()).Which;
             error.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+            await migrator.MigrateAsync();
             (await context.Set<CustomerOrderCheckoutJournal>().AsNoTracking().SingleAsync()).OrderId
                 .Should().Be(CustomerOrderCheckoutReplayTests.Journal().OrderId);
         }

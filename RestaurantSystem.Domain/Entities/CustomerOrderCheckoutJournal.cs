@@ -21,4 +21,5 @@ public sealed class CustomerOrderCheckoutJournal
     public Guid? LeaseId { get; set; }
     public DateTime? LeaseExpiresAt { get; set; }
     public DateTime? LastVerifiedAt { get; set; }
+    public DateTime? EffectsCompletedAt { get; set; }
 }

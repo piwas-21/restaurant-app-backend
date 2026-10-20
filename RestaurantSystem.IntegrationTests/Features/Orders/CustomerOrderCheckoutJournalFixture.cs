@@ -29,7 +29,8 @@ public abstract class CustomerOrderCheckoutJournalFixture(DatabaseFixture databa
     {
         Enabled = true,
         LinkOrigin = "https://links.example.test",
-        TenantSlug = "fixture"
+        TenantSlug = "fixture",
+        HostedPageOrigins = ["https://checkout.stripe.com"]
     };
     protected readonly StripeCommissionSettings Commission = new();
     protected readonly LocalizationSettings Localization = new() { Currency = "CHF" };
@@ -135,12 +136,21 @@ public abstract class CustomerOrderCheckoutJournalFixture(DatabaseFixture databa
         var operations = Store(context, owner, owner.HasValue, owner.HasValue ? UserRole.Customer : null);
         var store = new CustomerOrderCheckoutJournalStore(context, guard.Object,
             operations, gateway.Object, Options.Create(stripe), Options.Create(Settings), creation, Clock);
-        var leases = new CustomerOrderCheckoutLeaseStore(context, guard.Object, operations, store, creation, Clock);
+        var evidence = EvidenceWriter(context);
+        var leases = new CustomerOrderCheckoutLeaseStore(context, store, creation, evidence,
+            new CustomerOrderCheckoutOwnerScope(context, guard.Object, operations, Clock));
         var result = await action(context, store, leases);
         context.Database.CurrentTransaction.Should().BeNull();
         // The strict gateway exposes configuration only. Accessing its provider Client would fail.
         gateway.VerifyGet(value => value.Client, Times.Never);
         return result;
+    }
+
+    protected static CustomerOrderCheckoutEvidenceWriter EvidenceWriter(ApplicationDbContext context)
+    {
+        var actor = new Mock<RestaurantSystem.Api.Common.Services.Interfaces.ICurrentUserService>();
+        actor.Setup(value => value.GetAuditIdentifier()).Returns("native-checkout-fixture");
+        return new(context, new CustomerOrderCheckoutLedger(context, new OrderPaymentBuilder(actor.Object), actor.Object));
     }
 
     protected async Task AssertNoCheckoutAsync()

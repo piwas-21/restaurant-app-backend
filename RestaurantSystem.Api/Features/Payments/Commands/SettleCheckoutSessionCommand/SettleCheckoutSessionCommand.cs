@@ -53,13 +53,13 @@ public class SettleCheckoutSessionCommandHandler
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        // AsNoTracking throughout. The claim inside the writer is an ExecuteUpdate, which does not
-        // refresh tracked entities — a tracked copy of this row would silently go stale the moment
-        // it lands, and the stalest field would be the one deciding whether to settle again.
+        // ExecuteUpdate claims do not refresh tracked rows: settlement must read fresh state.
         var session = await _context.OrderCheckoutSessions
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.SessionId == command.SessionId, cancellationToken)
             ?? throw new NotFoundException("Checkout session not found");
+
+        await Services.NativeCheckoutExclusion.RequireWebAsync(_context, session.OrderId, cancellationToken);
 
         // Already terminal. Report, do not re-run: for Completed the tender exists, and for
         // Expired/Failed re-settling would resurrect a session we already gave up on.

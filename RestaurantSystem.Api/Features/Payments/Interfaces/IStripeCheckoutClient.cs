@@ -55,6 +55,13 @@ public record StripePaymentIntent
     /// </summary>
     public required string Status { get; init; }
 
+    public long? AmountMinor { get; init; }
+    public long? AmountReceivedMinor { get; init; }
+    public long? ApplicationFeeMinor { get; init; }
+    public string? Currency { get; init; }
+    public Services.StripeProviderContext? ProviderContext { get; init; }
+    public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
+
     /// <summary>The funds cleared. Terminal, and the only status that settles the question.</summary>
     public bool IsSucceeded => Status == "succeeded";
 
@@ -121,6 +128,7 @@ public record StripeCheckoutSession
     public long? AmountTotalMinor { get; init; }
 
     public string? Currency { get; init; }
+    public StripePaymentIntent? NativeIntentEvidence { get; init; }
     public Services.StripeProviderContext? ProviderContext { get; init; }
     public string? ClientReferenceId { get; init; }
     public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
