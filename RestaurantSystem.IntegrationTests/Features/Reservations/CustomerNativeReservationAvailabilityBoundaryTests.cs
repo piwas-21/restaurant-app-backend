@@ -81,6 +81,17 @@ public sealed partial class CustomerNativeReservationAvailabilityTests
         }
     }
 
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(20, true)]
+    public async Task Both_documented_party_size_limits_are_valid_reads(int party, bool empty)
+    {
+        await SeedAsync();
+        var page = await ReadAsync("?schemaVersion=1&date=2030-05-17&numberOfGuests=" + party);
+        Assert.Equal(party, page.GetProperty("numberOfGuests").GetInt32());
+        Assert.Equal(empty, Starts(page).Length == 0);
+    }
+
     [Fact]
     public async Task Closed_days_return_an_explicit_empty_page_and_missing_tables_never_claim_successful_availability()
     {
