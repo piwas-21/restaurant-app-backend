@@ -218,6 +218,7 @@ public sealed class CustomerOrderCancellationMigrationTests(DatabaseFixture fixt
         ExpectedVersion = 1,
         ObservedVersion = 2,
         Outcome = CustomerOrderCancellationOutcome.Cancelled,
-        CompletedAt = DateTime.UtcNow
+        // PostgreSQL timestamps retain microseconds; keep the strict whole-row oracle representable.
+        CompletedAt = new DateTime(2026, 10, 20, 0, 0, 0, DateTimeKind.Utc).AddTicks(1234560)
     };
 }
