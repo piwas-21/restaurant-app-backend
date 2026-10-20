@@ -52,18 +52,17 @@ public sealed class CustomerReservationOperationMigrationTests(DatabaseFixture f
         var downgrade = () => context.GetService<IMigrator>().MigrateAsync(Previous);
         var refusal = (await downgrade.Should().ThrowAsync<PostgresException>()).Which;
         refusal.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
-        refusal.MessageText.Should().Be("Customer reservation operation history must be retained");
+        refusal.MessageText.Should().Be("Reservation revision protects permanent operation history");
         (await context.Set<CustomerReservationOperation>().AsNoTracking().SingleAsync()).OperationId.Should().Be(operation.OperationId);
-        // A nonempty create journal must remain at this additive migration.
+        // The newer revision barrier must remain while permanent operation history exists.
         (await context.Database.GetAppliedMigrationsAsync()).Last().Should()
-            .Be("20261020173728_" + nameof(AddCustomerReservationOperations));
+            .Be(TestDatabaseCluster.CurrentSchemaMigration);
     }
     [Fact]
-    public async Task Concurrent_commit_is_observed_before_downgrade_can_discard_a_receipt()
+    public async Task In_flight_and_committed_receipt_history_both_refuse_downgrade()
     {
         await using var context = fixture.CreateContext();
         await context.Database.OpenConnectionAsync();
-        var pid = ((NpgsqlConnection)context.Database.GetDbConnection()).ProcessID;
         var migrator = context.GetService<IMigrator>();
         await using var writer = new NpgsqlConnection(fixture.ConnectionString);
         await writer.OpenAsync();
@@ -76,17 +75,23 @@ public sealed class CustomerReservationOperationMigrationTests(DatabaseFixture f
         var committed = false;
         try
         {
-            (await MigrationTestSafety.WaitForBlockedMigrationAsync(fixture.ConnectionString, pid)).Should().BeTrue();
+            // The outer revision migration must refuse an in-flight writer without waiting on
+            // a different table while holding exclusive booking locks.
+            var refusal = async () => await downgrade;
+            var wrapped = (await refusal.Should().ThrowAsync<InvalidOperationException>()).Which;
+            wrapped.InnerException.Should().BeOfType<PostgresException>().Which.SqlState.Should().Be(PostgresErrorCodes.LockNotAvailable);
             await transaction.CommitAsync();
             committed = true;
-            var refusal = async () => await downgrade;
-            (await refusal.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+            var committedRefusal = () => migrator.MigrateAsync(Previous);
+            (await committedRefusal.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
             (await context.Set<CustomerReservationOperation>().AsNoTracking().SingleAsync()).OperationId.Should().Be(id);
         }
         finally
         {
             if (!committed) await transaction.RollbackAsync();
-            try { await downgrade; } catch (PostgresException) { /* Expected preservation guard. */ }
+            try { await downgrade; }
+            catch (InvalidOperationException error) when (error.InnerException is PostgresException { SqlState: PostgresErrorCodes.LockNotAvailable })
+            { /* Expected non-waiting preservation guard. */ }
             await migrator.MigrateAsync();
         }
     }

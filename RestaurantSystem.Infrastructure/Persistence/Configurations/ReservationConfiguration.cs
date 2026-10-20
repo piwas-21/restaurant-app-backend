@@ -10,6 +10,8 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
     public void Configure(EntityTypeBuilder<Reservation> builder)
     {
         builder.ToTable("Reservations");
+        builder.Property(r => r.Revision).HasDefaultValueSql("gen_random_uuid()")
+            .ValueGeneratedOnAddOrUpdate();
 
         builder.Property(r => r.CustomerName)
             .IsRequired()

@@ -1,6 +1,6 @@
 namespace RestaurantSystem.Domain.Entities;
 
-/// <summary>Permanent create-attempt decision; contains no customer contact or request body.</summary>
+/// <summary>Permanent reservation-action decision; contains no customer contact or request body.</summary>
 public sealed class CustomerReservationOperation
 {
     public Guid OperationId { get; set; }

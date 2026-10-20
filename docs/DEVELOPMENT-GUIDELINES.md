@@ -362,7 +362,7 @@ Custom `StringEnumConverterFactory` in `/Common/Converters/`:
 ### Test Authentication
 - `AuthenticateAsAdmin()` - sets admin claims via `X-Test-Admin: true` header
 - `AuthenticateAsUser()` - default customer claims
-- All tests inherit from `IntegrationTestBase` which seeds data and resets DB
+- Database-backed HTTP tests generally use `IntegrationTestBase` for seeding and reset; pure policy and migration tests use their own fixtures. Native customer ownership tests use signed JWTs through the real bearer authentication handler.
 
 ---
 

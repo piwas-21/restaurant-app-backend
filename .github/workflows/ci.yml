@@ -102,9 +102,10 @@ jobs:
   # PostgreSQL service and the existing four xUnit database lanes.
   # Shard 1 owns its listed namespaces and Account-prefixed Orders classes;
   # shard 4 owns Basket, Auth and Customer-prefixed Orders classes; shard 3 owns
-  # other Orders classes; shard 2 catches every remaining namespace.
+  # other Orders classes plus Reservations; shard 2 catches every remaining namespace.
   # The HTTP-heavy Basket/Auth/customer-order work has its own runner so the
-  # catch-all shard can finish within the existing whole-job budget.
+  # catch-all shard can finish within the existing whole-job budget. Reservation HTTP cases
+  # share the lighter Orders runner; the whole-job cap stays at 30 minutes.
   # VSTest discovery and merged JUnit output below verify an exhaustive, disjoint
   # partition on every run. All tests and merged-coverage floors remain enforced.
   dotnet_test:
@@ -122,10 +123,10 @@ jobs:
               FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.Account|FullyQualifiedName~RestaurantSystem.IntegrationTests.Infrastructure.
           - shard: 2
             filter: >-
-              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Auth.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Infrastructure.
+              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Auth.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Infrastructure.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Reservations.
           - shard: 3
             filter: >-
-              FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Account&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Customer
+              (FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Account&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Customer)|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Reservations.
           - shard: 4
             filter: >-
               FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Basket.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Auth.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.Customer

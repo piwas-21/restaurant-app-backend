@@ -9819,6 +9819,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("reservation_date");
 
+                    b.Property<Guid>("Revision")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
                     b.Property<string>("SpecialRequests")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
