@@ -1,5 +1,8 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
@@ -10,7 +13,8 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.BillCharges.Services;
 
-public sealed class BillChargeService(ApplicationDbContext context, ICurrentUserService currentUser) : IBillChargeService
+public sealed class BillChargeService(ApplicationDbContext context, ICurrentUserService currentUser,
+    IOptions<CurrentStaffTicketSettings> settings) : IBillChargeService
 {
     public async Task ApplyAsync(Order order, IReadOnlyList<BillChargeInputDto>? inputs, Guid operationId,
         string? currency, CancellationToken cancellationToken)
@@ -28,8 +32,24 @@ public sealed class BillChargeService(ApplicationDbContext context, ICurrentUser
         var role = currentUser.Role?.ToString();
         var existing = OrderBillChargeReader.Read(order).ToList();
         var additions = new List<OrderBillCharge>();
+        var limit = settings.Value.MaximumAmendments;
         var amendments = await context.OrderAmendments.AsNoTracking().Where(value => value.SourceOrderId == order.Id
-            && value.State == OrderAmendmentState.Committed).ToListAsync(cancellationToken);
+            && value.State == OrderAmendmentState.Committed)
+            .OrderBy(value => value.CommittedAt).ThenBy(value => value.CreatedAt).ThenBy(value => value.Id)
+            .Select(value => new OrderAmendment
+            {
+                Id = value.Id,
+                CreatedBy = value.CreatedBy,
+                SourceOrderId = value.SourceOrderId,
+                State = value.State,
+                ChangesJson = value.ChangesJson,
+                FinancialResolutionJson = value.FinancialResolutionJson
+            })
+            .Take(limit + 1).ToListAsync(cancellationToken);
+        if (amendments.Count > limit)
+            throw new ConflictException("This bill exceeds the interactive amendment history limit. Reconcile it before applying adjustments.");
+        if (amendments.Any(value => OrderAmendmentFinancialGuard.IsUnresolved(value.FinancialResolutionJson)))
+            throw new ConflictException("Resolve the previous correction before adding bill charges.");
         var food = AccountDebtAmendmentProjection.ExcludeVoidedUnits([order], BillDiscountMath.Food(order, money), amendments);
         var basis = AccountDebtMath.Total(food);
         foreach (var input in inputs)

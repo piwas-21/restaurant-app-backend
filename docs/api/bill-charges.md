@@ -39,3 +39,5 @@ previews. `billCharges[].amount` is signed. `payableTotal` remains authoritative
 the frontend preview nor a sum of displayed rows reconstructs the payment ledger.
 
 Older admin clients may continue saving fixed increases. Saving an existing discount or percentage rule requires explicit effect and calculation fields; omitted modes return 409 without changing configuration. Refresh the admin page before editing these rules.
+
+Adjustment calculation shares the validated `CurrentStaffTicket:MaximumAmendments` source-history budget. An oversized history returns 409 before accepting a charge; calculations never use truncated amendments.

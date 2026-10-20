@@ -42,6 +42,7 @@ public sealed class AddOrderBillChargesCommandHandler(ApplicationDbContext conte
         var currency = await OrderNativeAcceptedCurrency.ReadOrderCurrencyEvidenceAsync(context, order, cancellationToken)
             ?? order.ServiceSession?.Currency ?? currencyResolver.Resolve(order);
         await charges.ApplyAsync(order, input.Charges, input.OperationId, currency, cancellationToken);
+        await RestaurantSystem.Api.Features.OrderAmendments.Services.OrderBillingCreditConsistency.AssertAsync(context, [order.Id], cancellationToken);
         order.PaymentStatus = PaymentStatus.Completed;
         if (order.RemainingAmount > 0)
             order.PaymentStatus = order.TotalPaid > 0 ? PaymentStatus.PartiallyPaid : PaymentStatus.Pending;
@@ -76,11 +77,6 @@ public sealed class AddOrderBillChargesCommandHandler(ApplicationDbContext conte
                 .Select(a => a.State).ToListAsync(cancellationToken) : [];
         if (attempts.Any(state => state.HoldsReservation()))
             throw new ConflictException("Confirm the pending table payment result before changing the bill.");
-        await RestaurantSystem.Api.Features.OrderAmendments.Services.OrderBillingCreditConsistency.AssertAsync(context, [order.Id], cancellationToken);
-        var resolutions = await context.OrderAmendments.AsNoTracking().Where(a => a.SourceOrderId == order.Id
-            && a.State == OrderAmendmentState.Committed).Select(a => a.FinancialResolutionJson).ToListAsync(cancellationToken);
-        if (resolutions.Any(RestaurantSystem.Api.Features.OrderAmendments.Services.OrderAmendmentFinancialGuard.IsUnresolved))
-            throw new ConflictException("Resolve the previous correction before adding bill charges.");
     }
 
 }

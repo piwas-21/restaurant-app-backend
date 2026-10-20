@@ -11,6 +11,7 @@ using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Queries.GetCurrentStaffTicketQuery;
@@ -46,7 +47,15 @@ public sealed class GetCurrentStaffTicketQueryHandler(
                 && amendment.State == OrderAmendmentState.Committed)
             .OrderBy(amendment => amendment.CommittedAt).ThenBy(amendment => amendment.CreatedAt)
             .ThenBy(amendment => amendment.Id)
-            .Select(amendment => new { amendment.SourceOrderId, amendment.ChangesJson })
+            .Select(amendment => new OrderAmendment
+            {
+                Id = amendment.Id,
+                CreatedBy = amendment.CreatedBy,
+                SourceOrderId = amendment.SourceOrderId,
+                State = amendment.State,
+                ChangesJson = amendment.ChangesJson,
+                FinancialResolutionJson = amendment.FinancialResolutionJson
+            })
             .Take(settings.Value.MaximumAmendments + 1)
             .ToListAsync(cancellationToken);
         if (amendments.Count > settings.Value.MaximumAmendments) throw Oversized();
