@@ -57,10 +57,10 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 235 includes native address writes, owned native receipt reads and account-deletion requests alongside native
+    /// Floor 236 includes private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
     /// root edits, durable cancellations, channel operations, account payments and guest checkout.
     /// </summary>
-    private const int KnownMutatingActionCount = 235;
+    private const int KnownMutatingActionCount = 236;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -121,6 +121,10 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
         // owner/session/digest must resolve an accepted receipt; failed auth/staff cannot downgrade.
         // No contact, address or operator/guest tokens are returned; ingress shares the basket budget.
         "CustomerMobileOrdersController.Receipt [POST]",
+        // Original session/customer/operation/digest proof and fresh database ownership are required.
+        // Only the frozen request can reach the provider; canonical session+intent evidence controls
+        // ledger writes. Failed auth/staff cannot become guests, and response caching is disabled.
+        "CustomerMobilePaymentsController.Recover [POST]",
         // Each payment action validates the original visit's hashed participant capability,
         // typed attempt ownership and frozen scope/version. New writes also require feature,
         // module, gateway and configured contribution limits; recovery preserves original identity.

@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -19,13 +18,7 @@ public static class AddressWriteTransaction
         {
             // NO KEY UPDATE serializes address writers and cooperates with erasure's user lock,
             // while allowing unrelated order FK checks to acquire KEY SHARE on the account.
-            var owners = await context.Database.SqlQuery<Guid>($"""
-                SELECT id AS "Value" FROM "Users"
-                WHERE id = {owner} AND is_deleted = false FOR NO KEY UPDATE
-                """).ToArrayAsync(cancellationToken);
-            if (owners.Length != 1 || (requireCustomer && !await CustomerAccountAccess.ForOwner(context, owner)
-                    .AsNoTracking().AnyAsync(cancellationToken)))
-                throw new NotFoundException("Account unavailable.");
+            await CustomerAccountWriteGuard.AcquireAsync(context, owner, requireCustomer, cancellationToken);
             return transaction;
         }
         catch

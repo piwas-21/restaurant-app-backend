@@ -15,6 +15,17 @@ public static class CustomerCheckoutServiceExtensions
         services.AddScoped<ICustomerCheckoutOrderCreator, CustomerCheckoutOrderCreator>();
         services.AddScoped<ICustomerCheckoutAcceptance, CustomerCheckoutAcceptance>();
         services.AddScoped<ICustomerOrderReceiptReader, CustomerOrderReceiptReader>();
+        services.AddScoped<ICustomerOrderCheckoutOwnerScope, CustomerOrderCheckoutOwnerScope>();
+        services.AddScoped<ICustomerOrderCheckoutPaymentService, CustomerOrderCheckoutPaymentService>();
+        services.AddScoped<ICustomerOrderCheckoutProviderReader, CustomerOrderCheckoutProviderReader>();
+        services.AddScoped<ICustomerOrderCheckoutEvidenceWriter, CustomerOrderCheckoutEvidenceWriter>();
+        services.AddScoped<ICustomerOrderCheckoutReconciler, CustomerOrderCheckoutReconciler>();
+        services.AddScoped<ICustomerOrderCheckoutLedger, CustomerOrderCheckoutLedger>();
+        services.AddScoped<ICustomerOrderCheckoutEffects, CustomerOrderCheckoutEffects>();
+        services.AddScoped<ICustomerOrderCheckoutCreationPolicy, CustomerOrderCheckoutCreationPolicy>();
+        services.AddScoped<ICustomerOrderCheckoutLeaseStore, CustomerOrderCheckoutLeaseStore>();
+        services.AddScoped<ICustomerOrderCheckoutRecovery, CustomerOrderCheckoutRecovery>();
+        services.AddScoped<ICustomerOrderCheckoutJournalStore, CustomerOrderCheckoutJournalStore>();
         return services;
     }
 }

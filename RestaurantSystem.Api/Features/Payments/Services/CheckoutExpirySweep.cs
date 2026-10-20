@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common;
+using RestaurantSystem.Api.Features.Orders.Services.CustomerCheckout;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
@@ -29,6 +30,7 @@ public partial class CheckoutExpirySweep : ICheckoutExpirySweep
     /// <summary>Exposed so the drift alarm can compare this list against <c>IsCaptured()</c>.</summary>
     internal static IReadOnlyList<PaymentStatus> CapturedStatusesForTests => CapturedStatuses;
 
+    private readonly ICustomerOrderCheckoutReconciler? _native;
     private readonly ApplicationDbContext _context;
     private readonly CustomMediator _mediator;
     private readonly IOrderMappingService _mapping;
@@ -42,8 +44,10 @@ public partial class CheckoutExpirySweep : ICheckoutExpirySweep
         IOrderMappingService mapping,
         IOrderEventService events,
         ICurrentUserService currentUser,
-        ILogger<CheckoutExpirySweep> logger)
+        ILogger<CheckoutExpirySweep> logger,
+        ICustomerOrderCheckoutReconciler? native = null)
     {
+        _native = native;
         _context = context;
         _mediator = mediator;
         _mapping = mapping;
@@ -139,13 +143,15 @@ public partial class CheckoutExpirySweep : ICheckoutExpirySweep
                 live.Count, settled, expired, cancelled, failures);
         }
 
+        var native = _native is null ? new CheckoutExpirySweepReport()
+            : await _native.RunAsync(batchSize, cancellationToken);
         return new CheckoutExpirySweepReport
         {
-            Examined = live.Count,
-            Settled = settled,
-            Expired = expired,
+            Examined = live.Count + native.Examined,
+            Settled = settled + native.Settled,
+            Expired = expired + native.Expired,
             OrdersCancelled = cancelled,
-            Failures = failures,
+            Failures = failures + native.Failures,
         };
     }
 
