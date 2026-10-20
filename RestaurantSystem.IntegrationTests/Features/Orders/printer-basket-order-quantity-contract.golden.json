@@ -1,6 +1,8 @@
 {
   "normalOrder": {
     "billChargeAmount": 0.00,
+    "billChargeItemBasis": 465.00,
+    "hasPendingBillingCorrection": false,
     "billCharges": [],
     "id": "00000000-0000-0000-0000-000000000001",
     "orderNumber": "ORDER-NORMALIZED",
@@ -755,6 +757,8 @@
   },
   "v1PrinterOrder": {
     "billChargeAmount": 0.00,
+    "billChargeItemBasis": 465.00,
+    "hasPendingBillingCorrection": false,
     "billCharges": [],
     "id": "00000000-0000-0000-0000-000000000001",
     "orderNumber": "ORDER-NORMALIZED",
@@ -1430,6 +1434,8 @@
   "projectionVersion": 2,
   "v2PrinterOrder": {
     "billChargeAmount": 0.00,
+    "billChargeItemBasis": 465.00,
+    "hasPendingBillingCorrection": false,
     "billCharges": [],
     "id": "00000000-0000-0000-0000-000000000001",
     "orderNumber": "ORDER-NORMALIZED",

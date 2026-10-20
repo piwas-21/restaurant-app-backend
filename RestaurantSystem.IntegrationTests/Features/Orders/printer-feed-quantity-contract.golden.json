@@ -1,6 +1,8 @@
 {
   "normalOrder": {
     "billChargeAmount": 0.00,
+    "billChargeItemBasis": 60.00,
+    "hasPendingBillingCorrection": false,
     "billCharges": [],
     "id": "10000000-0000-0000-0000-000000000001",
     "orderNumber": "PF-GUEST-QTY-001",
@@ -267,6 +269,8 @@
   "projectionVersion": 2,
   "v2Order": {
     "billChargeAmount": 0.00,
+    "billChargeItemBasis": 60.00,
+    "hasPendingBillingCorrection": false,
     "billCharges": [],
     "id": "10000000-0000-0000-0000-000000000001",
     "orderNumber": "PF-GUEST-QTY-001",
