@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Tenant.Queries.GetCustomerMobileBootstrapQuery;
+using RestaurantSystem.Api.Features.Tenant.Dtos;
 using RestaurantSystem.Api.Features.User.Services;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -15,10 +16,16 @@ public static class CustomerReservationReadAccess
         CancellationToken cancellationToken)
     {
         var owner = CustomerAccountAccess.RequireOwner(current);
+        await RequireAvailableAsync(mediator, cancellationToken);
+        return owner;
+    }
+    public static async Task<CustomerMobileBootstrapDto> RequireAvailableAsync(CustomMediator mediator,
+        CancellationToken cancellationToken)
+    {
         var bootstrap = (await mediator.SendQuery(new GetCustomerMobileBootstrapQuery(1), cancellationToken)).Data;
         if (bootstrap?.Capabilities.GetValueOrDefault("reservations") != "enabled")
             throw new NotFoundException("Customer reservations are unavailable.");
-        return owner;
+        return bootstrap;
     }
     public static IQueryable<Reservation> Scope(ApplicationDbContext context, Guid owner)
     {
