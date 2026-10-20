@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Identity;
+using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
@@ -11,12 +13,18 @@ public record ResetPasswordCommand(
     string Email,
     string Token,
     string NewPassword,
-    string ConfirmPassword) : ICommand<ApiResponse<string>>;
+    string ConfirmPassword) : ICommand<ApiResponse<string>>
+{
+    // Set only by the strict native command; legacy JSON cannot choose a different delivery rail.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool NativeClient { get; init; }
+}
 
 public class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand, ApiResponse<string>>
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IRefreshSessionService _sessions;
+    private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
     private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<ResetPasswordCommandHandler> _logger;
@@ -24,12 +32,14 @@ public class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand,
     public ResetPasswordCommandHandler(
         UserManager<ApplicationUser> userManager,
         IRefreshSessionService sessions,
+        ApplicationDbContext context,
         IEmailService emailService,
         IEmailLanguageResolver languages,
         ILogger<ResetPasswordCommandHandler> logger)
     {
         _userManager = userManager;
         _sessions = sessions;
+        _context = context;
         _emailService = emailService;
         _languages = languages;
         _logger = logger;
@@ -37,43 +47,25 @@ public class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand,
 
     public async Task<ApiResponse<string>> Handle(ResetPasswordCommand command, CancellationToken cancellationToken)
     {
-        var user = await _userManager.FindByEmailAsync(command.Email);
-
-        if (user == null || user.IsDeleted)
-        {
-            _logger.LogWarning("Password reset attempted for non-existent email: {Email}", command.Email);
-            return ApiResponse<string>.Failure("Invalid reset request", "Password reset failed");
-        }
-
-
-        var result = await _userManager.ResetPasswordAsync(user, command.Token, command.NewPassword);
-
-        if (!result.Succeeded)
-        {
-            var errors = result.Errors.Select(e => e.Description).ToList();
-            _logger.LogWarning("Password reset failed for user {UserId}: {Errors}", user.Id, string.Join(", ", errors));
-            return ApiResponse<string>.Failure(errors, "Password reset failed");
-        }
-
-        // Update audit fields
-        user.UpdatedAt = DateTime.UtcNow;
-        user.UpdatedBy = "PasswordReset";
-        await _userManager.UpdateAsync(user);
-
-        // Reset-password is the COMPROMISE response: whoever asked for it could not sign
-        // in, so every live refresh session (and the pre-migration legacy credential) must
-        // die with the password. Same contract as change-password (frontend #655 era).
-        await _sessions.RevokeAllAsync(user, cancellationToken);
+        var (user, result) = await ResetAsync(command, cancellationToken);
+        if (user is null) return result;
 
         // Send password changed notification email
+        Exception? mailFailure = null;
         try
         {
             await _emailService.SendPasswordChangedNotificationAsync(_languages.ForAccount(user), user);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send password changed notification to user {UserId}", user.Id);
-            // Don't fail the operation if email notification fails
+            mailFailure = ex;
+        }
+        if (mailFailure is not null)
+        {
+            if (command.NativeClient)
+                _logger.LogWarning("Native password-change mail failed with {ExceptionType}", mailFailure.GetType().Name);
+            else
+                _logger.LogError(mailFailure, "Failed to send password changed notification to user {UserId}", user.Id);
         }
 
         _logger.LogInformation("Password successfully reset for user {UserId}", user.Id);
@@ -82,4 +74,53 @@ public class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand,
             "Password has been reset successfully",
             "Password reset completed");
     }
+    private async Task<(ApplicationUser? User, ApiResponse<string> Result)> ResetAsync(
+        ResetPasswordCommand command, CancellationToken cancellationToken)
+    {
+        if (_context.Database.CurrentTransaction is not null || _context.ChangeTracker.HasChanges())
+            throw new ConflictException("Password reset requires a separate account operation.");
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        var committed = false;
+        try
+        {
+            var user = await _userManager.FindByEmailAsync(command.Email);
+
+            if (user == null || user.IsDeleted || command.NativeClient && user.Role != RestaurantSystem.Domain.Common.Enums.UserRole.Customer)
+            {
+                _logger.LogWarning("Password reset attempted for non-existent email: {Email}", command.Email);
+                return (null, ApiResponse<string>.Failure("Invalid reset request", "Password reset failed"));
+            }
+
+
+            var result = await _userManager.ResetPasswordAsync(user, command.Token, command.NewPassword);
+
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                _logger.LogWarning("Password reset failed for user {UserId}: {Errors}", user.Id, string.Join(", ", errors));
+                return (null, ApiResponse<string>.Failure(errors, "Password reset failed"));
+            }
+
+            // Update audit fields
+            user.UpdatedAt = DateTime.UtcNow;
+            user.UpdatedBy = "PasswordReset";
+            if (!(await _userManager.UpdateAsync(user)).Succeeded)
+                throw new ConflictException("The account changed. Request a new password reset link.");
+
+            // Reset-password is the COMPROMISE response: whoever asked for it could not sign
+            // in, so every live refresh session (and the pre-migration legacy credential) must
+            // die with the password. Same contract as change-password (frontend #655 era).
+            await _sessions.RevokeAllAsync(user, cancellationToken);
+
+
+            await transaction.CommitAsync(cancellationToken);
+            committed = true;
+            return (user, ApiResponse<string>.SuccessWithoutData());
+        }
+        finally
+        {
+            if (!committed) _context.ChangeTracker.Clear();
+        }
+    }
+
 }

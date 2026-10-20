@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Identity;
+using RestaurantSystem.Api.Features.Auth.Interfaces;
+using RestaurantSystem.Api.Features.Auth.Services;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -9,7 +11,12 @@ using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.SendEmailVerificationCommand;
 
-public record SendEmailVerificationCommand(string Email) : ICommand<ApiResponse<string>>;
+public record SendEmailVerificationCommand(string Email) : ICommand<ApiResponse<string>>
+{
+    // Set only by the strict native command; legacy JSON cannot choose a different delivery rail.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool NativeClient { get; init; }
+}
 
 /// <summary>
 /// Resends the email-verification mail. <b>Every</b> branch answers the same generic sentence so
@@ -29,6 +36,7 @@ public class SendEmailVerificationCommandHandler : ICommandHandler<SendEmailVeri
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
+    private readonly ICustomerNativeAccountMail _nativeMail;
     private readonly IEmailLanguageResolver _languages;
     private readonly RateLimiterSettings _rateLimiter;
     private readonly ILogger<SendEmailVerificationCommandHandler> _logger;
@@ -36,12 +44,14 @@ public class SendEmailVerificationCommandHandler : ICommandHandler<SendEmailVeri
     public SendEmailVerificationCommandHandler(
         UserManager<ApplicationUser> userManager,
         IEmailService emailService,
+        ICustomerNativeAccountMail nativeMail,
         IEmailLanguageResolver languages,
         IOptions<RateLimiterSettings> rateLimiter,
         ILogger<SendEmailVerificationCommandHandler> logger)
     {
         _userManager = userManager;
         _emailService = emailService;
+        _nativeMail = nativeMail;
         _languages = languages;
         _rateLimiter = rateLimiter.Value;
         _logger = logger;
@@ -58,7 +68,7 @@ public class SendEmailVerificationCommandHandler : ICommandHandler<SendEmailVeri
     {
         var user = await _userManager.FindByEmailAsync(command.Email);
 
-        if (user == null || user.IsDeleted)
+        if (user == null || user.IsDeleted || command.NativeClient && user.Role != RestaurantSystem.Domain.Common.Enums.UserRole.Customer)
         {
             // No address in the log line: this endpoint is anonymous and now attacker-drivable at
             // volume, so logging what was asked for would be both a PII sink and a spam amplifier.
@@ -114,22 +124,37 @@ public class SendEmailVerificationCommandHandler : ICommandHandler<SendEmailVeri
             return Acknowledged();
         }
 
+        Exception? mailFailure = null;
         try
         {
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             // The account's own preference. This endpoint is anonymous and attacker-drivable
             // (see the cooldown above), so the caller's Accept-Language is not the recipient's.
-            await _emailService.SendEmailVerificationAsync(_languages.ForAccount(user), user, token);
+            if (command.NativeClient)
+                await _nativeMail.SendAsync(_languages.ForAccount(user), user, token, CustomerNativeAccountLinks.Verify);
+            else
+                await _emailService.SendEmailVerificationAsync(_languages.ForAccount(user), user, token);
 
             _logger.LogInformation("Email verification sent successfully for user {UserId}", user.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send email verification for user {UserId}", user.Id);
-            // Don't reveal the error to the user for security reasons
+            mailFailure = ex;
         }
+        LogMailFailure(mailFailure, command.NativeClient, user.Id);
 
         return Acknowledged();
+    }
+
+    private void LogMailFailure(Exception? failure, bool nativeClient, Guid userId)
+    {
+        if (failure is null)
+            return;
+
+        if (nativeClient)
+            _logger.LogWarning("Native verification mail failed with {ExceptionType}", failure.GetType().Name);
+        else
+            _logger.LogError(failure, "Failed to send email verification for user {UserId}", userId);
     }
 
     private bool IsWithinCooldown(ApplicationUser user)

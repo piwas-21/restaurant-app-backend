@@ -18,7 +18,13 @@ public sealed class GetMobileAssociationsQueryHandler : IGetMobileAssociationsQu
         _authority = Uri.TryCreate(links.Value.Origin, UriKind.Absolute, out var origin) ? origin.Authority : string.Empty;
         if (!_enabled) return;
         var query = new ReadOnlyDictionary<string, string>(new Dictionary<string, string> { ["operation"] = "*" });
-        var components = Array.AsReadOnly(new[] { new AppleLinkComponentDto("/r/*/payment-return/*", query) });
+        var noQuery = new ReadOnlyDictionary<string, string>(new Dictionary<string, string>());
+        var components = Array.AsReadOnly(new[]
+        {
+            new AppleLinkComponentDto("/r/*/payment-return/*", query),
+            new AppleLinkComponentDto("/r/*/verify", noQuery),
+            new AppleLinkComponentDto("/r/*/recover", noQuery)
+        });
         var details = new AppleAppDetailsDto(Array.AsReadOnly(new[] { settings.AppleApplicationId }), components);
         _apple = new(new(Array.AsReadOnly(new[] { details })));
         var target = new AndroidAssetTargetDto("android_app", settings.AndroidPackage,

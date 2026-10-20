@@ -22,22 +22,16 @@
 
 **File:** `Features/Auth/Commands/ResetPasswordCommand/ResetPasswordCommand.cs`
 
-**Issue:** The `ResetPasswordCommand` does NOT accept or validate the reset token sent to the user's email. Instead, the handler generates a fresh token via `GeneratePasswordResetTokenAsync()` and immediately uses it. This means anyone who knows a user's email can reset their password without the email link.
+**Status: resolved in current source.** The command requires `Email`, `Token`, `NewPassword` and
+`ConfirmPassword`. The handler passes the supplied token to `UserManager.ResetPasswordAsync` and
+revokes all refresh sessions after success; it does not mint a replacement reset token. The native
+completion wrapper unwraps a tenant/purpose-bound email grant and delegates to this same validation.
+A replay or a token invalidated by a previous password change cannot reset another password.
 
-**Impact:** Complete account takeover for any user.
-
-**Fix:**
-```csharp
-// BEFORE (vulnerable)
-public record ResetPasswordCommand(string Email, string NewPassword) : ICommand<...>;
-// Handler generates its own token - bypasses email verification
-
-// AFTER (secure)
-public record ResetPasswordCommand(string Email, string Token, string NewPassword) : ICommand<...>;
-// Handler validates Token matches what was emailed
-```
-
-**Sprint:** Sprint 1.5 (immediate hotfix)
+**Verification:** `CustomerNativeAccountCompletionTests` and
+`CustomerNativeAccountAvailabilityTests` exercise real Identity tokens, password changes and
+refresh-session revocation. This resolves C1 only; the remaining audit entries need their own
+current-source and operational verification.
 
 ---
 

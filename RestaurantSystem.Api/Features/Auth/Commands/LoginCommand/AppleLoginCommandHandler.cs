@@ -1,3 +1,4 @@
+using RestaurantSystem.Api.Features.Auth.Services;
 using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -32,27 +33,27 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
     private readonly IRefreshSessionService _sessions;
+    private readonly IAppleAccountNameUpdater _names;
     private readonly IAppleIdentityTokenVerifier _tokenVerifier;
     private readonly LoginEventHandler _loginEventHandler;
     private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ILogger<AppleLoginCommandHandler> _logger;
 
     public AppleLoginCommandHandler(
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
         IRefreshSessionService sessions,
+        IAppleAccountNameUpdater names,
         IAppleIdentityTokenVerifier tokenVerifier,
         LoginEventHandler loginEventHandler,
-        IHttpContextAccessor httpContextAccessor,
-        ILogger<AppleLoginCommandHandler> logger)
+        IHttpContextAccessor httpContextAccessor)
     {
         _userManager = userManager;
         _tokenService = tokenService;
         _sessions = sessions;
+        _names = names;
         _tokenVerifier = tokenVerifier;
         _loginEventHandler = loginEventHandler;
         _httpContextAccessor = httpContextAccessor;
-        _logger = logger;
     }
 
     public async Task<ApiResponse<AuthResponse>> Handle(AppleLoginCommand request, CancellationToken cancellationToken)
@@ -95,7 +96,7 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
         }
         else
         {
-            await RefreshNameAsync(user, request);
+            await _names.UpdateAsync(user, request.FirstName, request.LastName);
         }
 
         return await IssueTokensAsync(user);
@@ -113,8 +114,8 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
         {
             UserName = email,
             Email = email,
-            FirstName = Clean(request.FirstName) ?? PlaceholderFirstName,
-            LastName = Clean(request.LastName) ?? PlaceholderLastName,
+            FirstName = AppleAccountNameRules.Clean(request.FirstName) ?? PlaceholderFirstName,
+            LastName = AppleAccountNameRules.Clean(request.LastName) ?? PlaceholderLastName,
             EmailConfirmed = true,
             Role = UserRole.Customer,
             CreatedBy = "AppleAuth",
@@ -129,42 +130,6 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
         }
 
         return (user, string.Empty);
-    }
-
-    /// <summary>
-    /// BACKEND-NOTES §4.2. Apple hands over <c>fullName</c> only on an Apple ID's FIRST
-    /// authorisation, so an account created without one stayed "Apple User" forever. An
-    /// incoming non-empty name now wins over what is stored.
-    /// </summary>
-    private async Task RefreshNameAsync(ApplicationUser user, AppleLoginCommand request)
-    {
-        var firstName = Clean(request.FirstName);
-        var lastName = Clean(request.LastName);
-
-        var changed = false;
-
-        if (firstName is not null && !string.Equals(user.FirstName, firstName, StringComparison.Ordinal))
-        {
-            user.FirstName = firstName;
-            changed = true;
-        }
-
-        if (lastName is not null && !string.Equals(user.LastName, lastName, StringComparison.Ordinal))
-        {
-            user.LastName = lastName;
-            changed = true;
-        }
-
-        if (changed)
-        {
-            var result = await _userManager.UpdateAsync(user);
-            if (!result.Succeeded)
-            {
-                // Never fail a sign-in over a cosmetic field.
-                _logger.LogWarning("Could not refresh the Apple name for {UserId}: {Errors}",
-                    user.Id, string.Join(", ", result.Errors.Select(e => e.Description)));
-            }
-        }
     }
 
     private async Task<ApiResponse<AuthResponse>> IssueTokensAsync(ApplicationUser user)
@@ -192,7 +157,4 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
         });
     }
 
-    /// <summary>Trimmed name, or null when the client sent nothing usable.</summary>
-    private static string? Clean(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

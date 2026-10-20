@@ -1,3 +1,5 @@
+using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.User.Services;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Domain.Entities;
@@ -17,7 +19,49 @@ public class RefreshSessionService : IRefreshSessionService
         _tokens = tokens;
     }
 
-    public async Task<string> IssueAsync(ApplicationUser user, CancellationToken cancellationToken)
+    public Task<string> IssueAsync(ApplicationUser user, CancellationToken cancellationToken) =>
+        WithLockedUserAsync(user, () => IssueUnderLockAsync(user, cancellationToken), cancellationToken);
+
+    public Task<string?> RotateAsync(ApplicationUser user, string refreshToken, CancellationToken cancellationToken) =>
+        WithLockedUserAsync(user, () => RotateUnderLockAsync(user, refreshToken, cancellationToken), cancellationToken);
+
+    public async Task RevokeAllAsync(ApplicationUser user, CancellationToken cancellationToken) =>
+        await WithLockedUserAsync(user, () => RevokeUnderLockAsync(user, cancellationToken), cancellationToken);
+
+    private async Task<T> WithLockedUserAsync<T>(ApplicationUser user, Func<Task<T>> work, CancellationToken cancellationToken)
+    {
+        // Never let a credential save accidentally publish unrelated pending account work.
+        if (_context.ChangeTracker.HasChanges())
+            throw new ConflictException("The account changed. Sign in again.");
+        await using var transaction = _context.Database.CurrentTransaction is null
+            ? await _context.Database.BeginTransactionAsync(cancellationToken) : null;
+        var completed = false;
+        try
+        {
+            await CustomerAccountWriteGuard.AcquireAsync(_context, user.Id, false, cancellationToken);
+            var current = await _context.Users.AsNoTracking().SingleAsync(row => row.Id == user.Id, cancellationToken);
+            // A login/refresh may have validated before reset, role change or erasure won the lock.
+            // Revalidate its original account authority; never refresh the stale caller into it.
+            if (current.IsDeleted || current.SecurityStamp != user.SecurityStamp || current.Role != user.Role
+                || current.Email != user.Email || current.EmailConfirmed != user.EmailConfirmed
+                || current.RefreshToken != user.RefreshToken || current.RefreshTokenExpiryTime != user.RefreshTokenExpiryTime)
+                throw new UnauthorizedAccessException("The account changed. Sign in again.");
+            // Identity resolution cannot turn a preloaded credential into current authority.
+            foreach (var entry in _context.ChangeTracker.Entries<RefreshSession>().Where(entry => entry.Entity.UserId == user.Id).ToArray())
+                await entry.ReloadAsync(cancellationToken);
+            var result = await work();
+            if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+            completed = true;
+            return result;
+        }
+        finally
+        {
+            // An outer account transaction owns rollback/detach. Never clear its unrelated state.
+            if (!completed && transaction is not null) _context.ChangeTracker.Clear();
+        }
+    }
+
+    private async Task<string> IssueUnderLockAsync(ApplicationUser user, CancellationToken cancellationToken)
     {
         var rawToken = _tokens.GenerateRefreshToken();
         _context.RefreshSessions.Add(NewSession(user, rawToken));
@@ -25,7 +69,7 @@ public class RefreshSessionService : IRefreshSessionService
         return rawToken;
     }
 
-    public async Task<string?> RotateAsync(
+    private async Task<string?> RotateUnderLockAsync(
         ApplicationUser user, string refreshToken, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
@@ -79,7 +123,7 @@ public class RefreshSessionService : IRefreshSessionService
         return null;
     }
 
-    public async Task RevokeAllAsync(ApplicationUser user, CancellationToken cancellationToken)
+    private async Task<bool> RevokeUnderLockAsync(ApplicationUser user, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
         var sessions = await _context.RefreshSessions
@@ -96,6 +140,7 @@ public class RefreshSessionService : IRefreshSessionService
         user.RefreshToken = string.Empty;
         user.RefreshTokenExpiryTime = now;
         await _context.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private RefreshSession NewSession(ApplicationUser user, string rawToken) => new()

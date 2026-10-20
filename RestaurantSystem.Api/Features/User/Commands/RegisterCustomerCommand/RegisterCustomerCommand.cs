@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Identity;
+using RestaurantSystem.Api.Features.Auth.Interfaces;
+using RestaurantSystem.Api.Features.Auth.Services;
+using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
@@ -14,7 +16,12 @@ public record RegisterCustomerCommand(
     string LastName,
     string Email,
     string Password,
-    string ConfirmPassword) : ICommand<ApiResponse<AuthResponse>>;
+    string ConfirmPassword) : ICommand<ApiResponse<AuthResponse>>
+{
+    // Set only by the strict native command; legacy JSON cannot choose a different delivery rail.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool NativeClient { get; init; }
+}
 
 public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCommand, ApiResponse<AuthResponse>>
 {
@@ -22,6 +29,7 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
     private readonly ITokenService _tokenService;
     private readonly IRefreshSessionService _sessions;
     private readonly IEmailService _emailService;
+    private readonly ICustomerNativeAccountMail _nativeMail;
     private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<RegisterCustomerCommandHandler> _logger;
 
@@ -30,6 +38,7 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
         ITokenService tokenService,
         IRefreshSessionService sessions,
         IEmailService emailService,
+        ICustomerNativeAccountMail nativeMail,
         IEmailLanguageResolver languages,
         ILogger<RegisterCustomerCommandHandler> logger)
     {
@@ -37,6 +46,7 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
         _tokenService = tokenService;
         _sessions = sessions;
         _emailService = emailService;
+        _nativeMail = nativeMail;
         _languages = languages;
         _logger = logger;
     }
@@ -82,8 +92,8 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
         }
 
         // Generate tokens. The raw refresh token only leaves in this response; the database gets its hash.
-        var token = _tokenService.GenerateAccessToken(newUser);
-        var refreshToken = await _sessions.IssueAsync(newUser, cancellationToken);
+        var token = command.NativeClient ? string.Empty : _tokenService.GenerateAccessToken(newUser);
+        var refreshToken = command.NativeClient ? string.Empty : await _sessions.IssueAsync(newUser, cancellationToken);
         // Registration sends the verification mail below, so it opens the per-address cooldown
         // too (GAP-3) — otherwise register-then-resend would deliver two mails back to back and
         // the cooldown would only start on the second. Piggy-backs the update already happening.
@@ -104,17 +114,26 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
         var verificationToken = await _userManager.GenerateEmailConfirmationTokenAsync(newUser);
 
         // Send verification email
+        Exception? mailFailure = null;
         try
         {
             // The language this registration was made in, which the row above just recorded — the
             // one mail whose recipient asked for it moments ago, in this very request.
-            await _emailService.SendEmailVerificationAsync(
-                _languages.ForAccount(newUser), newUser, verificationToken);
+            if (command.NativeClient)
+                await _nativeMail.SendAsync(_languages.ForAccount(newUser), newUser, verificationToken, CustomerNativeAccountLinks.Verify);
+            else
+                await _emailService.SendEmailVerificationAsync(_languages.ForAccount(newUser), newUser, verificationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send welcome email to user {UserId}", newUser.Id);
-            // Don't fail the registration if email sending fails
+            mailFailure = ex;
+        }
+        if (mailFailure is not null)
+        {
+            if (command.NativeClient)
+                _logger.LogWarning("Native registration mail failed with {ExceptionType}", mailFailure.GetType().Name);
+            else
+                _logger.LogError(mailFailure, "Failed to send welcome email to user {UserId}", newUser.Id);
         }
 
         _logger.LogInformation("Customer {UserId} successfully registered", newUser.Id);

@@ -29,7 +29,13 @@ public sealed class MobileAssociationHttpTests
             var app = details[0];
             Assert.Equal(["appIDs", "components"], app.EnumerateObject().Select(value => value.Name).ToArray());
             Assert.Equal([MobileAssociationFixture.AppleId], app.GetProperty("appIDs").EnumerateArray().Select(value => Assert.IsType<string>(value.GetString())).ToArray());
-            var component = app.GetProperty("components")[0];
+            var components = app.GetProperty("components");
+            Assert.Equal(3, components.GetArrayLength());
+            Assert.Equal("/r/*/verify", components[1].GetProperty("/").GetString());
+            Assert.Equal("/r/*/recover", components[2].GetProperty("/").GetString());
+            Assert.Empty(components[1].GetProperty("?").EnumerateObject());
+            Assert.Empty(components[2].GetProperty("?").EnumerateObject());
+            var component = components[0];
             Assert.Equal(["/", "?"], component.EnumerateObject().Select(value => value.Name).ToArray());
             Assert.Equal("/r/*/payment-return/*", component.GetProperty("/").GetString());
             Assert.Equal("*", component.GetProperty("?").GetProperty("operation").GetString());
