@@ -32,6 +32,7 @@ public static class AppleAuthExtensions
         // Singleton: the key cache is the whole reason this type exists.
         services.AddSingleton<IAppleSigningKeyProvider, AppleSigningKeyProvider>();
         services.AddScoped<IAppleIdentityTokenVerifier, AppleIdentityTokenVerifier>();
+        services.AddScoped<IAppleAccountNameUpdater, AppleAccountNameUpdater>();
 
         return services;
     }
