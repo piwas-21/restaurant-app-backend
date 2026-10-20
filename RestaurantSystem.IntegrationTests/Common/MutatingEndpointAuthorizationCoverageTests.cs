@@ -70,6 +70,15 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// </summary>
     private static readonly string[] AnonymousWrites =
     [
+        // Native booking ingress requires canonical session/principal and a server-protected,
+        // purpose/tenant/owner/input-bound preparation. Invalid JWTs never become guests.
+        // Create rechecks current rollout/time/capacity under schedule/account authority and
+        // commits booking+decision atomically. Recover is read-only; stop seals only unseen work.
+        // All four share the bounded native basket IP budget and return no-store responses.
+        "CustomerMobileReservationCreateController.Prepare [POST]",
+        "CustomerMobileReservationCreateController.Create [POST]",
+        "CustomerMobileReservationCreateController.Recover [POST]",
+        "CustomerMobileReservationCreateController.CancelAttempt [POST]",
         // Native Google login requires explicit tenant opt-in, a short-lived tenant/flow-bound
         // challenge, nonce-validated provider signature and one-use proof. Email never auto-links.
         // Linking uses separate authenticated Customer actions with current password reauth.
