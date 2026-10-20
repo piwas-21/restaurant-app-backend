@@ -10,6 +10,7 @@ using RestaurantSystem.Api.Features.Reservations.Commands.DeleteReservationComma
 using RestaurantSystem.Api.Features.Reservations.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.IntegrationTests.Common;
 
 namespace RestaurantSystem.IntegrationTests.Features.Reservations;
 
@@ -108,6 +109,49 @@ public sealed partial class ReservationWriteConcurrencyTests
             .Handle(new(Payload()), default);
         Assert.True(result.Success);
         Assert.True(mailed);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cancellation_commits_before_rejection_mail_and_provider_failure_does_not_fail_it(bool failMail)
+    {
+        ReservationStatus? observedStatus = null;
+        string? recipient = null;
+        string? subject = null;
+        string? html = null;
+        var email = new Mock<IEmailService>();
+        email.Setup(value => value.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(async (string to, string title, string body, string _) =>
+            {
+                await using var observer = DatabaseFixture.CreateContext();
+                observedStatus = await observer.Reservations.Where(row => row.Id == _existing)
+                    .Select(row => row.Status).SingleAsync();
+                recipient = to;
+                subject = title;
+                html = body;
+                if (failMail) throw new IOException("Injected mail provider failure after cancellation.");
+            });
+        using var scope = Factory.Services.CreateScope();
+        var mailer = ActivatorUtilities.CreateInstance<ReservationRejectedMailer>(scope.ServiceProvider, email.Object);
+        var actor = new Mock<ICurrentUserService>();
+        actor.SetupGet(value => value.UserId).Returns(Owner);
+        await using var db = DatabaseFixture.CreateContext();
+        var result = await ActivatorUtilities.CreateInstance<CancelReservationCommandHandler>(
+                scope.ServiceProvider, db, actor.Object, mailer)
+            .Handle(new(_existing), default);
+
+        Assert.True(result.Success);
+        Assert.Equal(ReservationStatus.Cancelled, observedStatus);
+        Assert.Equal(TestAuthHandler.UserName, recipient);
+        Assert.False(string.IsNullOrWhiteSpace(subject));
+        Assert.Contains(nameof(ReservationWriteConcurrencyTests), html, StringComparison.Ordinal);
+        email.Verify(value => value.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        await using var verify = DatabaseFixture.CreateContext();
+        Assert.Equal(ReservationStatus.Cancelled,
+            await verify.Reservations.Where(row => row.Id == _existing).Select(row => row.Status).SingleAsync());
     }
 
     [Fact]

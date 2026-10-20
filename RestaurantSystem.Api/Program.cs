@@ -810,6 +810,8 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Features.Reservations.Service
     RestaurantSystem.Api.Features.Reservations.Services.ReservationQuickActionPages>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.IReservationChangedMailer,
     RestaurantSystem.Api.Features.Reservations.Services.ReservationChangedMailer>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.IReservationRejectedMailer,
+    RestaurantSystem.Api.Features.Reservations.Services.ReservationRejectedMailer>();
 builder.Services.AddScoped<IOrderItemFactory, OrderItemFactory>();
 builder.Services.AddScoped<IBasketToOrderTranslator, BasketToOrderTranslator>();
 builder.Services.AddScoped<IOrderPricingService, OrderPricingService>();
