@@ -19,6 +19,7 @@ public static class MobileLinkExtensions
             .Bind(configuration.GetSection(MobileLinkSettings.SectionName), options => options.ErrorOnUnknownConfiguration = true)
             .ValidateOnStart();
         services.AddSingleton<IGetMobilePaymentReturnQueryHandler, GetMobilePaymentReturnQueryHandler>();
+        services.AddSingleton<IGetMobileAccountLinkQueryHandler, GetMobileAccountLinkQueryHandler>();
         return services;
     }
 
@@ -38,6 +39,6 @@ public static class MobileLinkExtensions
                 return query.Handle(input) ? Results.Content(PaymentReturnHtml, "text/html; charset=utf-8")
                     : Results.NotFound();
             });
-        return endpoints;
+        return endpoints.MapMobileAccountLinks();
     }
 }

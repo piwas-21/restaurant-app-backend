@@ -1,4 +1,4 @@
-﻿using RestaurantSystem.Api.Features.Basket.Services.Operations;
+using RestaurantSystem.Api.Features.Basket.Services.Operations;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -831,6 +831,7 @@ builder.Services.AddOrderDetailServices();
 builder.Services.AddOrderCreationServices();
 builder.Services.AddStaffOrderServices();
 builder.Services.AddCustomerCheckoutServices();
+builder.Services.AddCustomerNativeAccounts(builder.Configuration);
 builder.Services.AddServerWorkspaceServices();
 builder.Services.AddKitchenBoardServices();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
