@@ -110,7 +110,7 @@ jobs:
   #
   # The split is BY NAMESPACE. Shard 1 owns its listed prefixes, shard 3 owns
   # Orders except Account-prefixed classes, and shard 2 includes Basket and catches
-  # the remaining namespaces. Account-prefixed Orders classes run with shard 1.
+  # the remaining namespaces. Account-prefixed Orders classes and Infrastructure run with shard 1.
   # Together these filters are a disjoint, exhaustive partition: new tests under a
   # listed prefix follow that shard, and other namespaces fall into shard 2. The
   # aggregate job below re-verifies this against `dotnet test --list-tests` and merged
@@ -141,10 +141,12 @@ jobs:
   dotnet_test:
     name: dotnet test (integration) shard ${{ matrix.shard }}/3
     runs-on: ubuntu-latest
-    # Run 39398012475: shard 1 passed in 16m25s, shard 2 in 24m37s; Orders hit
-    # the 30-minute job cap twice. Move Account-prefixed Orders classes to shard 1.
-    # Actual VSTest discovery preserves all 5,245 entries exactly once, partitioned
-    # 1,785 / 2,045 / 1,415. Missing/overlap controls also reject a dropped/doubled slice.
+    # Run 39439413976: shard 1 passed in 18m27s, shard 3 in 26m51s;
+    # shard 2 reached the unchanged 30-minute job cap. Move Infrastructure to shard 1.
+    # Its 170 completed cases account for 271s of summed test-method time in that run;
+    # fixture/setup time is additional. Verify full VSTest discovery on this exact source.
+    # Exact VSTest discovery: 5,405 entries, partitioned 1,955 / 2,035 / 1,415.
+    # Actual filtered drop/overlap controls reject the missing/doubled 170-case prefix.
     # Hosted timing remains the acceptance gate; no tests, floors or time bounds change.
     # Budget includes restore/build, tests, coverage/discovery and artifact uploads.
     # Leave upload margin after a successful long-running shard, rather than cancelling its evidence.
@@ -156,10 +158,10 @@ jobs:
         include:
           - shard: 1
             filter: >-
-              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.Account
+              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.Account|FullyQualifiedName~RestaurantSystem.IntegrationTests.Infrastructure.
           - shard: 2
             filter: >-
-              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.
+              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Infrastructure.
           - shard: 3
             filter: >-
               FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Account

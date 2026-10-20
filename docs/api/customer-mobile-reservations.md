@@ -28,5 +28,27 @@ machine credentials cannot substitute for the owning customer.
 
 Responses use no-store and the existing native basket read IP budget. This adds no migration or
 configuration activation and changes no existing web contract. The deployed OpenAPI fixture is
-not evidence that these source-only routes are available on a tenant. Reservation creation,
-availability, edits/cancellation and installed native journeys remain separate implementation.
+not evidence that these source-only routes are available on a tenant. Reservation creation, edits/cancellation and installed native journeys remain separate implementation.
+Public availability is specified below.
+
+## Public availability
+
+`GET /api/customer-mobile/reservations/availability?schemaVersion=1&date=YYYY-MM-DD&numberOfGuests=N`
+adds a public no-store read using the same native read IP budget. `N` is 1–20, matching the existing
+reservation write contract. Date binding is calendar-only; past days are refused against the
+restaurant clock, including when UTC has already moved to the next day.
+
+Response data contains only `schemaVersion`, calendar `date`, restaurant `timeZone`, `numberOfGuests`
+and at most 48 unique ordered `slots` with `startTime`/`endTime`. The existing shared engine owns
+split shifts, elapsed slots and pending/confirmed occupancy across primary and combined tables.
+A slot is included only when the available active tables have enough combined capacity for the
+requested party. No table IDs, names, layout, notes, QR data or contact fields leave this projection.
+
+A closed day returns an empty slot list. An engine failure or missing active table configuration
+returns 400 rather than a successful empty result. Fresh native Reservations capability is required
+before and after materialization; withdrawal or a tenant/timezone change refuses a stale response.
+Anonymous availability does not authorize reading or changing any reservation.
+
+Availability is advisory and reserves nothing. Creation must revalidate current capacity and conflicts
+atomically, bind the original customer/guest authority and give retries a durable operation identity.
+That write contract and the dependent native availability UI are separate implementation gates.
