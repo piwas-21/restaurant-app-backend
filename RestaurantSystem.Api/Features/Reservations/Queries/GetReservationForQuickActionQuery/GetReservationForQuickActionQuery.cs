@@ -13,8 +13,8 @@ namespace RestaurantSystem.Api.Features.Reservations.Queries.GetReservationForQu
 /// a later addition to <c>ReservationDto</c> cannot silently widen this surface.
 /// </remarks>
 /// <param name="Status">What the token has to have been signed over to be valid.</param>
-/// <param name="CreatedAt">Anchor of the legacy grace window (backend #402).</param>
-public sealed record QuickActionReservation(Guid Id, ReservationStatus Status, DateTime CreatedAt);
+/// <param name="Revision">Database-owned authority version; a returned status cannot revive an old link.</param>
+public sealed record QuickActionReservation(Guid Id, ReservationStatus Status, Guid Revision);
 
 /// <summary>
 /// Resolves the reservation behind a quick-approve / quick-reject email link. Returns null when
@@ -39,6 +39,6 @@ public class GetReservationForQuickActionQueryHandler
         _context.Reservations
             .AsNoTracking()
             .Where(r => r.Id == query.ReservationId)
-            .Select(r => new QuickActionReservation(r.Id, r.Status, r.CreatedAt))
+            .Select(r => new QuickActionReservation(r.Id, r.Status, r.Revision))
             .FirstOrDefaultAsync(cancellationToken);
 }

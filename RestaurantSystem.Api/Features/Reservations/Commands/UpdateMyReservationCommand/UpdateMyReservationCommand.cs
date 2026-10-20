@@ -87,6 +87,7 @@ public class UpdateMyReservationCommandHandler
         var edit = GuestReservationEdit.Apply(reservation, data, bookedDay);
 
         await _context.SaveChangesAsync(cancellationToken);
+        await ReservationMailRevision.RefreshTrackedAsync(_context, reservation, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         // After the commit and never awaited into the response contract: the mails are a

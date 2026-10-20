@@ -18,8 +18,8 @@ namespace RestaurantSystem.Api.Features.Reservations;
 /// <remarks>
 /// Still <c>[AllowAnonymous]</c>, and that is not a gap: the links are opened from a mail client,
 /// which carries no session. What authorises the caller is the <c>?token=</c> the alert mail put on
-/// the link — an HMAC over the reservation, the action and the booking's CURRENT status
-/// (<see cref="IReservationQuickActionLinks"/>, backend #402). Before that token existed, the bare
+/// the link — an HMAC over the reservation, the action and the booking's CURRENT status/revision
+/// (<see cref="IReservationQuickActionLinks"/>). Revisionless links are refused; the bare
 /// reservation id was the whole authorisation, and <c>POST /api/Reservations</c> hands that id to
 /// whoever made the booking — so a guest could approve their own table.
 /// </remarks>
@@ -122,7 +122,7 @@ public class ReservationQuickActionsController : ControllerBase
             return false;
         }
 
-        return _links.Verify(id, action, reservation.Status, reservation.CreatedAt, token)
+        return _links.Verify(id, action, reservation.Status, reservation.Revision, token)
             != QuickActionLinkVerdict.Refused;
     }
 

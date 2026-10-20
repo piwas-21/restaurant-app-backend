@@ -12,9 +12,8 @@ namespace RestaurantSystem.Api.Features.Reservations.Services;
 /// mail provider having a bad minute is not a reason to tell a guest their change was lost — the
 /// same policy every other reservation mail already follows.
 /// <para>
-/// A contact-detail-only edit deliberately sends the restaurant NOTHING. It changes no decision
-/// the restaurant has to take, the dashboard already shows the new number, and an alert that
-/// arrives for a corrected phone number is how the alert that matters stops being read.
+/// A Confirmed contact-only correction sends no operator alert. A Pending correction refreshes
+/// the operator's buttons because every saved revision retires its previous email authority.
 /// </para>
 /// </remarks>
 public interface IReservationChangedMailer

@@ -84,6 +84,8 @@ public sealed class CustomerReservationOperationService(ApplicationDbContext con
         };
         context.Set<CustomerReservationOperation>().Add(receipt);
         await context.SaveChangesAsync(cancellationToken);
+        if (draft?.Reservation is { } reservation)
+            await ReservationMailRevision.RefreshTrackedAsync(context, reservation, cancellationToken);
         return new(CustomerReservationDecisions.ToResolution(receipt), draft);
     }
 

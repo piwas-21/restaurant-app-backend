@@ -39,3 +39,10 @@ connection waiting in PostgreSQL pg_locks, then release the first commit. Final 
 oracle: competing create/staff/customer edits cannot both take the same slot. Status/delete cases
 observe changes committed while waiting; rollback and cross-connection mail visibility exercise
 transaction boundaries. Source checks do not prove deployed or installed native booking acceptance.
+
+
+Email actions additionally bind the actual saved database UUID revision. The original version2
+proof is verified before and after waiting; status or parent/child ABA cannot revive a retired
+button. Writers refresh tracked mail snapshots after all parent/child effects before committing.
+Pending customer contact/no-op corrections send fresh operator authority; Confirmed contact-only
+corrections remain quiet. Unsigned/version1 links cannot prove a revision and use dashboard recovery.

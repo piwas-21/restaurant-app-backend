@@ -47,10 +47,8 @@ public class ReservationChangedMailer : IReservationChangedMailer
 
         try
         {
-            // Signed over the status the booking is in AFTER the edit (backend #402), which is the
-            // whole point on this path: a re-shaped booking is Pending again, so the fresh buttons
-            // work — while the ones in the mail the restaurant already has were signed over
-            // Confirmed and are now dead. The stale alert cannot decide the new booking.
+            // Use the writer's final saved revision, read after every parent/child effect.
+            // A return to Pending never makes an earlier email authorize a different proposal.
             var details = new ReservationMailDetails(
                 reservation.ReservationDate,
                 reservation.StartTime,
@@ -59,8 +57,8 @@ public class ReservationChangedMailer : IReservationChangedMailer
                 tableNumber,
                 reservation.SpecialRequests,
                 reservation.Id,
-                _quickActionLinks.Mint(reservation.Id, ReservationQuickAction.Approve, reservation.Status),
-                _quickActionLinks.Mint(reservation.Id, ReservationQuickAction.Reject, reservation.Status));
+                _quickActionLinks.Mint(reservation.Id, ReservationQuickAction.Approve, reservation.Status, reservation.Revision),
+                _quickActionLinks.Mint(reservation.Id, ReservationQuickAction.Reject, reservation.Status, reservation.Revision));
 
             // The guest reads the language frozen on the booking, the restaurant its own (§1 rank
             // 4) — two values that must not become one.
@@ -71,7 +69,8 @@ public class ReservationChangedMailer : IReservationChangedMailer
                 details,
                 OutcomeOf(reservation, edit));
 
-            if (edit.ShapeChanged)
+            // Every Pending edit retires the previous revision's buttons, including contact-only/no-op corrections.
+            if (edit.ShapeChanged || reservation.Status == ReservationStatus.Pending)
             {
                 await SendOperatorAlertAsync(reservation, details, edit, cancellationToken);
             }
