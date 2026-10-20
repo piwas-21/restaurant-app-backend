@@ -86,6 +86,8 @@ The existing ordinary expiry sweep runs first, then a bounded native reconciliat
 claims a short lease and commits its rotation before validating retained/provider inputs, so poison
 rows back off. Provider reads occur outside database transactions. Server financial recovery does
 not require a surviving customer account or an app return, and never creates a replacement session.
+Failure diagnostics retain only the opaque order ID and exception classification, excluding raw
+provider exception messages, URLs and credentials.
 
 Migration `20261020002402_AddCustomerCheckoutEffectRecovery` adds nullable UTC `effects_completed_at`
 to the retained journal. Completed payments without this marker remain background candidates even

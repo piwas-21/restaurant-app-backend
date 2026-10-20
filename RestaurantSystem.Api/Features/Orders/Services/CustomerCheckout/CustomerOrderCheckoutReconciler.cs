@@ -12,8 +12,8 @@ namespace RestaurantSystem.Api.Features.Orders.Services.CustomerCheckout;
 
 /// <summary>Tenant-scoped server authority for known financial references, including after owner erasure.</summary>
 public sealed class CustomerOrderCheckoutReconciler(ApplicationDbContext context,
-    ICustomerOrderCheckoutEvidenceWriter writer, ICustomerOrderCheckoutProviderReader reader, IStripeGateway gateway,
-    IOptions<StripeSettings> stripe, IOptions<CustomerHostedCheckoutSettings> settings,
+    ICustomerOrderCheckoutEvidenceWriter writer, ICustomerOrderCheckoutProviderReader reader,
+    IOptions<CustomerHostedCheckoutSettings> settings,
     TimeProvider clock, ICustomerOrderCheckoutEffects effects,
     ILogger<CustomerOrderCheckoutReconciler> logger) : ICustomerOrderCheckoutReconciler
 {
@@ -46,32 +46,39 @@ public sealed class CustomerOrderCheckoutReconciler(ApplicationDbContext context
             examined++;
             try
             {
-                var work = await AcquireAsync(orderId, workToken);
-                if (work is null) continue;
-                if (work.Payment is not { } lease)
-                {
-                    await effects.CompleteAsync(orderId, workToken);
-                    continue;
-                }
-                lease.Request.NativeRouting!.RequireCurrent(gateway, stripe.Value, orderId);
-                if (clock.GetUtcNow().UtcDateTime >= lease.LeaseExpiresAt) throw Pending();
-                var remote = await reader.ReadAsync(lease.Request, lease.ProviderSessionId!, workToken);
-                var outcome = await RecordAsync(lease, remote, workToken);
-                if (outcome == CheckoutSessionStatus.Completed)
-                {
-                    settled++;
-                    await effects.CompleteAsync(orderId, workToken);
-                }
-                if (outcome == CheckoutSessionStatus.Expired) expired++;
+                var result = await ReconcileAsync(orderId, workToken);
+                if (result.Outcome == CheckoutSessionStatus.Completed) settled++;
+                if (result.Outcome == CheckoutSessionStatus.Expired) expired++;
+                if (result.Effects) await effects.CompleteAsync(orderId, workToken);
             }
             catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 context.ChangeTracker.Clear();
                 failures++;
-                logger.LogWarning("Native payment requires reconciliation for order {OrderId}", orderId);
+                ReportFailure(orderId, error);
             }
         }
         return new() { Examined = examined, Settled = settled, Expired = expired, Failures = failures };
+    }
+
+    private async Task<(CheckoutSessionStatus? Outcome, bool Effects)> ReconcileAsync(Guid orderId,
+        CancellationToken cancellationToken)
+    {
+        var work = await AcquireAsync(orderId, cancellationToken);
+        if (work is null) return (null, false);
+        if (work.Payment is not { } lease) return (null, true);
+        if (clock.GetUtcNow().UtcDateTime >= lease.LeaseExpiresAt) throw Pending();
+        // The reader verifies frozen routing immediately before provider I/O, outside any transaction.
+        var remote = await reader.ReadAsync(lease.Request, lease.ProviderSessionId!, cancellationToken);
+        var outcome = await RecordAsync(lease, remote, cancellationToken);
+        return (outcome, outcome == CheckoutSessionStatus.Completed);
+    }
+
+    private void ReportFailure(Guid orderId, Exception error)
+    {
+        // Provider exception text may contain URLs, credentials or customer data. Retain only classification.
+        logger.LogWarning("Native payment requires reconciliation for order {OrderId}; failure type {FailureType}",
+            orderId, error.GetType().Name);
     }
 
     private sealed record Work(CustomerOrderCheckoutLease? Payment);
@@ -96,7 +103,6 @@ public sealed class CustomerOrderCheckoutReconciler(ApplicationDbContext context
         // Commit rotation before validating retained/provider inputs: poisoned rows must back off too.
         if (status == CheckoutSessionStatus.Completed) return new(null);
         var request = CustomerOrderCheckoutReplay.Read(journal, now, forCreate: false);
-        request.NativeRouting!.RequireCurrent(gateway, stripe.Value, orderId);
         return new(new(id, request, journal.ProviderSessionId, expiry, journal.MaximumCreateRetryAt));
     }
 

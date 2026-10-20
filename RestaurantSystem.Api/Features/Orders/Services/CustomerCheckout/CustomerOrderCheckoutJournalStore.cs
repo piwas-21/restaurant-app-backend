@@ -14,7 +14,7 @@ namespace RestaurantSystem.Api.Features.Orders.Services.CustomerCheckout;
 /// <summary>Commits the original request before any provider I/O; replay never reprices or rotates identity.</summary>
 public sealed class CustomerOrderCheckoutJournalStore(ApplicationDbContext context,
     ICustomerCheckoutGuard guard, ICustomerOrderOperationStore operations,
-    IStripeGateway gateway, IOptions<StripeSettings> stripe,
+    ICustomerOrderCheckoutProviderReader provider,
     IOptions<CustomerHostedCheckoutSettings> options, ICustomerOrderCheckoutCreationPolicy creation, TimeProvider clock) : ICustomerOrderCheckoutJournalStore
 {
     public async Task<CustomerOrderCheckoutJournal> FreezeAsync(string sessionId, CustomerOrderRecoveryDto proof,
@@ -50,7 +50,7 @@ public sealed class CustomerOrderCheckoutJournalStore(ApplicationDbContext conte
                 throw new ConflictException("Reconcile the existing checkout before starting a native payment.");
             var settings = options.Value;
             var routing = NativeCheckoutRouting.Create(settings.LinkOrigin, settings.TenantSlug, orderId,
-                proof.OperationId, StripeProviderContext.Read(gateway, stripe.Value));
+                proof.OperationId, provider.CurrentContext());
             var request = new CheckoutSessionRequest
             {
                 OrderId = orderId,

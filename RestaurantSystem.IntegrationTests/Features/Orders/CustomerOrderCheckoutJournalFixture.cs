@@ -135,7 +135,8 @@ public abstract class CustomerOrderCheckoutJournalFixture(DatabaseFixture databa
             new OnlinePaymentIntentGuard(context, Mock.Of<RestaurantSystem.Api.Common.Services.Interfaces.ICurrentUserService>()));
         var operations = Store(context, owner, owner.HasValue, owner.HasValue ? UserRole.Customer : null);
         var store = new CustomerOrderCheckoutJournalStore(context, guard.Object,
-            operations, gateway.Object, Options.Create(stripe), Options.Create(Settings), creation, Clock);
+            operations, new CustomerOrderCheckoutProviderReader(Mock.Of<IStripeCheckoutClient>(), gateway.Object, Options.Create(stripe)),
+            Options.Create(Settings), creation, Clock);
         var evidence = EvidenceWriter(context);
         var leases = new CustomerOrderCheckoutLeaseStore(context, store, creation, evidence,
             new CustomerOrderCheckoutOwnerScope(context, guard.Object, operations, Clock));

@@ -26,31 +26,35 @@ public sealed class CustomerOrderCheckoutEffects(ApplicationDbContext context, I
             var order = await context.Orders.AsNoTracking().IncludeOrderLineGraph().Include(value => value.Payments)
                 .Include(value => value.User).Include(value => value.DeliveryAddress).AsSplitQuery()
                 .SingleOrDefaultAsync(value => value.Id == orderId && !value.IsDeleted, cancellationToken);
-            var completed = order is null || !OrderStatusTransitions.IsValid(order.Status, OrderStatus.Cancelled);
-            if (!completed && order is not null)
+            if (order is null || !OrderStatusTransitions.IsValid(order.Status, OrderStatus.Cancelled))
             {
-                var view = await mapping.MapToOrderDtoAsync(order, cancellationToken);
-                alerts.Queue(view);
-                receipts.Queue(view);
-                // Queue mail independently of loyalty conflicts; the strict award remains retryable.
-                var award = order.UserId.HasValue
-                    ? await fidelity.AwardAcceptedOrderAsync(orderId, cancellationToken) : null;
-                // Queueing and an in-flight claim are not delivery evidence. Keep the journal
-                // retryable until the existing ledgers report success, including after process death.
-                var adminSent = await WasSentAsync(OutboundEmailTypes.OrderAdminAlert, orderId, cancellationToken);
-                var guestSent = string.IsNullOrWhiteSpace(view.CustomerEmail)
-                    || await WasSentAsync(OutboundEmailTypes.OrderReceived, orderId, cancellationToken);
-                completed = adminSent && guestSent && award?.Disposition != FidelityPointsAwardDisposition.Deferred;
+                await MarkCompletedAsync(orderId, cancellationToken);
+                return;
             }
-            if (completed)
-                await context.Set<CustomerOrderCheckoutJournal>().Where(value => value.OrderId == orderId)
-                    .ExecuteUpdateAsync(update => update.SetProperty(value => value.EffectsCompletedAt, clock.GetUtcNow().UtcDateTime), cancellationToken);
+            var view = await mapping.MapToOrderDtoAsync(order, cancellationToken);
+            alerts.Queue(view);
+            receipts.Queue(view);
+            // Queue mail independently of loyalty conflicts; the strict award remains retryable.
+            var award = order.UserId.HasValue
+                ? await fidelity.AwardAcceptedOrderAsync(orderId, cancellationToken) : null;
+            // Queueing and an in-flight claim are not delivery evidence. Keep the journal
+            // retryable until the existing ledgers report success, including after process death.
+            var adminSent = await WasSentAsync(OutboundEmailTypes.OrderAdminAlert, orderId, cancellationToken);
+            var guestSent = string.IsNullOrWhiteSpace(view.CustomerEmail)
+                || await WasSentAsync(OutboundEmailTypes.OrderReceived, orderId, cancellationToken);
+            if (adminSent && guestSent && award?.Disposition != FidelityPointsAwardDisposition.Deferred)
+                await MarkCompletedAsync(orderId, cancellationToken);
         }
         finally
         {
             context.ChangeTracker.Clear();
         }
     }
+
+    private Task<int> MarkCompletedAsync(Guid orderId, CancellationToken cancellationToken) =>
+        context.Set<CustomerOrderCheckoutJournal>().Where(value => value.OrderId == orderId)
+            .ExecuteUpdateAsync(update => update.SetProperty(value => value.EffectsCompletedAt,
+                clock.GetUtcNow().UtcDateTime), cancellationToken);
 
     private Task<bool> WasSentAsync(string type, Guid orderId, CancellationToken cancellationToken) =>
         context.OutboundEmails.AsNoTracking().AnyAsync(value => value.EmailType == type && value.EntityId == orderId

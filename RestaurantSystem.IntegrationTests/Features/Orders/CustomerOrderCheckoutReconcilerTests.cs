@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using RestaurantSystem.Api.Common.Services;
@@ -34,14 +35,14 @@ public sealed class CustomerOrderCheckoutReconcilerTests(DatabaseFixture databas
         }, owner);
     }
 
-    private CustomerOrderCheckoutReconciler Build(ApplicationDbContext context)
+    private CustomerOrderCheckoutReconciler Build(ApplicationDbContext context, ILogger<CustomerOrderCheckoutReconciler>? logger = null)
     {
         _gateway.SetupGet(value => value.IsConfigured).Returns(true);
         _gateway.SetupGet(value => value.ConnectedAccountId).Returns("acct_native_fixture");
         return new(context, EvidenceWriter(context),
             new CustomerOrderCheckoutProviderReader(_provider.Object, _gateway.Object, Options.Create(_stripe)),
-            _gateway.Object, Options.Create(_stripe), Options.Create(Settings), Clock, _effects.Object,
-            NullLogger<CustomerOrderCheckoutReconciler>.Instance);
+            Options.Create(Settings), Clock, _effects.Object,
+            logger ?? NullLogger<CustomerOrderCheckoutReconciler>.Instance);
     }
 
     private void Respond(StripeCheckoutSession remote)
@@ -270,5 +271,34 @@ public sealed class CustomerOrderCheckoutReconcilerTests(DatabaseFixture databas
         journal.ProviderSessionId.Should().Be("cs_native_canonical_fixture");
         journal.LeaseId.Should().NotBeNull();
         (await context.OrderPayments.AsNoTracking().SingleAsync()).Status.Should().Be(PaymentStatus.Processing);
+    }
+
+    [Fact]
+    public async Task Provider_failure_reports_only_safe_classification_and_never_exception_payloads()
+    {
+        await PrimeAsync();
+        const string privateDetails = "private-provider-url-credential-fixture";
+        _provider.Setup(value => value.GetAsync("cs_native_canonical_fixture", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException(privateDetails));
+        var log = new SafeLogger();
+        await using var context = Database.CreateContext();
+        (await Build(context, log).RunAsync(10, CancellationToken.None)).Failures.Should().Be(1);
+        log.Message.Should().Contain(nameof(IOException)).And.NotContain(privateDetails);
+        log.Error.Should().BeNull();
+        (await context.OrderPayments.SingleAsync()).Status.Should().Be(PaymentStatus.Processing);
+    }
+
+    private sealed class SafeLogger : ILogger<CustomerOrderCheckoutReconciler>
+    {
+        public string Message { get; private set; } = string.Empty;
+        public Exception? Error { get; private set; }
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Message = formatter(state, exception);
+            Error = exception;
+        }
     }
 }

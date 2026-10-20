@@ -28,15 +28,7 @@ public sealed class CustomerOrderCheckoutLedger(ApplicationDbContext context, IO
         NativeCheckoutSessionEvidence.Require(request, evidence);
         var terminal = Terminal(request, evidence);
         if (terminal is null) return null;
-        var previous = await context.OrderCheckoutSessions.AsNoTracking()
-            .Where(value => value.OrderId == journal.OrderId).Take(2).ToArrayAsync(cancellationToken);
-        if (previous.Length != 0)
-        {
-            if (previous.Length != 1 || !Matches(previous[0], journal, evidence, terminal.Value)) throw Reconcile();
-            if (terminal == CheckoutSessionStatus.Completed)
-                await RequireRetainedTenderAsync(previous[0], journal, cancellationToken);
-            return terminal;
-        }
+        if (await IsRetainedAsync(journal, evidence, terminal.Value, cancellationToken)) return terminal;
         var order = await context.Orders.SingleOrDefaultAsync(value => value.Id == journal.OrderId
             && !value.IsDeleted && value.ServiceSessionId == null, cancellationToken) ?? throw Reconcile();
         order.Payments = await context.OrderPayments.Where(value => value.OrderId == order.Id)
@@ -64,22 +56,36 @@ public sealed class CustomerOrderCheckoutLedger(ApplicationDbContext context, IO
             if (tender.Id == Guid.Empty) tender.Id = Guid.NewGuid();
             session.OrderPaymentId = tender.Id;
         }
-        else
-        {
-            foreach (var tender in order.Payments.Where(value => value.PaymentMethod == PaymentMethod.OnlinePayment
-                && value.Status == PaymentStatus.Processing))
-            {
-                tender.Status = PaymentStatus.Failed;
-                tender.UpdatedAt = now;
-                tender.UpdatedBy = audit;
-            }
-        }
+        else FailProcessingTenders(order, audit, now);
         payments.UpdatePaymentSummary(order);
         order.UpdatedAt = now;
         order.UpdatedBy = audit;
         context.OrderCheckoutSessions.Add(session);
         await context.SaveChangesAsync(cancellationToken);
         return terminal;
+    }
+
+    private async Task<bool> IsRetainedAsync(CustomerOrderCheckoutJournal journal, StripeCheckoutSession evidence,
+        CheckoutSessionStatus terminal, CancellationToken cancellationToken)
+    {
+        var rows = await context.OrderCheckoutSessions.AsNoTracking()
+            .Where(value => value.OrderId == journal.OrderId).Take(2).ToArrayAsync(cancellationToken);
+        if (rows.Length == 0) return false;
+        if (rows.Length != 1 || !Matches(rows[0], journal, evidence, terminal)) throw Reconcile();
+        if (terminal == CheckoutSessionStatus.Completed)
+            await RequireRetainedTenderAsync(rows[0], journal, cancellationToken);
+        return true;
+    }
+
+    private static void FailProcessingTenders(Order order, string audit, DateTime now)
+    {
+        foreach (var tender in order.Payments.Where(value => value.PaymentMethod == PaymentMethod.OnlinePayment
+            && value.Status == PaymentStatus.Processing))
+        {
+            tender.Status = PaymentStatus.Failed;
+            tender.UpdatedAt = now;
+            tender.UpdatedBy = audit;
+        }
     }
 
     private async Task RequireRetainedTenderAsync(OrderCheckoutSession row, CustomerOrderCheckoutJournal journal,
@@ -95,23 +101,40 @@ public sealed class CustomerOrderCheckoutLedger(ApplicationDbContext context, IO
 
     private static CheckoutSessionStatus? Terminal(CheckoutSessionRequest request, StripeCheckoutSession evidence)
     {
+        var intent = ReadIntent(request, evidence);
+        if (evidence.IsComplete) return CompletedOutcome(request, evidence, intent);
+        if (evidence.IsExpired)
+        {
+            if (evidence.PaymentStatus != "unpaid") throw Reconcile();
+            return intent is null || FailedWithoutCapture(intent) ? CheckoutSessionStatus.Expired : null;
+        }
+        if (evidence.IsPaid) throw Reconcile();
+        return null;
+    }
+
+    private static StripePaymentIntent? ReadIntent(CheckoutSessionRequest request, StripeCheckoutSession evidence)
+    {
         var intent = evidence.NativeIntentEvidence;
         if (intent is not null) NativeCheckoutIntentEvidence.Require(request, evidence, intent);
         if ((evidence.IsComplete || evidence.IsExpired) && evidence.PaymentIntentId is not null && intent is null)
             throw Reconcile();
-        if (evidence.IsComplete && evidence.IsPaid)
+        return intent;
+    }
+
+    private static CheckoutSessionStatus? CompletedOutcome(CheckoutSessionRequest request,
+        StripeCheckoutSession evidence, StripePaymentIntent? intent)
+    {
+        if (evidence.IsPaid)
         {
             if (intent is null) throw Reconcile();
             return intent.IsSucceeded && intent.AmountReceivedMinor == request.AmountMinor
                 ? CheckoutSessionStatus.Completed : null;
         }
-        if (evidence.IsExpired && evidence.PaymentStatus == "unpaid")
-            return intent is null || intent.HasFailed && intent.AmountReceivedMinor == 0 ? CheckoutSessionStatus.Expired : null;
-        if (evidence.IsComplete && evidence.PaymentStatus == "unpaid" && intent is not null
-            && intent.HasFailed && intent.AmountReceivedMinor == 0) return CheckoutSessionStatus.Failed;
-        if (evidence.IsPaid || evidence.IsExpired) throw Reconcile();
-        return null;
+        return evidence.PaymentStatus == "unpaid" && intent is not null && FailedWithoutCapture(intent)
+            ? CheckoutSessionStatus.Failed : null;
     }
+
+    private static bool FailedWithoutCapture(StripePaymentIntent intent) => intent.HasFailed && intent.AmountReceivedMinor == 0;
 
     private static bool Matches(OrderCheckoutSession row, CustomerOrderCheckoutJournal journal,
         StripeCheckoutSession evidence, CheckoutSessionStatus terminal) => row.SessionId == evidence.Id

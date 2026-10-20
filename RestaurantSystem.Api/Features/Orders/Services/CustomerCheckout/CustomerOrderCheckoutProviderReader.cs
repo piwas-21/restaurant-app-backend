@@ -9,6 +9,9 @@ namespace RestaurantSystem.Api.Features.Orders.Services.CustomerCheckout;
 public sealed class CustomerOrderCheckoutProviderReader(IStripeCheckoutClient provider, IStripeGateway gateway,
     IOptions<StripeSettings> stripe) : ICustomerOrderCheckoutProviderReader
 {
+    // Configuration only: this must never create a provider client or perform network I/O.
+    public StripeProviderContext CurrentContext() => StripeProviderContext.Read(gateway, stripe.Value);
+
     public async Task<StripeCheckoutSession> ReadAsync(CheckoutSessionRequest request, string sessionId,
         CancellationToken cancellationToken)
     {
