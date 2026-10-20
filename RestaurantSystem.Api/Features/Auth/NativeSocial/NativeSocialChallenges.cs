@@ -19,8 +19,9 @@ public sealed class NativeSocialChallenges(ApplicationDbContext context, TimePro
     public async Task<NativeSocialChallengeDto> CreateAsync(string provider, Guid? owner, string? currentPassword, CancellationToken cancellationToken)
     {
         var tenantId = await access.RequireEnabledAsync(provider, cancellationToken);
+        var password = currentPassword ?? string.Empty;
         if (owner is null && currentPassword is not null || owner is not null
-            && (string.IsNullOrEmpty(currentPassword) || currentPassword.Length > 1000))
+            && (password.Length == 0 || password.Length > 1000))
             throw new BadRequestException("Account reauthentication is required.");
         if (context.ChangeTracker.HasChanges() || context.Database.CurrentTransaction is not null)
             throw new ConflictException("The account changed. Start sign-in again.");
@@ -47,7 +48,7 @@ public sealed class NativeSocialChallenges(ApplicationDbContext context, TimePro
             await NativeSocialLocks.PoolAsync(context, tenantId, cancellationToken);
             if (owner is { } userId)
             {
-                var reauthentication = await ReauthenticateAsync(userId, currentPassword ?? string.Empty, cancellationToken);
+                var reauthentication = await ReauthenticateAsync(userId, password, cancellationToken);
                 if (!reauthentication.Authenticated)
                 {
                     // Preserve the failed-attempt counter without creating a challenge/session.
