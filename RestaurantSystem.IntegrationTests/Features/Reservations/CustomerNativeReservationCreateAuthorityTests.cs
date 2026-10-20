@@ -45,6 +45,7 @@ public sealed partial class CustomerNativeReservationCreateTests
     public async Task Fresh_native_and_database_customer_authority_are_required_before_creating(string mode)
     {
         Authenticate(); var request = Request();
+        await PrepareAsync(request);
         await using var db = DatabaseFixture.CreateContext();
         if (mode == "capability") Mobile.EnabledCapabilities = ["accounts"];
         else if (mode == "accounts-capability") Mobile.EnabledCapabilities = ["reservations"];
@@ -86,7 +87,7 @@ public sealed partial class CustomerNativeReservationCreateTests
     [InlineData("time")]
     [InlineData("date")]
     [InlineData("operation")]
-    public async Task Invalid_payloads_cannot_write_or_leave_attempt_tombstones(string mode)
+    public async Task Invalid_create_payloads_cannot_write_or_leave_receipts(string mode)
     {
         var valid = Request();
         var invalid = mode switch
@@ -99,7 +100,6 @@ public sealed partial class CustomerNativeReservationCreateTests
             "date" => valid with { Date = null },
             _ => valid with { OperationId = Guid.Empty }
         };
-        Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(invalid, true)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(invalid)).StatusCode);
         Assert.Equal("Applied", (await ResolveAsync(valid)).GetProperty("outcome").GetString());
         await using var db = DatabaseFixture.CreateContext(); Assert.Single(await db.Set<CustomerReservationOperation>().ToListAsync());
@@ -125,12 +125,13 @@ public sealed partial class CustomerNativeReservationCreateTests
     [Fact]
     public async Task Unknown_staff_fields_are_not_silently_accepted()
     {
+        var original = Request(); var proof = await PrepareAsync(original);
         using var request = new HttpRequestMessage(HttpMethod.Post, Route);
         request.Headers.Add("X-Session-Id", _session);
         request.Content = JsonContent.Create(new
         {
             schemaVersion = 1,
-            operationId = Guid.NewGuid(),
+            operationId = original.OperationId,
             tenantId = Tenant,
             timeZone = "Europe/Zurich",
             date = "2030-05-17",
@@ -139,10 +140,14 @@ public sealed partial class CustomerNativeReservationCreateTests
             numberOfGuests = 6,
             customerName = "Native guest",
             customerEmail = "guest@example.test",
+            customerPhone = original.CustomerPhone,
+            specialRequests = original.SpecialRequests,
+            payloadHash = proof.PayloadHash,
+            ownerProof = proof.OwnerProof,
             status = "Confirmed",
             tableId = _first
         });
         Assert.Equal(HttpStatusCode.BadRequest, (await Client.SendAsync(request)).StatusCode);
-        Assert.Equal("Applied", (await ResolveAsync(Request())).GetProperty("outcome").GetString());
+        Assert.Equal("Applied", (await ResolveAsync(original)).GetProperty("outcome").GetString());
     }
 }

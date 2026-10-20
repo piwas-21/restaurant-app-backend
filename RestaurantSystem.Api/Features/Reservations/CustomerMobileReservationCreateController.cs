@@ -6,6 +6,8 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Services.Operations;
 using RestaurantSystem.Api.Features.Reservations.Commands.CreateCustomerReservationCommand;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
+using RestaurantSystem.Api.Features.Reservations.Commands.PrepareCustomerReservationCommand;
+using RestaurantSystem.Api.Features.Reservations.Commands.ResolveCustomerReservationCommand;
 
 namespace RestaurantSystem.Api.Features.Reservations;
 
@@ -22,10 +24,22 @@ public sealed class CustomerMobileReservationCreateController(CustomMediator med
         [FromBody] CustomerReservationCreateDto request, CancellationToken cancellationToken) =>
         Ok(await mediator.SendCommand(new CreateCustomerReservationCommand(sessionId, request), cancellationToken));
 
-    // No module attribute: sealing/recovering an original attempt remains possible after withdrawal.
+    [HttpPost("prepare")]
+    public async Task<ActionResult<ApiResponse<CustomerReservationProofDto>>> Prepare(
+        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromBody] CustomerReservationCreateDto request, CancellationToken cancellationToken) =>
+        Ok(await mediator.SendCommand(new PrepareCustomerReservationCommand(sessionId, request), cancellationToken));
+
+    // Recovery never reconstructs a booking and remains possible after module/native withdrawal.
+    [HttpPost("recover")]
+    public async Task<ActionResult<ApiResponse<CustomerReservationResolutionDto>>> Recover(
+        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromBody] CustomerReservationProofDto proof, CancellationToken cancellationToken) =>
+        Ok(await mediator.SendCommand(new ResolveCustomerReservationCommand(sessionId, proof, false), cancellationToken));
+
     [HttpPost("cancel-attempt")]
     public async Task<ActionResult<ApiResponse<CustomerReservationResolutionDto>>> CancelAttempt(
         [FromHeader(Name = "X-Session-Id")] string sessionId,
-        [FromBody] CustomerReservationCreateDto request, CancellationToken cancellationToken) =>
-        Ok(await mediator.SendCommand(new CreateCustomerReservationCommand(sessionId, request, true), cancellationToken));
+        [FromBody] CustomerReservationProofDto proof, CancellationToken cancellationToken) =>
+        Ok(await mediator.SendCommand(new ResolveCustomerReservationCommand(sessionId, proof, true), cancellationToken));
 }

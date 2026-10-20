@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.EntityFrameworkCore;
+using Moq;
 using RestaurantSystem.Api.Features.Reservations.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -38,7 +39,12 @@ public sealed partial class CustomerNativeReservationCreateTests
         else if (mode == "duration") request = request with { EndTime = TimeSpan.FromHours(19) };
         else if (mode == "past") request = request with { Date = DateOnly.FromDateTime(Day.AddDays(-10)) };
         else if (mode == "capacity") request = request with { NumberOfGuests = 7 };
-        else if (mode == "timezone") { request = request with { TimeZone = "UTC" }; expected = HttpStatusCode.NotFound; }
+        else if (mode == "timezone")
+        {
+            await PrepareAsync(request);
+            _clock.SetupGet(value => value.TimeZone).Returns(TimeZoneInfo.FindSystemTimeZoneById("UTC"));
+            expected = HttpStatusCode.NotFound;
+        }
         else { request = request with { TenantId = Guid.NewGuid() }; expected = HttpStatusCode.NotFound; }
         Assert.Equal(expected, (await SendAsync(request)).StatusCode);
         Assert.Empty(await db.Reservations.ToListAsync()); Assert.Empty(await db.Set<CustomerReservationOperation>().ToListAsync());
@@ -122,6 +128,37 @@ public sealed partial class CustomerNativeReservationCreateTests
         await using var verify = DatabaseFixture.CreateContext();
         Assert.Equal(alreadyApplied ? 1 : 0, await verify.Set<CustomerReservationOperation>().CountAsync());
         Assert.Equal(alreadyApplied ? 1 : 0, _mailCalls);
+    }
+
+    [Fact]
+    public async Task A_separate_table_admin_capacity_reduction_after_slots_is_read_fresh_before_booking()
+    {
+        var reduced = false;
+        _afterSlots = () =>
+        {
+            using var admin = DatabaseFixture.CreateContext();
+            admin.Tables.Where(row => row.Id == _first).ExecuteUpdate(update => update.SetProperty(row => row.MaxGuests, 1));
+            reduced = true;
+        };
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(Request())).StatusCode);
+        Assert.True(reduced);
+        await using var verify = DatabaseFixture.CreateContext();
+        Assert.Equal(3, await verify.Tables.SumAsync(row => row.MaxGuests));
+        Assert.Empty(await verify.Reservations.ToListAsync()); Assert.Empty(await verify.Set<CustomerReservationOperation>().ToListAsync());
+        Assert.Equal(0, _mailCalls);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task A_start_which_elapses_after_slot_calculation_cannot_be_accepted(int elapsedMinutes)
+    {
+        _afterSlots = () => _clock.SetupGet(value => value.Now).Returns(
+            new DateTimeOffset(2030, 5, 17, 18, elapsedMinutes, 0, TimeSpan.FromHours(2)));
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(Request())).StatusCode);
+        await using var verify = DatabaseFixture.CreateContext();
+        Assert.Empty(await verify.Reservations.ToListAsync()); Assert.Empty(await verify.Set<CustomerReservationOperation>().ToListAsync());
+        Assert.Equal(0, _mailCalls);
     }
 
     private async Task WaitForScheduleAsync()

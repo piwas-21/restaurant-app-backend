@@ -798,6 +798,8 @@ builder.Services.AddScoped<IOrderDisplayCurrencyResolver, OrderDisplayCurrencyRe
 builder.Services.AddScoped<IOrderDisplayTranslator, OrderDisplayTranslator>();
 builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
 builder.Services.AddScoped<IOrderFactory, OrderFactory>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationProofService,
+    RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationProofService>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationOperationGuard,
     RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationOperationGuard>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationCreator,

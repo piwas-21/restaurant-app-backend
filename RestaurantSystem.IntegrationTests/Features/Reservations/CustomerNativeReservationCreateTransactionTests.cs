@@ -43,6 +43,8 @@ public sealed partial class CustomerNativeReservationCreateTests
     public async Task Concurrent_create_attempts_cannot_duplicate_a_booking_or_claim_the_same_tables(bool sameOperation)
     {
         var first = Request(); var second = sameOperation ? first : Request();
+        await PrepareAsync(first);
+        if (!sameOperation) await PrepareAsync(second);
         var responses = await Task.WhenAll(SendAsync(first), SendAsync(second));
         Assert.Equal(sameOperation ? 2 : 1, responses.Count(value => value.StatusCode == HttpStatusCode.OK));
         Assert.Equal(sameOperation ? 0 : 1, responses.Count(value => value.StatusCode == HttpStatusCode.Conflict));
@@ -58,8 +60,9 @@ public sealed partial class CustomerNativeReservationCreateTests
         using var scope = Factory.Services.CreateScope();
         await using var failedDb = DatabaseFixture.CreateContext(new FailNativeSave());
         var failed = Service(scope.ServiceProvider, failedDb);
-        var request = Request();
-        await Assert.ThrowsAsync<IOException>(() => failed.RunAsync(_session, request, false, default));
+        var input = Request(); var proof = await PrepareAsync(input);
+        var request = input with { PayloadHash = proof.PayloadHash, OwnerProof = proof.OwnerProof };
+        await Assert.ThrowsAsync<IOException>(() => failed.CreateAsync(_session, request, default));
         Assert.Empty(failedDb.ChangeTracker.Entries());
         Assert.Equal(0, await failedDb.SaveChangesAsync());
         await using var observer = DatabaseFixture.CreateContext();

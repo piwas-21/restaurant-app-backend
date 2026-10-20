@@ -6,4 +6,4 @@ namespace RestaurantSystem.Api.Features.Reservations.Dtos;
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CustomerReservationCreateDto(int? SchemaVersion, Guid OperationId, Guid TenantId,
     string TimeZone, DateOnly? Date, TimeSpan? StartTime, TimeSpan? EndTime, int? NumberOfGuests,
-    string CustomerName, string CustomerEmail, string? CustomerPhone, string? SpecialRequests);
+    string CustomerName, string CustomerEmail, string? CustomerPhone, string? SpecialRequests, string? PayloadHash = null, string? OwnerProof = null);

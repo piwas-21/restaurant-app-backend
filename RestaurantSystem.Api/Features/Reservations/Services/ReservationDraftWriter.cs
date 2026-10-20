@@ -47,7 +47,7 @@ public sealed class ReservationDraftWriter(ApplicationDbContext context,
         var combinedTableIds = data.CombinedTableIds ?? new List<Guid>();
         var requestedTableIds = combinedTableIds.Append(data.TableId).Distinct().ToList();
 
-        var tables = await _context.Tables
+        var tables = await _context.Tables.AsNoTracking()
             .Where(t => requestedTableIds.Contains(t.Id) && t.IsActive)
             .ToListAsync(cancellationToken);
 

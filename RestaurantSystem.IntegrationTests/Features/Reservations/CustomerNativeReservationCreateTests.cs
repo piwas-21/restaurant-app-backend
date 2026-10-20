@@ -38,6 +38,7 @@ public sealed partial class CustomerNativeReservationCreateTests(DatabaseFixture
     private Action? _afterSlots;
     private Func<Reservation, Task>? _onMail;
     private int _mailCalls;
+    private readonly Dictionary<string, CustomerReservationProofDto> _proofs = new();
     private Guid _first, _second;
 
     protected override void ConfigureTestServices(IServiceCollection services)
@@ -113,6 +114,7 @@ public sealed partial class CustomerNativeReservationCreateTests(DatabaseFixture
     public async Task An_unseen_cancel_attempt_seals_late_execution_after_native_access_is_withdrawn()
     {
         var request = Request();
+        await PrepareAsync(request);
         Mobile.Enabled = false;
         var cancelled = await ResolveAsync(request, true);
         Assert.Equal("Cancelled", cancelled.GetProperty("outcome").GetString());
@@ -151,10 +153,39 @@ public sealed partial class CustomerNativeReservationCreateTests(DatabaseFixture
     private CustomerMobileSettings Mobile => Factory.Services.GetRequiredService<IOptions<CustomerMobileSettings>>().Value;
     private void Authenticate(UserRole role = UserRole.Customer, bool expired = false) =>
         Client.DefaultRequestHeaders.Authorization = new("Bearer", CustomerBasketTokens.Create(Factory.Services, role, expired));
+    private static string ProofKey(CustomerReservationCreateDto request) => JsonSerializer.Serialize(request with { PayloadHash = null, OwnerProof = null });
+    private async Task<CustomerReservationProofDto> PrepareAsync(CustomerReservationCreateDto request)
+    {
+        var proof = await ProofAsync(request);
+        Assert.True(_proofs.ContainsKey(ProofKey(request)), "A valid preparation must come from the real server.");
+        return proof;
+    }
+    private async Task<CustomerReservationProofDto> ProofAsync(CustomerReservationCreateDto request)
+    {
+        if (request.PayloadHash is { } explicitHash)
+            return new(request.SchemaVersion, request.OperationId, request.TenantId, explicitHash, request.OwnerProof ?? string.Empty);
+        var key = ProofKey(request);
+        if (_proofs.TryGetValue(key, out var existing)) return existing;
+        using var prepare = new HttpRequestMessage(HttpMethod.Post, Route + "/prepare");
+        prepare.Headers.Add("X-Session-Id", _session);
+        prepare.Content = JsonContent.Create(request with { PayloadHash = null, OwnerProof = null });
+        using var prepared = await Client.SendAsync(prepare);
+        if (prepared.IsSuccessStatusCode)
+        {
+            var envelope = (await prepared.Content.ReadFromJsonAsync<ApiResponse<CustomerReservationProofDto>>())!;
+            Assert.True(envelope.Success); Assert.NotNull(envelope.Data);
+            _proofs.Add(key, envelope.Data);
+            return envelope.Data;
+        }
+        // Negative input/auth tests MUST still exercise create/cancel themselves, even if preparation refuses.
+        return new(request.SchemaVersion, request.OperationId, request.TenantId, new string('a', 64), "invalid");
+    }
     private async Task<HttpResponseMessage> SendAsync(CustomerReservationCreateDto request, bool cancel = false, string? session = null)
     {
+        var proof = await ProofAsync(request);
         using var message = new HttpRequestMessage(HttpMethod.Post, Route + (cancel ? "/cancel-attempt" : ""));
-        message.Headers.Add("X-Session-Id", session ?? _session); message.Content = JsonContent.Create(request);
+        message.Headers.Add("X-Session-Id", session ?? _session);
+        message.Content = cancel ? JsonContent.Create(proof) : JsonContent.Create(request with { PayloadHash = proof.PayloadHash, OwnerProof = proof.OwnerProof });
         return await Client.SendAsync(message);
     }
     private async Task<JsonElement> ResolveAsync(CustomerReservationCreateDto request, bool cancel = false)
