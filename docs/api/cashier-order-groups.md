@@ -49,6 +49,12 @@ item view. Replacement/addition items belong to their supplement and appear once
 order items and financial records remain intact. This operational read includes staff
 preparation text; the separate audit-history response continues to redact free text.
 
+The interactive ticket budget is 100 member orders and 1,000 committed amendments per
+group. A bounded preflight reads at most one entry beyond each budget before loading the
+order/payment graph. An oversized group returns HTTP 409 with an explicit refusal; it
+never returns a partial ticket or bill. Both checks share the ticket's repeatable-read
+snapshot, so concurrent amendments cannot evade the history budget or yield mixed totals.
+
 The cashier's main ticket and browser bill display the combined active members from this
 snapshot. Amendment history is a compact change log with detailed snapshots and recorded
 financial effects available on expansion. Staff mutations continue to target individual
