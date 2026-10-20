@@ -114,9 +114,9 @@ public sealed partial class CustomerNativeReservationReadTests(DatabaseFixture f
     [InlineData("?schemaVersion=2")]
     [InlineData("?schemaVersion=1&beforeDate=2026-11-01")]
     [InlineData("?schemaVersion=1&beforeId=11111111-1111-4111-8111-111111111111")]
-    [InlineData("?schemaVersion=1&beforeDate=2026-11-01T00:00:00Z&beforeStartTime=bad&beforeId=11111111-1111-4111-8111-111111111111")]
+    [InlineData("?schemaVersion=1&beforeStartTime=bad&beforeDate=2026-11-01T00:00:00Z&beforeId=11111111-1111-4111-8111-111111111111")]
     [InlineData("?schemaVersion=1&beforeDate=bad&beforeStartTime=18:30:00&beforeId=11111111-1111-4111-8111-111111111111")]
-    [InlineData("?schemaVersion=1&beforeDate=2026-11-01T00:00:00Z&beforeStartTime=18:30:00&beforeId=00000000-0000-0000-0000-000000000000")]
+    [InlineData("?schemaVersion=1&beforeId=00000000-0000-0000-0000-000000000000&beforeDate=2026-11-01T00:00:00Z&beforeStartTime=18:30:00")]
     public async Task Invalid_version_and_cursor_fail_with_a_working_read_control(string query)
     {
         Authenticate();
