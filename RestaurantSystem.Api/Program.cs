@@ -800,6 +800,8 @@ builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
 builder.Services.AddScoped<IOrderFactory, OrderFactory>();
 RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationCancellationRegistration
     .AddCustomerReservationCancellation(builder.Services);
+RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationEditReadRegistration
+    .AddCustomerReservationEditReads(builder.Services);
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationProofService,
     RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationProofService>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationOperationGuard,
