@@ -27,7 +27,8 @@ public sealed class AddOrderBillChargesCommandHandler(ApplicationDbContext conte
         var input = command.Request;
         ValidateRequest(input);
         await using var scope = await OrderAccountMutationScope.BeginAsync(context, command.OrderId, cancellationToken);
-        var order = await context.Orders.Include(o => o.Payments).Include(o => o.ServiceSession).Include(o => o.ExternalReference)
+        var order = await context.Orders.Include(o => o.Payments).Include(o => o.ServiceSession).Include(o => o.ExternalReference).Include(o => o.Items)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(o => o.Id == command.OrderId, cancellationToken)
             ?? throw new NotFoundException("Order not found.");
         var existing = OrderBillChargeReader.Read(order).Where(c => c.OperationId == input.OperationId).ToList();
@@ -58,7 +59,8 @@ public sealed class AddOrderBillChargesCommandHandler(ApplicationDbContext conte
     private static void ValidateReplay(AddBillChargesRequest input, List<OrderBillCharge> existing)
     {
         var positive = input.Charges.Where(c => c.Amount > 0).ToList();
-        if (existing.Count != positive.Count || existing.Any(c => !positive.Any(i => i.Key == c.Key && i.Amount == c.Amount)))
+        if (existing.Count != positive.Count || existing.Any(c => !positive.Any(i => i.Key == c.Key && i.Amount == (c.EnteredValue ?? c.Amount)
+            && (i.Effect ?? "Increase") == c.Effect && (i.Calculation ?? "Fixed") == c.Calculation)))
             throw new ConflictException("This operation identity already belongs to different bill charges.");
     }
 

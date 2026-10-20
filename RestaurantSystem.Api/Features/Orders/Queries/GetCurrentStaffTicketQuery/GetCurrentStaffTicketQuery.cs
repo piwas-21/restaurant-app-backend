@@ -67,6 +67,7 @@ public sealed class GetCurrentStaffTicketQueryHandler(
             var lineChanges = changes[order.Id].SelectMany(amendment => OrderAmendmentJson
                 .Deserialize<List<OrderAmendmentChangeSnapshot>>(amendment.ChangesJson)).ToArray();
             dto.Items = CurrentStaffTicketItems.Project(dto.Items, lineChanges, dto.Currency);
+            CurrentStaffTicketAmounts.Apply(order, dto, changes[order.Id].ToArray());
             results.Add(dto);
         }
         await snapshot.CommitAsync(cancellationToken);

@@ -49,6 +49,11 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
             : ToMinor(Math.Max(0m, supplement.Total
                 - Math.Max(0m, supplement.Tip)
                 - Math.Max(0m, supplement.DeliveryFee)));
+        if (removed == 0 && RestaurantSystem.Api.Features.BillCharges.Services.OrderBillChargeReader.Read(source).Any(value => value.Amount < 0)
+            && changes.Any(change => change.Kind is OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace)
+            && (source.FidelityPointsEarned > 0 || source.FidelityPointsRedeemed > 0 || source.FidelityPointsDiscount > 0))
+            throw new RestaurantSystem.Api.Common.Exceptions.ConflictException(
+                "A zero-value food removal with loyalty points requires loyalty reconciliation before amendment.");
         var captured = source.Payments.Where(payment => payment.Status.IsCaptured()
             && payment.Amount - (payment.RefundedAmount ?? 0m) > 0m).ToList();
         var hasUnattributedPaidAmount = captured.Count == 0 && ToMinor(source.TotalPaid) > 0;
@@ -143,14 +148,18 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
             return 0;
         var frozen = FrozenOrderChargeMath.Read(source, money);
         var lines = frozen.FoodLines.ToDictionary(line => line.Item.Id);
+        var hasStaffDiscount = RestaurantSystem.Api.Features.BillCharges.Services.OrderBillChargeReader.Read(source).Any(value => value.Amount < 0);
+        var netFood = hasStaffDiscount ? RestaurantSystem.Api.Features.BillCharges.Services.BillDiscountMath.Food(source, money) : null;
         long removed = 0;
         foreach (var change in removals)
         {
             if (!lines.TryGetValue(change.OrderItemId, out var line))
                 throw new RestaurantSystem.Api.Common.Exceptions.ConflictException(
                     "The removed food line is absent from the frozen order.");
-            removed = checked(removed + FrozenOrderChargeMath.RemovedUnits(
-                line, change.StartOrdinal, change.Quantity));
+            var gross = FrozenOrderChargeMath.RemovedUnits(line, change.StartOrdinal, change.Quantity);
+            var value = netFood is null ? gross : RestaurantSystem.Api.Features.BillCharges.Services.BillDiscountMath.Removed(
+                netFood, line.Item.Id, change.StartOrdinal, change.Quantity);
+            removed = checked(removed + value);
         }
         return removed;
     }

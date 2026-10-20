@@ -58,6 +58,13 @@ order/payment graph. An oversized group returns HTTP 409 with an explicit refusa
 never returns a partial ticket or bill. Both checks share the ticket's repeatable-read
 snapshot, so concurrent amendments cannot evade the history budget or yield mixed totals.
 
+Current-ticket monetary presentation retains only the discount portions belonging to the
+remaining food units. Subtotals and original sale discounts retain exact ordinal penny
+ownership; original discount categories combine into the current Discount line. Pending
+financial corrections hold bill printing until credit/refund/loyalty resolution. The stored
+original amounts, credit journal, payment balance and eligible adjustment basis remain
+authoritative and unchanged. See [staff bill adjustments](bill-charges.md).
+
 The cashier's main ticket and browser bill display the combined active members from this
 snapshot. Amendment history is a compact change log with detailed snapshots and recorded
 financial effects available on expansion. Staff mutations continue to target individual

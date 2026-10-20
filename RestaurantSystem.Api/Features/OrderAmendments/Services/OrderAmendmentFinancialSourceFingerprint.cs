@@ -37,7 +37,20 @@ internal static class OrderAmendmentFinancialSourceFingerprint
             amendment.SupplementOrderId, amendment.ChangesJson,
             amendment.FinancialResolutionJson, amendment.SourceSnapshotJson,
             amendment.SupplementSnapshotJson);
-        return OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(snapshot));
+        var legacyHash = OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(snapshot));
+        // In-flight legacy resolutions retain their exact accepted hash across this deployment.
+        // New-model adjustments freeze their semantics and allocation evidence in the fingerprint.
+        var hasAdjustmentEvidence = RestaurantSystem.Api.Features.BillCharges.Services.OrderBillChargeReader.Read(source)
+            .Any(value => value.EnteredValue.HasValue);
+        return hasAdjustmentEvidence
+            ? OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(new
+            {
+                Version = 2,
+                LegacyHash = legacyHash,
+                source.BillChargeAmount,
+                source.BillChargesJson
+            }))
+            : legacyHash;
     }
 
     private static ItemSnapshot Item(OrderItem value) => new(

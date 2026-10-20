@@ -13,7 +13,10 @@ internal static partial class BillChargeRules
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     internal static List<BillChargeRuleDto> Read(string json) =>
-        JsonSerializer.Deserialize<List<BillChargeRuleDto>>(json, JsonOptions) ?? [];
+        Normalize(JsonSerializer.Deserialize<List<BillChargeRuleDto>>(json, JsonOptions) ?? []);
+
+    internal static List<BillChargeRuleDto> Normalize(IEnumerable<BillChargeRuleDto> rules) =>
+        rules.Select(rule => rule with { Effect = rule.Effect ?? "Increase", Calculation = rule.Calculation ?? "Fixed" }).ToList();
 
     internal static void Validate(IReadOnlyList<BillChargeRuleDto>? rules, string? currency)
     {
@@ -24,7 +27,8 @@ internal static partial class BillChargeRules
         {
             if (string.IsNullOrWhiteSpace(rule.Key) || !KeyPattern().IsMatch(rule.Key)
                 || string.IsNullOrWhiteSpace(rule.Label) || rule.Label.Trim().Length > 60
-                || rule.DefaultAmount < 0 || rule.DefaultAmount > MaximumCharge
+                || rule.Effect is not (null or "Increase" or "Reduce") || rule.Calculation is not (null or "Fixed" or "Percentage")
+                || rule.DefaultAmount < 0 || rule.DefaultAmount > (rule.Calculation == "Percentage" ? 100m : MaximumCharge)
                 || rule.OrderTypes is null || rule.OrderTypes.Length == 0
                 || rule.OrderTypes.Any(t => t is not ("DineIn" or "Takeaway" or "Delivery"))
                 || rule.Roles is null || rule.Roles.Length == 0
