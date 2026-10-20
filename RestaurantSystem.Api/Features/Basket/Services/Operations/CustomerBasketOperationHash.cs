@@ -33,6 +33,7 @@ internal static class CustomerBasketOperationHash
     public static long OperationLock(Guid operationId) => Lock("customer-basket-operation", operationId.ToString("D"));
     // Separate from basket operation locks: native order scopes take the shared owner lock first.
     public static long OrderOperationLock(Guid operationId) => Lock("customer-order-operation", operationId.ToString("D"));
+    public static long CancellationOperationLock(Guid operationId) => Lock("customer-order-cancellation", operationId.ToString("D"));
 
     public static string Payload<T>(T item)
     {

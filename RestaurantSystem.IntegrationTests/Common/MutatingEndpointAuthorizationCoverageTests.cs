@@ -57,10 +57,10 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 236 includes private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
+    /// Floor 241 includes owned native cancellation and original-proof preparation/recovery alongside private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
     /// root edits, durable cancellations, channel operations, account payments and guest checkout.
     /// </summary>
-    private const int KnownMutatingActionCount = 236;
+    private const int KnownMutatingActionCount = 241;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -70,6 +70,13 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// </summary>
     private static readonly string[] AnonymousWrites =
     [
+        // The retained native checkout capability and original session bind the exact guest
+        // order; failed authentication never downgrades. Preparation/recovery are read-only.
+        // Submit additionally freezes an owner/payload/version-bound decision under order/account
+        // locks and refuses payment/loyalty/adjustment activity; it never refunds or moves money.
+        "CustomerMobileOrderCancellationsController.PrepareOriginal [POST]",
+        "CustomerMobileOrderCancellationsController.SubmitOriginal [POST]",
+        "CustomerMobileOrderCancellationsController.RecoverOriginal [POST]",
         // Stripe signature, connected-account/mode checks and bounded ingress authorize this
         // wakeup only; canonical provider reads remain the sole monetary authority.
         "AccountCheckoutWebhookController.Receive [POST]",

@@ -26,6 +26,6 @@ public static class CustomerCheckoutServiceExtensions
         services.AddScoped<ICustomerOrderCheckoutLeaseStore, CustomerOrderCheckoutLeaseStore>();
         services.AddScoped<ICustomerOrderCheckoutRecovery, CustomerOrderCheckoutRecovery>();
         services.AddScoped<ICustomerOrderCheckoutJournalStore, CustomerOrderCheckoutJournalStore>();
-        return services;
+        return services.AddCustomerOrderCancellationServices();
     }
 }
