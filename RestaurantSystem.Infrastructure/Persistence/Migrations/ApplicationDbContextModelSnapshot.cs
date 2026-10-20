@@ -2637,6 +2637,63 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("CustomerFormFieldConfigurations", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerOrderCancellationOperation", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<int>("ExpectedVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_version");
+
+                    b.Property<int>("ObservedVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("observed_version");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("OwnerHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("owner_hash");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("OperationId")
+                        .HasName("pk_customer_order_cancellation_operations");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_customer_order_cancellation_operations_order_id");
+
+                    b.ToTable("customer_order_cancellation_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_order_cancellation_operation_shape", "operation_id <> '00000000-0000-0000-0000-000000000000'::uuid AND order_id <> '00000000-0000-0000-0000-000000000000'::uuid AND owner_hash ~ '^[0-9a-f]{64}$' AND payload_hash ~ '^[0-9a-f]{64}$' AND expected_version > 0 AND observed_version > 0 AND ((outcome = 'Cancelled' AND reason IS NULL AND observed_version > expected_version) OR (outcome = 'Refused' AND reason IS NOT NULL AND reason IN ('OrderChanged', 'NotAwaitingCustomerApproval', 'RestaurantManaged', 'FinancialReview', 'OrderingUnavailable')))");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerOrderCheckoutJournal", b =>
                 {
                     b.Property<Guid>("OrderId")

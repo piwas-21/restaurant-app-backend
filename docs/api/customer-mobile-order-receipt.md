@@ -22,3 +22,7 @@ The POST shares the configured basket/native-checkout IP budget and requires no 
 Accepted source, deployment/migration application, connected native receipt UI and installed-device
 acceptance remain separate evidence. Customer account history and hosted payment recovery are
 separate contracts; this endpoint is limited to the original accepted native operation.
+
+Preparation-delay rejection has a separate strict [cancellation contract](customer-mobile-order-cancellation.md).
+The checkout operation cancellation tombstone does not cancel an accepted order. Receipt status alone
+does not authorize an action or resolve an ambiguous cancellation.

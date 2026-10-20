@@ -60,6 +60,7 @@ public class DatabaseFixture : IAsyncLifetime
             TablesToIgnore = new Table[]
             {
                 "__EFMigrationsHistory",
+                "customer_order_cancellation_operations",
                 "table_occupancy_recovery_operations",
                 "table_occupancy_recovery_dispositions",
                 // Singleton seeded by the AddRestaurantInfo migration —
@@ -151,7 +152,8 @@ public class DatabaseFixture : IAsyncLifetime
         try
         {
             await using var clearJournal = new NpgsqlCommand(
-                "TRUNCATE TABLE table_occupancy_recovery_dispositions, table_occupancy_recovery_operations, "
+                "TRUNCATE TABLE customer_order_cancellation_operations, "
+                + "table_occupancy_recovery_dispositions, table_occupancy_recovery_operations, "
                 + "order_amendment_loyalty_compensation_postings, "
                 + "order_amendment_loyalty_compensation_units, order_amendment_loyalty_reservations, "
                 + "order_amendment_loyalty_owner_holds, order_amendment_loyalty_compensations, "
