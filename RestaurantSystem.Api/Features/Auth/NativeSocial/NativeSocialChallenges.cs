@@ -47,15 +47,15 @@ public sealed class NativeSocialChallenges(ApplicationDbContext context, TimePro
             await NativeSocialLocks.PoolAsync(context, tenantId, cancellationToken);
             if (owner is { } userId)
             {
-                var stampHash = await ReauthenticateAsync(userId, currentPassword ?? string.Empty, cancellationToken);
-                if (stampHash is null)
+                var reauthentication = await ReauthenticateAsync(userId, currentPassword ?? string.Empty, cancellationToken);
+                if (!reauthentication.Authenticated)
                 {
                     // Preserve the failed-attempt counter without creating a challenge/session.
                     await transaction.CommitAsync(cancellationToken);
                     committed = true;
                     throw ReauthenticationRequired();
                 }
-                challenge.SecurityStampHash = stampHash;
+                challenge.SecurityStampHash = reauthentication.StampHash;
             }
             var now = time.GetUtcNow().UtcDateTime;
             if (await context.CustomerSocialChallenges.CountAsync(row => row.TenantId == tenantId && row.ExpiresAt > now, cancellationToken) >= MaximumActiveChallenges)
@@ -74,7 +74,7 @@ public sealed class NativeSocialChallenges(ApplicationDbContext context, TimePro
         }
         return new NativeSocialChallengeDto(1, challenge.Id, proof, challenge.Nonce, challenge.ExpiresAt);
     }
-    private async Task<string?> ReauthenticateAsync(Guid owner, string password, CancellationToken cancellationToken)
+    private async Task<(bool Authenticated, string StampHash)> ReauthenticateAsync(Guid owner, string password, CancellationToken cancellationToken)
     {
         var user = await NativeSocialAccountGuard.AcquireAsync(context, owner, cancellationToken);
         if (string.IsNullOrEmpty(user.SecurityStamp) || user.DeletionScheduledAt is not null
@@ -84,11 +84,11 @@ public sealed class NativeSocialChallenges(ApplicationDbContext context, TimePro
         {
             if (users.SupportsUserLockout && !(await users.AccessFailedAsync(user)).Succeeded)
                 throw ReauthenticationRequired();
-            return null;
+            return (false, string.Empty);
         }
         if (users.SupportsUserLockout && !(await users.ResetAccessFailedCountAsync(user)).Succeeded)
             throw ReauthenticationRequired();
-        return NativeSocialChallengeProof.Hash(user.SecurityStamp);
+        return (true, NativeSocialChallengeProof.Hash(user.SecurityStamp));
     }
     private static ConflictException ReauthenticationRequired() => new("The account changed. Sign in again.");
 }
