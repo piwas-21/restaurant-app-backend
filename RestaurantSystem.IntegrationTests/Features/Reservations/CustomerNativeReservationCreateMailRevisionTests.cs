@@ -16,12 +16,12 @@ public sealed partial class CustomerNativeReservationCreateTests
     [InlineData(true)]
     public async Task Combined_creation_mail_uses_the_final_child_trigger_revision_and_its_actual_email_button_works(bool native)
     {
-        Authenticate(); var observed = false;
+        Authenticate(); var observed = false; Guid? committedRevision = null, mailedRevision = null;
         _onMail = async row =>
         {
             await using var independent = DatabaseFixture.CreateContext();
             var saved = await independent.Reservations.Include(value => value.CombinedTables).SingleAsync();
-            Assert.Single(saved.CombinedTables); Assert.Equal(saved.Revision, row.Revision); observed = true;
+            Assert.Single(saved.CombinedTables); committedRevision = saved.Revision; mailedRevision = row.Revision; observed = true;
         };
         Guid id;
         if (native) id = (await ResolveAsync(Request())).GetProperty("reservationId").GetGuid();
@@ -43,7 +43,7 @@ public sealed partial class CustomerNativeReservationCreateTests
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<ReservationDto>>(JsonOptions);
             Assert.NotNull(body); Assert.True(body.Success, body.Message); Assert.NotNull(body.Data); id = body.Data.Id;
         }
-        Assert.True(observed);
+        Assert.True(observed); Assert.NotNull(committedRevision); Assert.Equal(committedRevision, mailedRevision);
         var admin = Assert.Single(_email.Invocations, value => value.Method.Name == nameof(IEmailService.SendEmailAsync));
         var match = Regex.Match((string)admin.Arguments[2], """quick-approve\?token=([^'"&<>\s]+)"""); Assert.True(match.Success);
         Client.DefaultRequestHeaders.Authorization = null;
