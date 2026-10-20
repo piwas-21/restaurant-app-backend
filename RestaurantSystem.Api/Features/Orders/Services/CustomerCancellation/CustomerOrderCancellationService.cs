@@ -44,12 +44,16 @@ public sealed class CustomerOrderCancellationService(ICustomerOrderCancellationO
         var result = await write;
         if (result.Changed)
         {
+            string? failureType = null;
             try { await notifier.NotifyAsync(result.Resolution.OrderId, cancellationToken); }
             catch (Exception exception)
             {
-                logger.LogWarning("Cancellation notification unavailable for order {OrderId} ({ExceptionType})",
-                    result.Resolution.OrderId, exception.GetType().Name);
+                // Provider/transport exception messages and stacks may contain private data.
+                failureType = exception.GetType().Name;
             }
+            if (failureType is not null)
+                logger.LogWarning("Cancellation notification unavailable for order {OrderId} ({ExceptionType})",
+                    result.Resolution.OrderId, failureType);
         }
         return result.Resolution;
     }

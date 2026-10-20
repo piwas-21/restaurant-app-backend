@@ -30,11 +30,7 @@ public sealed class CustomerOrderCancellationRules(ApplicationDbContext context,
         if (configuration is null || !configuration.IsEnabled)
             return CustomerOrderCancellationReason.OrderingUnavailable;
         var flow = configuration.ConfirmationFlow;
-        var local = order.ServiceSessionId is null && (order.Type != OrderType.DineIn || order.TableNumber is null)
-            && !await context.Set<ExternalOrderReference>().AnyAsync(value => value.OrderId == order.Id, cancellationToken)
-            && !await context.OrderStatusHistories.AnyAsync(value => value.OrderId == order.Id
-                && ((value.ToStatus != OrderStatus.Pending && value.ToStatus != OrderStatus.PendingApproval)
-                    || (value.FromStatus != OrderStatus.Pending && value.FromStatus != OrderStatus.PendingApproval)), cancellationToken);
+        var local = await IsLocalStandaloneAsync(order, cancellationToken);
         var canReviewFinancials = CustomerOrderCancellationPolicy.CanDeclineDelay(order.Status, flow, local, true);
         var financial = canReviewFinancials && await FinancialClearAsync(order, cancellationToken);
         if (CustomerOrderCancellationPolicy.CanDeclineDelay(order.Status, flow, local, financial)) return null;
@@ -42,6 +38,13 @@ public sealed class CustomerOrderCancellationRules(ApplicationDbContext context,
         return canReviewFinancials ? CustomerOrderCancellationReason.FinancialReview
             : CustomerOrderCancellationReason.NotAwaitingCustomerApproval;
     }
+
+    private async Task<bool> IsLocalStandaloneAsync(Order order, CancellationToken cancellationToken) =>
+        order.ServiceSessionId is null && (order.Type != OrderType.DineIn || order.TableNumber is null)
+            && !await context.Set<ExternalOrderReference>().AnyAsync(value => value.OrderId == order.Id, cancellationToken)
+            && !await context.OrderStatusHistories.AnyAsync(value => value.OrderId == order.Id
+                && ((value.ToStatus != OrderStatus.Pending && value.ToStatus != OrderStatus.PendingApproval)
+                    || (value.FromStatus != OrderStatus.Pending && value.FromStatus != OrderStatus.PendingApproval)), cancellationToken);
 
     private async Task<bool> FinancialClearAsync(Order order, CancellationToken cancellationToken)
     {
