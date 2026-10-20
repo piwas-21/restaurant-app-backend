@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.Auth.NativeSocial;
+using RestaurantSystem.Api.Features.Tenant.Services;
 using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Common.Extensions;
@@ -17,6 +18,7 @@ public static class CustomerNativeSocialExtensions
         services.AddScoped<INativeSocialChallenges, NativeSocialChallenges>();
         services.AddScoped<INativeSocialAccounts, NativeSocialAccounts>();
         services.AddScoped<INativeSocialCompletion, NativeSocialCompletion>();
+        services.AddScoped<ICustomerNativeAuthenticationCapabilities, CustomerNativeAuthenticationCapabilities>();
         return services;
     }
 }

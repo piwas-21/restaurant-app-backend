@@ -1,9 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Auth.Dtos;
-using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -11,17 +9,18 @@ namespace RestaurantSystem.Api.Features.Auth.NativeSocial;
 
 /// <summary>Consume a verified nonce once, then execute only that live original under fresh guards.</summary>
 public sealed class NativeSocialCompletion(ApplicationDbContext context, TimeProvider time,
-    IOptions<CustomerMobileSettings> mobile, INativeSocialAccess access, INativeGoogleIdentityVerifier verifier,
+    INativeSocialAccess access, INativeGoogleIdentityVerifier verifier,
     INativeSocialAccounts accounts, ITokenService tokens, IRefreshSessionService sessions) : INativeSocialCompletion
 {
+    private const string Provider = "google";
     public async Task<AuthResponse?> CompleteAsync(Guid challengeId, string proof, string token,
         Guid? owner, NativeSocialProfile profile, CancellationToken cancellationToken)
     {
-        await access.RequireEnabledAsync("google", cancellationToken);
+        var tenantId = await access.RequireEnabledAsync(Provider, cancellationToken);
         RequireCleanContext();
         var original = await context.CustomerSocialChallenges.AsNoTracking().SingleOrDefaultAsync(row =>
-            row.Id == challengeId && row.TenantId == mobile.Value.TenantId, cancellationToken);
-        original = RequireOriginal(original, proof, owner, false);
+            row.Id == challengeId && row.TenantId == tenantId, cancellationToken);
+        original = RequireOriginal(original, tenantId, proof, owner, false);
         // No transaction/lock spans provider key fetching or token signature validation.
         var identity = await verifier.VerifyAsync(token, original.Nonce, cancellationToken);
         var frame = NativeSocialChallengeFrame.From(original);
@@ -38,9 +37,9 @@ public sealed class NativeSocialCompletion(ApplicationDbContext context, TimePro
         try
         {
             await NativeSocialLocks.IdentityAsync(context, frame.TenantId, identity, cancellationToken);
-            var row = RequireOriginal(await LockedAsync(frame.Id, cancellationToken), proof, owner, false);
+            var row = RequireOriginal(await LockedAsync(frame.Id, cancellationToken), frame.TenantId, proof, owner, false);
             if (NativeSocialChallengeFrame.From(row) != frame) throw Invalid();
-            await access.RequireEnabledAsync("google", cancellationToken);
+            await RequireTenantAsync(frame.TenantId, cancellationToken);
             var now = time.GetUtcNow().UtcDateTime;
             await context.CustomerSocialChallenges.Where(value => value.Id == frame.Id)
                 .ExecuteUpdateAsync(update => update.SetProperty(value => value.ConsumedAt, now), cancellationToken);
@@ -67,9 +66,9 @@ public sealed class NativeSocialCompletion(ApplicationDbContext context, TimePro
             // Erasure locks User before cascading into owned challenges. Preserve that order.
             if (owner is { } userId)
                 await NativeSocialAccountGuard.AcquireAsync(context, userId, cancellationToken);
-            var row = RequireOriginal(await LockedAsync(frame.Id, cancellationToken), proof, owner, true);
+            var row = RequireOriginal(await LockedAsync(frame.Id, cancellationToken), frame.TenantId, proof, owner, true);
             if (NativeSocialChallengeFrame.From(row) != frame || row.ConsumedAt != consumedAt) throw Invalid();
-            await access.RequireEnabledAsync("google", cancellationToken);
+            await RequireTenantAsync(frame.TenantId, cancellationToken);
             var user = await accounts.ResolveAsync(identity, profile, row, cancellationToken);
             RequireLive(frame);
             AuthResponse? response = null;
@@ -103,14 +102,18 @@ public sealed class NativeSocialCompletion(ApplicationDbContext context, TimePro
     private Task<CustomerSocialChallenge?> LockedAsync(Guid id, CancellationToken cancellationToken) =>
         context.CustomerSocialChallenges.FromSqlInterpolated($"SELECT * FROM customer_social_challenges WHERE id = {id} FOR UPDATE")
             .AsNoTracking().SingleOrDefaultAsync(cancellationToken);
-    private CustomerSocialChallenge RequireOriginal(CustomerSocialChallenge? row, string proof, Guid? owner, bool consumed)
+    private CustomerSocialChallenge RequireOriginal(CustomerSocialChallenge? row, Guid tenantId, string proof, Guid? owner, bool consumed)
     {
-        if (row is null || row.TenantId != mobile.Value.TenantId || row.Provider != "google"
+        if (row is null || row.TenantId != tenantId || row.Provider != Provider
             || row.UserId != owner || row.Flow != (owner is null ? "login" : "link")
             || (row.ConsumedAt is not null) != consumed || !NativeSocialChallengeProof.Matches(proof, row.ProofHash))
             throw Invalid();
         RequireLive(NativeSocialChallengeFrame.From(row));
         return row;
+    }
+    private async Task RequireTenantAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (await access.RequireEnabledAsync(Provider, cancellationToken) != tenantId) throw Invalid();
     }
     private void RequireLive(NativeSocialChallengeFrame frame)
     {

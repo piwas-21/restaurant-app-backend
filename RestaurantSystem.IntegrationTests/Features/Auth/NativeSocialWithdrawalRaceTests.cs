@@ -2,7 +2,9 @@ using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
@@ -25,6 +27,8 @@ public sealed class NativeSocialWithdrawalRaceTests(DatabaseFixture fixture) : N
     [InlineData("link", "stamp")]
     [InlineData("login", "deletion")]
     [InlineData("login", "role")]
+    [InlineData("link", "tenant")]
+    [InlineData("login", "tenant")]
     public async Task CommittedNonceCannotAuthorizeAfterAccountWithdrawalBeforeExecution(string flow, string withdrawal)
     {
         Guid owner;
@@ -44,6 +48,12 @@ public sealed class NativeSocialWithdrawalRaceTests(DatabaseFixture fixture) : N
             var row = await observer.CustomerSocialChallenges.SingleAsync(value => value.Id == challenge.ChallengeId);
             Assert.NotNull(row.ConsumedAt);
             observedCommittedConsumption = true;
+            if (withdrawal == "tenant")
+            {
+                using var scope = Factory.Services.CreateScope();
+                scope.ServiceProvider.GetRequiredService<IOptions<CustomerMobileSettings>>().Value.TenantId = Guid.NewGuid();
+                return;
+            }
             await ChangeUserAsync(owner, user =>
             {
                 if (withdrawal == "role") user.Role = UserRole.Admin;

@@ -10,7 +10,7 @@ namespace RestaurantSystem.Api.Features.Auth.NativeSocial;
 
 /// <summary>Creates expiring challenges; completion must lock and consume the stored original once.</summary>
 public sealed class NativeSocialChallenges(ApplicationDbContext context, TimeProvider time,
-    IOptions<CustomerNativeSocialSettings> settings, IOptions<CustomerMobileSettings> mobile,
+    IOptions<CustomerNativeSocialSettings> settings,
     INativeSocialAccess access, UserManager<ApplicationUser> users) : INativeSocialChallenges
 {
     private const int CleanupBatchSize = 100;
@@ -18,7 +18,7 @@ public sealed class NativeSocialChallenges(ApplicationDbContext context, TimePro
 
     public async Task<NativeSocialChallengeDto> CreateAsync(string provider, Guid? owner, string? currentPassword, CancellationToken cancellationToken)
     {
-        await access.RequireEnabledAsync(provider, cancellationToken);
+        var tenantId = await access.RequireEnabledAsync(provider, cancellationToken);
         if (owner is null && currentPassword is not null || owner is not null
             && (string.IsNullOrEmpty(currentPassword) || currentPassword.Length > 1000))
             throw new BadRequestException("Account reauthentication is required.");
@@ -28,7 +28,7 @@ public sealed class NativeSocialChallenges(ApplicationDbContext context, TimePro
         var challenge = new CustomerSocialChallenge
         {
             Id = Guid.NewGuid(),
-            TenantId = mobile.Value.TenantId,
+            TenantId = tenantId,
             Provider = provider,
             Flow = owner is null ? "login" : "link",
             UserId = owner,
@@ -38,26 +38,27 @@ public sealed class NativeSocialChallenges(ApplicationDbContext context, TimePro
         // This statement commits before any owner lock. Never retain cleanup row locks while
         // waiting for User: an anonymous returning completion can already hold its challenge.
         var cutoff = time.GetUtcNow().UtcDateTime;
-        await context.CustomerSocialChallenges.Where(row => row.TenantId == mobile.Value.TenantId && row.ExpiresAt <= cutoff)
+        await context.CustomerSocialChallenges.Where(row => row.TenantId == tenantId && row.ExpiresAt <= cutoff)
             .OrderBy(row => row.ExpiresAt).Take(CleanupBatchSize).ExecuteDeleteAsync(cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var committed = false;
         try
         {
-            await NativeSocialLocks.PoolAsync(context, mobile.Value.TenantId, cancellationToken);
+            await NativeSocialLocks.PoolAsync(context, tenantId, cancellationToken);
             if (owner is { } userId)
             {
-                challenge.SecurityStampHash = await ReauthenticateAsync(userId, currentPassword ?? string.Empty, cancellationToken);
-                if (challenge.SecurityStampHash is null)
+                var stampHash = await ReauthenticateAsync(userId, currentPassword ?? string.Empty, cancellationToken);
+                if (stampHash is null)
                 {
                     // Preserve the failed-attempt counter without creating a challenge/session.
                     await transaction.CommitAsync(cancellationToken);
                     committed = true;
                     throw ReauthenticationRequired();
                 }
+                challenge.SecurityStampHash = stampHash;
             }
             var now = time.GetUtcNow().UtcDateTime;
-            if (await context.CustomerSocialChallenges.CountAsync(row => row.TenantId == mobile.Value.TenantId && row.ExpiresAt > now, cancellationToken) >= MaximumActiveChallenges)
+            if (await context.CustomerSocialChallenges.CountAsync(row => row.TenantId == tenantId && row.ExpiresAt > now, cancellationToken) >= MaximumActiveChallenges)
                 throw new ConflictException("Native sign-in is temporarily unavailable.");
             // Cleanup can itself wait on an expired row. Start the full lifetime only afterward.
             challenge.CreatedAt = time.GetUtcNow().UtcDateTime;

@@ -2,5 +2,5 @@ namespace RestaurantSystem.Api.Features.Auth.NativeSocial;
 
 public interface INativeSocialAccess
 {
-    Task RequireEnabledAsync(string provider, CancellationToken cancellationToken);
+    Task<Guid> RequireEnabledAsync(string provider, CancellationToken cancellationToken);
 }
