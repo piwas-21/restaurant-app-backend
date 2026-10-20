@@ -141,15 +141,20 @@ public class SendEmailVerificationCommandHandler : ICommandHandler<SendEmailVeri
         {
             mailFailure = ex;
         }
-        if (mailFailure is not null)
-        {
-            if (command.NativeClient)
-                _logger.LogWarning("Native verification mail failed with {ExceptionType}", mailFailure.GetType().Name);
-            else
-                _logger.LogError(mailFailure, "Failed to send email verification for user {UserId}", user.Id);
-        }
+        LogMailFailure(mailFailure, command.NativeClient, user.Id);
 
         return Acknowledged();
+    }
+
+    private void LogMailFailure(Exception? failure, bool nativeClient, Guid userId)
+    {
+        if (failure is null)
+            return;
+
+        if (nativeClient)
+            _logger.LogWarning("Native verification mail failed with {ExceptionType}", failure.GetType().Name);
+        else
+            _logger.LogError(failure, "Failed to send email verification for user {UserId}", userId);
     }
 
     private bool IsWithinCooldown(ApplicationUser user)
