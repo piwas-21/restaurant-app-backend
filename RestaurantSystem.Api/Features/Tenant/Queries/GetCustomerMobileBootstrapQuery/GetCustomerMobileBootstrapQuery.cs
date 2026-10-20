@@ -21,6 +21,7 @@ public sealed class GetCustomerMobileBootstrapQueryHandler(
     ApplicationDbContext context,
     IOptions<CustomerMobileSettings> mobile,
     IOptions<CustomerNativeAccountSettings> nativeAccounts,
+    IOptions<CustomerNativeSocialSettings> nativeSocial,
     IOptions<LocalizationSettings> localization,
     ITenantModules modules,
     ITenantFeatures features,
@@ -44,6 +45,8 @@ public sealed class GetCustomerMobileBootstrapQueryHandler(
             supported ? "supported" : "unavailable", modules.EnabledModules, modules.IsEnforced,
             new Dictionary<string, bool>
             {
+                ["nativeGoogleAuthV1"] = nativeSocial.Value.GoogleEnabled && nativeSocial.Value.IsValid()
+                    && capabilities.GetValueOrDefault("accounts") == "enabled",
                 ["nativeAccountLinksV1"] = nativeAccounts.Value.Enabled && nativeAccounts.Value.IsValid()
                     && capabilities.GetValueOrDefault("accounts") == "enabled",
                 ["tableGuestVisitsV1"] = features.TableGuestVisitsV1,

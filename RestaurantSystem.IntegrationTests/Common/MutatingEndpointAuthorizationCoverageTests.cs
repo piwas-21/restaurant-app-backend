@@ -57,10 +57,10 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 246 includes five strict native account-email actions alongside owned native cancellation and original-proof preparation/recovery alongside private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
+    /// Floor 250 includes four native Google challenge/completion actions and five strict native account-email actions alongside owned native cancellation and original-proof preparation/recovery alongside private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
     /// root edits, durable cancellations, channel operations, account payments and guest checkout.
     /// </summary>
-    private const int KnownMutatingActionCount = 246;
+    private const int KnownMutatingActionCount = 250;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -70,6 +70,11 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// </summary>
     private static readonly string[] AnonymousWrites =
     [
+        // Native Google login requires explicit tenant opt-in, a short-lived tenant/flow-bound
+        // challenge, nonce-validated provider signature and one-use proof. Email never auto-links.
+        // Linking uses separate authenticated Customer actions with current password reauth.
+        "CustomerMobileSocialAuthController.Challenge [POST]",
+        "CustomerMobileSocialAuthController.Complete [POST]",
         // Explicit native opt-in, shared legacy IP/cooldown budgets and protected tenant/purpose-
         // bound email grants. Requests reveal no account state; completion never signs in.
         "CustomerMobileAuthController.Register [POST]",
