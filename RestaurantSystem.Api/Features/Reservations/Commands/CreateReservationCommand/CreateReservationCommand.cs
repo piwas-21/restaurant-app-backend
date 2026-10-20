@@ -56,12 +56,11 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
                 },
                 cancellationToken);
 
-            // Resolved before the conflict check, not between it and the insert: that check is an
-            // unlocked read, so every await added after it widens the window in which two guests
-            // can both be told they have the same table. Frozen on the row because the quick-action
-            // links a reservation mail carries run with no request language at all — this column is
-            // the only thing that can tell the approve/reject mail what to write in.
+            // Frozen on the booking before entering the schedule write transaction. Email links
+            // have no request language, so approval/rejection mail uses this captured language.
             var language = await _languages.ForUserAsync(command.CustomerId, cancellationToken);
+
+            await using var transaction = await ReservationWriteLock.BeginAsync(_context, cancellationToken);
 
             // "Today" is the restaurant's day, not UTC's. Read against UtcNow this refused a
             // booking for TONIGHT for any tenant west of UTC after 19:00 local — a zone
@@ -137,6 +136,7 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
 
             _context.Reservations.Add(reservation);
             await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
             await _mailer.SendAsync(reservation, table.TableNumber, cancellationToken);
 

@@ -1,4 +1,7 @@
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Features.Reservations.Services;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
@@ -9,22 +12,29 @@ using RestaurantSystem.Api.Common.Templates;
 
 namespace RestaurantSystem.Api.Features.Reservations.Commands.ConfirmReservationCommand;
 
-public record ConfirmReservationCommand(Guid ReservationId) : ICommand<ApiResponse<bool>>;
+public record ConfirmReservationCommand(Guid ReservationId) : ICommand<ApiResponse<bool>>
+{
+    [BindNever, JsonIgnore]
+    internal ReservationQuickActionAuthority? QuickAction { get; init; }
+}
 
 public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservationCommand, ApiResponse<bool>>
 {
     private readonly ApplicationDbContext _context;
+    private readonly IReservationQuickActionLinks _quickActions;
     private readonly IEmailService _emailService;
     private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<ConfirmReservationCommandHandler> _logger;
 
     public ConfirmReservationCommandHandler(
         ApplicationDbContext context,
+        IReservationQuickActionLinks quickActions,
         IEmailService emailService,
         IEmailLanguageResolver languages,
         ILogger<ConfirmReservationCommandHandler> logger)
     {
         _context = context;
+        _quickActions = quickActions;
         _emailService = emailService;
         _languages = languages;
         _logger = logger;
@@ -34,9 +44,15 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
     {
         try
         {
+            await using var transaction = await ReservationWriteLock.BeginAsync(_context, cancellationToken);
             var reservation = await _context.Reservations
                 .Include(r => r.Table)
+                .Include(r => r.CombinedTables)
                 .FirstOrDefaultAsync(r => r.Id == command.ReservationId, cancellationToken);
+
+            if (command.QuickAction is { } authority
+                && !authority.Allows(reservation, ReservationQuickAction.Approve, _quickActions))
+                return ReservationQuickActionAuthority.Refused();
 
             if (reservation == null)
             {
@@ -58,8 +74,16 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                 return ApiResponse<bool>.Failure("Cannot confirm a completed reservation");
             }
 
+            var occupiedTableIds = reservation.CombinedTables.Select(row => row.TableId)
+                .Append(reservation.TableId).Distinct().ToArray();
+            if (await _context.Reservations.AnyAsync(ReservationSlotOccupancy.ConflictsWithAnyOf(
+                    occupiedTableIds, reservation.ReservationDate, reservation.StartTime,
+                    reservation.EndTime, reservation.Id), cancellationToken))
+                return ApiResponse<bool>.Failure("One or more of the selected tables is not available for the selected time slot");
+
             reservation.Status = ReservationStatus.Confirmed;
             await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
             // Send confirmation email to customer
             try

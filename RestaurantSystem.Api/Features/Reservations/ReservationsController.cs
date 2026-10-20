@@ -124,9 +124,8 @@ public class ReservationsController : ControllerBase
     [Authorize]
     public async Task<ActionResult<ApiResponse<bool>>> CancelReservation(Guid id)
     {
-        // Ownership is enforced inside the handler (EnforceOwnership defaults to true), so the
-        // caller cannot be spoofed from the route and the anonymous email link stays the only
-        // opt-out. It used to be enforced NOWHERE: any signed-in customer could cancel any booking.
+        // The handler enforces caller ownership. Only the email controller can supply an
+        // internal original proof instead, which is revalidated against the locked booking.
         var result = await _mediator.SendCommand(new CancelReservationCommand(id));
         return result.Success ? Ok(result) : BadRequest(result);
     }
