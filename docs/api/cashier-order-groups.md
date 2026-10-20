@@ -39,3 +39,18 @@ archived days are excluded. Operational preparation and payment identities remai
 
 `orders.amendment_root_order_id` records the original standalone order for every supplement.
 The migration backfills committed historical chains without rewriting orders or payments.
+
+`GET /api/orders/{orderId}/current-ticket` reads the complete selected visit or standalone
+amendment chain for the current ticket. It requires staff authorization and either the
+cashier or server module. Its `ApiResponse<IReadOnlyList<OrderDto>>` uses a repeatable-read
+snapshot, retains current server totals, payments, versions and permitted actions, and
+applies committed removals, replacements and preparation-instruction edits to each member's
+item view. Replacement/addition items belong to their supplement and appear once. Original
+order items and financial records remain intact. This operational read includes staff
+preparation text; the separate audit-history response continues to redact free text.
+
+The cashier's main ticket and browser bill display the combined active members from this
+snapshot. Amendment history is a compact change log with detailed snapshots and recorded
+financial effects available on expansion. Staff mutations continue to target individual
+order IDs/versions, and table payment collection continues to use the authoritative visit
+account endpoint.
