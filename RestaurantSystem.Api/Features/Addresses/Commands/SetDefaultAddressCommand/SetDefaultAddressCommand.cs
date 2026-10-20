@@ -1,12 +1,16 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Addresses.Services;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Addresses.Commands.SetDefaultAddressCommand;
 
-public record SetDefaultAddressCommand(Guid AddressId) : ICommand<ApiResponse<string>>;
+public record SetDefaultAddressCommand(Guid AddressId) : ICommand<ApiResponse<string>>
+{
+    internal bool RequireCustomer { get; init; }
+}
 
 public class SetDefaultAddressCommandHandler : ICommandHandler<SetDefaultAddressCommand, ApiResponse<string>>
 {
@@ -32,7 +36,7 @@ public class SetDefaultAddressCommandHandler : ICommandHandler<SetDefaultAddress
             return ApiResponse<string>.Failure("User not authenticated");
         }
 
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken, command.RequireCustomer);
 
         try
         {

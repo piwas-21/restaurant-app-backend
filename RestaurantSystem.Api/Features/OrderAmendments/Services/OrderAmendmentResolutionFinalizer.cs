@@ -260,9 +260,9 @@ public sealed partial class OrderAmendmentResolutionFinalizer(
             .Select(value => value.AmountMinor).ToArray();
         var existingTotal = existing.Sum();
         var total = checked(existingTotal + operation.CreditMinor);
-        var frozen = FrozenOrderChargeMath.Read(source, money);
+        var food = AccountDebtMath.Total(RestaurantSystem.Api.Features.BillCharges.Services.BillDiscountMath.Food(source, money));
         if (operation.CreditMinor <= 0 || money.ToMinor(source.BillingCreditAmount) != existingTotal
-            || total > frozen.FoodMinor
+            || total > food
             || context.OrderBillingCredits.Local.Any(value => value.AmendmentId == amendment.Id))
             throw new ConflictException("The amendment credit exceeds the retained frozen food charge.");
 

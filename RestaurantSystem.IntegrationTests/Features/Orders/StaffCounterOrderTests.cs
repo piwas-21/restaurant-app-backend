@@ -15,7 +15,7 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
 
 [Collection("Database Lane 3")]
-public sealed class StaffCounterOrderTests : IntegrationTestBase
+public sealed partial class StaffCounterOrderTests : IntegrationTestBase
 {
     private Guid _productId;
     private Guid _customerId;

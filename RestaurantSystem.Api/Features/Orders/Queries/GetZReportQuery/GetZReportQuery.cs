@@ -91,7 +91,9 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
         var totalDeliveryFees = salesOrders.Sum(o => o.DeliveryFee);
 
         // --- Discounts ---
-        var totalDiscounts = salesOrders.Sum(o => o.Discount + o.CustomerDiscountAmount + o.FidelityPointsDiscount);
+        var staffDiscounts = salesOrders.Sum(order => -RestaurantSystem.Api.Features.BillCharges.Services.OrderBillChargeReader.Read(order)
+            .Where(value => value.Amount < 0).Sum(value => value.Amount));
+        var totalDiscounts = salesOrders.Sum(o => o.Discount + o.CustomerDiscountAmount + o.FidelityPointsDiscount) + staffDiscounts;
         var promoCodeDiscounts = salesOrders
             .Where(o => !string.IsNullOrEmpty(o.PromoCode))
             .Sum(o => o.Discount);
@@ -157,6 +159,7 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
             Discounts = new ZReportDiscountsDto
             {
                 TotalDiscounts = totalDiscounts,
+                StaffDiscounts = staffDiscounts,
                 PromoCodeDiscounts = promoCodeDiscounts,
                 CustomerDiscounts = customerDiscounts,
                 FidelityPointsDiscounts = fidelityPointsDiscounts

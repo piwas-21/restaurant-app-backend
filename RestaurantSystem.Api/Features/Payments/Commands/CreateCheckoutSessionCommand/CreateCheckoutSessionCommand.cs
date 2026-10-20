@@ -82,7 +82,6 @@ public class CreateCheckoutSessionCommandHandler
         CreateCheckoutSessionCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-
         // The controller's module gate says the tenant BOUGHT online payments; this says it can
         // actually transact. Neither implies the other — a bought module with no connected account
         // is exactly the state between signup and Stripe onboarding.
@@ -94,6 +93,7 @@ public class CreateCheckoutSessionCommandHandler
         var order = await _context.Orders
             .FirstOrDefaultAsync(o => o.Id == command.OrderId && !o.IsDeleted, cancellationToken)
             ?? throw new NotFoundException("Order not found");
+        await NativeCheckoutExclusion.RequireWebAsync(_context, order.Id, cancellationToken);
         OnlinePaymentEligibility.EnsurePayable(order);
         await _intentGuard.EnsureProcessingAsync(order.Id, cancellationToken);
         var existing = await _context.OrderCheckoutSessions

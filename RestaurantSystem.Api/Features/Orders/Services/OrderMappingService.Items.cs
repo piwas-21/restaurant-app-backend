@@ -19,7 +19,7 @@ public partial class OrderMappingService
             Status = order.Status.ToString(),
             PaymentStatus = order.PaymentStatus.ToString(),
             Total = order.Total,
-            PayableTotal = (order.BillingCreditAmount > 0 || order.BillChargeAmount > 0) ? order.PayableTotal : null,
+            PayableTotal = (order.BillingCreditAmount > 0 || order.BillChargeAmount != 0) ? order.PayableTotal : null,
             BillingCreditAmount = order.BillingCreditAmount,
             BillChargeAmount = order.BillChargeAmount,
             OrderDate = order.OrderDate,

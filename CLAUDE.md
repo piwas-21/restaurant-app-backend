@@ -43,7 +43,7 @@ RestaurantSystem.Api/        ← API layer (Controllers, CQRS handlers, Features
   └── RestaurantSystem.Domain/   ← pure domain (Entities, enums) — no EF, no ASP.NET
   └── RestaurantSystem.Infrastructure/  ← EF Core, persistence, migrations
        └── (depends on Domain)
-Sofra.MobileService/          ← independent shared native-app directory host (no tenant database/services)
+Sofra.MobileService/          ← independent shared native-app navigation host (no tenant database/services)
 RestaurantSystem.IntegrationTests/  ← integration tests (xUnit)
 ```
 
@@ -51,7 +51,7 @@ RestaurantSystem.IntegrationTests/  ← integration tests (xUnit)
 - Domain layer is **pure C#** — no `Microsoft.EntityFrameworkCore`, no `Microsoft.AspNetCore.*` references.
 - `Sofra.MobileService` is a separate deployable host from the customer mobile plan. Minimal HTTP
   routes dispatch to a directory query handler; reviewed public settings supply all tenant origins.
-  Its current directory-only slice has no customer database, private registry or tenant-service dependency.
+  Its directory, public payment-return landing and optional OS-association documents have no customer database, private registry or tenant-service dependency.
   Read `Sofra.MobileService/README.md` for configuration and its remaining integration gates.
 
 

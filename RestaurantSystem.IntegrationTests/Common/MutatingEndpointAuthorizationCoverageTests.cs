@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Filters;
 using RestaurantSystem.Api.Common.Modules;
+using Xunit.Abstractions;
 
 namespace RestaurantSystem.IntegrationTests.Common;
 
@@ -43,22 +44,23 @@ namespace RestaurantSystem.IntegrationTests.Common;
 /// construction.
 /// </para>
 /// </summary>
-public class MutatingEndpointAuthorizationCoverageTests
+public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output)
 {
     private static readonly Assembly Api = typeof(RequireAdminAttribute).Assembly;
 
     private static readonly string[] MutatingVerbs = ["POST", "PUT", "PATCH", "DELETE"];
 
     /// <summary>
-    /// The measured size of the write surface, 2026-09-04. A RATCHET, and its stated end is that it
+    /// The measured size of the write surface, 2026-10-19. A RATCHET, and its stated end is that it
     /// only ever goes up: it exists to catch the scan losing its corpus (a namespace move, a
     /// changed discovery predicate, the wrong assembly), which is the one failure that turns
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 207 includes native root edits, durable cancellations and reviewed channel operations; account-payment and guest-checkout writes remain covered.
+    /// Floor 250 includes four native Google challenge/completion actions and five strict native account-email actions alongside owned native cancellation and original-proof preparation/recovery alongside private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
+    /// root edits, durable cancellations, channel operations, account payments and guest checkout.
     /// </summary>
-    private const int KnownMutatingActionCount = 207;
+    private const int KnownMutatingActionCount = 250;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -68,6 +70,25 @@ public class MutatingEndpointAuthorizationCoverageTests
     /// </summary>
     private static readonly string[] AnonymousWrites =
     [
+        // Native Google login requires explicit tenant opt-in, a short-lived tenant/flow-bound
+        // challenge, nonce-validated provider signature and one-use proof. Email never auto-links.
+        // Linking uses separate authenticated Customer actions with current password reauth.
+        "CustomerMobileSocialAuthController.Challenge [POST]",
+        "CustomerMobileSocialAuthController.Complete [POST]",
+        // Explicit native opt-in, shared legacy IP/cooldown budgets and protected tenant/purpose-
+        // bound email grants. Requests reveal no account state; completion never signs in.
+        "CustomerMobileAuthController.Register [POST]",
+        "CustomerMobileAuthController.RequestVerification [POST]",
+        "CustomerMobileAuthController.RequestPasswordReset [POST]",
+        "CustomerMobileAuthController.CompleteVerification [POST]",
+        "CustomerMobileAuthController.CompletePasswordReset [POST]",
+        // The retained native checkout capability and original session bind the exact guest
+        // order; failed authentication never downgrades. Preparation/recovery are read-only.
+        // Submit additionally freezes an owner/payload/version-bound decision under order/account
+        // locks and refuses payment/loyalty/adjustment activity; it never refunds or moves money.
+        "CustomerMobileOrderCancellationsController.PrepareOriginal [POST]",
+        "CustomerMobileOrderCancellationsController.SubmitOriginal [POST]",
+        "CustomerMobileOrderCancellationsController.RecoverOriginal [POST]",
         // Stripe signature, connected-account/mode checks and bounded ingress authorize this
         // wakeup only; canonical provider reads remain the sole monetary authority.
         "AccountCheckoutWebhookController.Receive [POST]",
@@ -115,6 +136,14 @@ public class MutatingEndpointAuthorizationCoverageTests
         "CustomerMobileCheckoutController.Submit [POST]",
         "CustomerMobileCheckoutController.Recover [POST]",
         "CustomerMobileCheckoutController.Cancel [POST]",
+        // Read-only receipt POST keeps the operation capability out of URLs. The original
+        // owner/session/digest must resolve an accepted receipt; failed auth/staff cannot downgrade.
+        // No contact, address or operator/guest tokens are returned; ingress shares the basket budget.
+        "CustomerMobileOrdersController.Receipt [POST]",
+        // Original session/customer/operation/digest proof and fresh database ownership are required.
+        // Only the frozen request can reach the provider; canonical session+intent evidence controls
+        // ledger writes. Failed auth/staff cannot become guests, and response caching is disabled.
+        "CustomerMobilePaymentsController.Recover [POST]",
         // Each payment action validates the original visit's hashed participant capability,
         // typed attempt ownership and frozen scope/version. New writes also require feature,
         // module, gateway and configured contribution limits; recovery preserves original identity.
@@ -269,6 +298,7 @@ public class MutatingEndpointAuthorizationCoverageTests
     public void The_scan_reaches_the_real_controllers()
     {
         var actions = MutatingActions(DiscoveredControllers(Api)).Select(Describe).ToArray();
+        output.WriteLine("Discovered {0} state-changing controller actions.", actions.Length);
 
         actions.Should().HaveCountGreaterThanOrEqualTo(KnownMutatingActionCount,
             "the scan lost part of its corpus — a 'no violations' result would mean nothing was looked at");

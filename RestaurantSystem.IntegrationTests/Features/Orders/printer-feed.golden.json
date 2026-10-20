@@ -4,6 +4,8 @@
     "items": [
       {
         "billChargeAmount": 0.00,
+        "billChargeItemBasis": 24.00,
+        "hasPendingBillingCorrection": false,
         "billCharges": [],
         "id": "__volatile__",
         "orderNumber": "PF238-A-BUNDLE",
@@ -171,6 +173,8 @@
       },
       {
         "billChargeAmount": 0.00,
+        "billChargeItemBasis": 15.00,
+        "hasPendingBillingCorrection": false,
         "billCharges": [],
         "id": "__volatile__",
         "orderNumber": "PF238-B-DELIVERY",

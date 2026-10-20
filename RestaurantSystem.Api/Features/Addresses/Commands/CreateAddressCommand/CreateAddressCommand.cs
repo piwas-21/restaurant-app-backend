@@ -1,28 +1,15 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Addresses.Services;
 using RestaurantSystem.Api.Features.Addresses.Dtos;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Addresses.Commands.CreateAddressCommand;
 
-public record CreateAddressCommand : ICommand<ApiResponse<AddressDto>>
-{
-    public string Label { get; set; } = null!;
-    public string AddressLine1 { get; set; } = null!;
-    public string? AddressLine2 { get; set; }
-    public string City { get; set; } = null!;
-    public string? State { get; set; }
-    public string PostalCode { get; set; } = null!;
-    public string Country { get; set; } = null!;
-    public string? Phone { get; set; }
-    public bool IsDefault { get; set; }
-    public double? Latitude { get; set; }
-    public double? Longitude { get; set; }
-    public string? DeliveryInstructions { get; set; }
-}
+public record CreateAddressCommand : AddressContent, ICommand<ApiResponse<AddressDto>>;
 
 public class CreateAddressCommandHandler : ICommandHandler<CreateAddressCommand, ApiResponse<AddressDto>>
 {
@@ -48,12 +35,13 @@ public class CreateAddressCommandHandler : ICommandHandler<CreateAddressCommand,
             return ApiResponse<AddressDto>.Failure("User not authenticated");
         }
 
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        var isDefault = command.IsDefault ?? false;
+        await using var transaction = await AddressWriteTransaction.BeginAsync(_context, userId.Value, cancellationToken, command.RequireCustomer);
 
         try
         {
             // If this is set as default, unset other default addresses
-            if (command.IsDefault)
+            if (isDefault)
             {
                 await _context.UserAddresses
                     .Where(a => a.UserId == userId.Value && a.IsDefault && !a.IsDeleted)
@@ -71,7 +59,7 @@ public class CreateAddressCommandHandler : ICommandHandler<CreateAddressCommand,
                 PostalCode = command.PostalCode,
                 Country = command.Country,
                 Phone = command.Phone,
-                IsDefault = command.IsDefault,
+                IsDefault = isDefault,
                 Latitude = command.Latitude,
                 Longitude = command.Longitude,
                 DeliveryInstructions = command.DeliveryInstructions,

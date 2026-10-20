@@ -16,7 +16,7 @@ namespace RestaurantSystem.Api.Features.Payments.Services;
 public static class OnlineTenderCompletion
 {
     /// <summary>Written to <c>OrderPayment.PaymentGateway</c>, the column that already names one.</summary>
-    private const string GatewayName = "Stripe";
+    internal const string GatewayName = "Stripe";
 
     /// <summary>
     /// Every currency Sofra can onboard a tenant in is two-decimal, which is what lets this be a

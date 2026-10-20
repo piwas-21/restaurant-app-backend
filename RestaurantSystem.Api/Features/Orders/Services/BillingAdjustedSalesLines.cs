@@ -34,10 +34,9 @@ internal static class BillingAdjustedSalesLines
                 .FirstOrDefault(value => value.Currency is not null)
                 ?? throw new ConflictException("The report's removed units have no currency evidence.");
             var money = new AccountMoney(outcome.Currency);
-            var frozen = FrozenOrderChargeMath.Read(order, money);
-            var food = Keep(order, frozen.FoodLines.SelectMany(line => AccountDebtMath.CreateLine(
-                order.Id, line.Item.Id, line.Item.Quantity, line.AmountMinor, 0)).ToArray(), changes);
-            if (frozen.FoodMinor - AccountDebtMath.Total(food) != money.ToMinor(order.BillingCreditAmount))
+            var netFood = RestaurantSystem.Api.Features.BillCharges.Services.BillDiscountMath.Food(order, money);
+            var food = Keep(order, netFood, changes);
+            if (AccountDebtMath.Total(netFood) - AccountDebtMath.Total(food) != money.ToMinor(order.BillingCreditAmount))
                 throw new ConflictException("The report's removed units and billing credit require reconciliation.");
 
             // Zero-price dishes still count as units; money segments intentionally omit zero amounts.

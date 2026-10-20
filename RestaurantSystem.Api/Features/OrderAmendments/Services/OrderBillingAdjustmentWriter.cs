@@ -59,7 +59,7 @@ public sealed class OrderBillingAdjustmentWriter(
                 || value.IsRefunded || value.RefundedAmount.HasValue))
             throw new ConflictException("A paid, processing, or marketplace order requires credit reconciliation.");
         var credits = money.ToMinor(source.BillingCreditAmount);
-        var foodCharge = FrozenOrderChargeMath.Read(source, money).FoodMinor;
+        var foodCharge = AccountDebtMath.Total(RestaurantSystem.Api.Features.BillCharges.Services.BillDiscountMath.Food(source, money));
         var nextCredit = checked(credits + preview.PotentialCreditMinor);
         if (nextCredit > foodCharge)
             throw new ConflictException("The billing credit exceeds the frozen food charge.");

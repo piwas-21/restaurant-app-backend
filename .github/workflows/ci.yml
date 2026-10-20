@@ -98,50 +98,19 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
 
-  # The DB-backed integration suite, SHARDED across runners.
-  #
-  # Shape: the suite already splits its DB-backed classes into four xUnit collections
-  # ("lanes", see DatabaseCollections.cs), each with its own database, so they run in
-  # parallel. On one 2-core runner that parallelism is capped at two lanes at a time —
-  # measured (run 31990710971): 175s of test execution for a summed 142s of per-test
-  # time, i.e. the runner, not the schedule, was the limit. This job therefore also
-  # splits the work across three runners, each with its own postgres service container
-  # (services are per-job, so cross-shard contamination is impossible by construction).
-  #
-  # The split is BY NAMESPACE. Shard 1 owns its five listed prefixes, shard 3 owns
-  # Orders, and shard 2 includes Basket and catches the remaining namespaces.
-  # Together these filters are a disjoint, exhaustive partition: new tests under a
-  # listed prefix follow that shard, and other namespaces fall into shard 2. The
-  # aggregate job below re-verifies this against `dotnet test --list-tests` and merged
-  # JUnit output.
-  #
-  # Current rebalance evidence: run 37203816598 emitted 1,008 passing Orders cases
-  # (530s summed test-method duration) before shard 2's 20-minute job timeout; shard 1
-  # completed in 17m38s. The method durations omit fixture/setup wall time, so the
-  # three-shard timing projection remains provisional until hosted CI completes.
-  # Earlier diagnostic run 37175238849 measured a different split: shard 1 reached
-  # its 20-minute deadline while shard 2 finished its test run in 10.31 minutes.
-  # Rebalance by moving a namespace prefix among the three filters; the four database
-  # lanes are unaffected. Coverage floors are unchanged.
-  #
-  # Historical capacity measurements for the earlier, much shorter suite rejected four
-  # shards: roughly 34s/36s/40s/33s of test work each produced a 266s critical path and
-  # 111s/134s/164s/195s test steps, versus 234s/270s/256s for two shards. Those figures
-  # describe that earlier workload, not this current three-shard allocation. The reason
-  # was the fixed floor then: ~35s container init, ~16s NuGet restore, ~62s restore+compile,
-  # plus suite bootstrap (template migration, four lane databases, four test hosts).
-  #
-  # Historical whole-job measurements, `dotnet test (integration)` critical path:
-  #   single job  289s, 296s   (test step 238s, 246s)
-  #   two shards  234s, 270s, 256s
-  #   four shards 266s
-  # Runner-to-runner variance on the same code is ±20%, which is why every number above
-  # is a real sample and not an average of one.
+  # The DB-backed integration suite uses four isolated runners, each with its own
+  # PostgreSQL service and the existing four xUnit database lanes.
+  # Shard 1 owns its listed namespaces and Account-prefixed Orders classes;
+  # shard 4 owns Basket, Auth and Customer-prefixed Orders classes; shard 3 owns
+  # other Orders classes; shard 2 catches every remaining namespace.
+  # The HTTP-heavy Basket/Auth/customer-order work has its own runner so the
+  # catch-all shard can finish within the existing whole-job budget.
+  # VSTest discovery and merged JUnit output below verify an exhaustive, disjoint
+  # partition on every run. All tests and merged-coverage floors remain enforced.
   dotnet_test:
-    name: dotnet test (integration) shard ${{ matrix.shard }}/3
+    name: dotnet test (integration) shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
     # Budget includes restore/build, tests, coverage/discovery and artifact uploads.
-    # Leave upload margin after a successful long-running shard, rather than cancelling its evidence.
     timeout-minutes: 30
     strategy:
       # All shards always run: a red shard must not hide the state of another one.
@@ -150,13 +119,16 @@ jobs:
         include:
           - shard: 1
             filter: >-
-              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.
+              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.Account|FullyQualifiedName~RestaurantSystem.IntegrationTests.Infrastructure.
           - shard: 2
             filter: >-
-              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.
+              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Auth.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Infrastructure.
           - shard: 3
             filter: >-
-              FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.
+              FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Account&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Customer
+          - shard: 4
+            filter: >-
+              FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Basket.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Auth.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.Customer
     container:
       image: mcr.microsoft.com/dotnet/sdk:10.0
     services:

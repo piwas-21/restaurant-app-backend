@@ -49,6 +49,8 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
     {
         ArgumentNullException.ThrowIfNull(session);
 
+        await NativeCheckoutExclusion.RequireWebAsync(_context, session.OrderId, cancellationToken);
+
         Order? order = null;
         OrderStatus previousStatus = default;
         bool confirmed = false;

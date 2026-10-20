@@ -20,6 +20,7 @@ public sealed record GetCustomerMobileBootstrapQuery(int ContractVersion)
 public sealed class GetCustomerMobileBootstrapQueryHandler(
     ApplicationDbContext context,
     IOptions<CustomerMobileSettings> mobile,
+    ICustomerNativeAuthenticationCapabilities authentication,
     IOptions<LocalizationSettings> localization,
     ITenantModules modules,
     ITenantFeatures features,
@@ -36,17 +37,21 @@ public sealed class GetCustomerMobileBootstrapQueryHandler(
         var currency = await context.RestaurantInfo.AsNoTracking()
             .Select(info => info.Currency).FirstOrDefaultAsync(cancellationToken);
         var supported = query.ContractVersion == 1;
+        var capabilities = MobileCapabilityPolicy.Resolve(settings, modules, features,
+            !string.IsNullOrWhiteSpace(currency), supported);
+        var native = authentication.Resolve(capabilities.GetValueOrDefault("accounts") == "enabled");
         var dto = new CustomerMobileBootstrapDto(1, settings.TenantId, currency,
             localization.Value.DefaultLanguage, clock.TimeZone.Id, settings.Lifecycle,
             supported ? "supported" : "unavailable", modules.EnabledModules, modules.IsEnforced,
             new Dictionary<string, bool>
             {
+                ["nativeGoogleAuthV1"] = native.GoogleEnabled,
+                ["nativeAccountLinksV1"] = native.AccountLinksEnabled,
                 ["tableGuestVisitsV1"] = features.TableGuestVisitsV1,
                 ["tableGuestAccountPaymentsV1"] = features.TableGuestAccountPaymentsV1,
                 ["tableAccountPaymentsV1"] = features.TableAccountPaymentsV1
             },
-            MobileCapabilityPolicy.Resolve(settings, modules, features,
-                !string.IsNullOrWhiteSpace(currency), supported));
+            capabilities);
         return ApiResponse<CustomerMobileBootstrapDto>.SuccessWithData(dto);
     }
 }

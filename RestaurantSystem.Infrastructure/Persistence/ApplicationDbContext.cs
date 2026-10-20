@@ -141,11 +141,14 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<OrderRoutingState> OrderRoutingStates { get; set; }
         public DbSet<StaffOrderOperation> StaffOrderOperations { get; set; }
         public DbSet<OrderCheckoutSession> OrderCheckoutSessions { get; set; }
+        public DbSet<CustomerOrderCheckoutJournal> CustomerOrderCheckoutJournals { get; set; }
         public DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
 
         //User-related DbSets
         public DbSet<UserAddress> UserAddresses { get; set; }
         public DbSet<RefreshSession> RefreshSessions { get; set; }
+        public DbSet<CustomerSocialIdentity> CustomerSocialIdentities { get; set; }
+        public DbSet<CustomerSocialChallenge> CustomerSocialChallenges { get; set; }
 
         public DbSet<OrderAddress> OrderAddresses { get; set; }
 

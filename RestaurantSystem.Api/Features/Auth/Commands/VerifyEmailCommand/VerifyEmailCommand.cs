@@ -1,11 +1,16 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.VerifyEmailCommand;
 
-public record VerifyEmailCommand(string Email, string Token) : ICommand<ApiResponse<string>>;
+public record VerifyEmailCommand(string Email, string Token) : ICommand<ApiResponse<string>>
+{
+    // Set only by the strict native command; legacy JSON cannot choose a different delivery rail.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool NativeClient { get; init; }
+}
 
 public class VerifyEmailCommandHandler : ICommandHandler<VerifyEmailCommand, ApiResponse<string>>
 {
@@ -26,7 +31,7 @@ public class VerifyEmailCommandHandler : ICommandHandler<VerifyEmailCommand, Api
 
         var user = await _userManager.FindByEmailAsync(command.Email);
 
-        if (user == null || user.IsDeleted)
+        if (user == null || user.IsDeleted || command.NativeClient && user.Role != RestaurantSystem.Domain.Common.Enums.UserRole.Customer)
         {
             _logger.LogWarning("Email verification attempted for non-existent or deleted email: {Email}", command.Email);
             return ApiResponse<string>.Failure("Invalid verification request", "Email verification failed");

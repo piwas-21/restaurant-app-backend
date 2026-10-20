@@ -748,14 +748,13 @@ public sealed class OrderAmendmentIntegrationTests(DatabaseFixture fixture) : In
     }
 
     [Fact]
-    public async Task Preparing_paid_line_quote_allows_server_acknowledgement_and_retains_gateway_refund_custody()
+    public async Task Preparing_paid_line_quote_allows_no_reason_after_acknowledgement_and_retains_gateway_refund_custody()
     {
         var itemId = await PreparePaidOrderAsync();
         var sourceVersion = await ReadSourceVersionAsync();
         var quoteRequest = new OrderAmendmentQuoteRequest
         {
             ExpectedOrderVersion = sourceVersion,
-            Reason = "Guest changed the order after release",
             Changes = [new OrderAmendmentLineChangeRequest
             {
                 OrderItemId = itemId,

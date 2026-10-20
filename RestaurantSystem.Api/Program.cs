@@ -1,4 +1,4 @@
-﻿using RestaurantSystem.Api.Features.Basket.Services.Operations;
+using RestaurantSystem.Api.Features.Basket.Services.Operations;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -451,6 +451,11 @@ builder.Services.AddOptions<CustomerMobileSettings>()
     .Validate(settings => settings.IsValid(), "CustomerMobile settings are invalid.")
     .ValidateOnStart();
 
+builder.Services.AddOptions<CustomerHostedCheckoutSettings>()
+    .Bind(builder.Configuration.GetSection(CustomerHostedCheckoutSettings.SectionName))
+    .Validate(settings => settings.IsValid(), "CustomerHostedCheckout settings are invalid.")
+    .ValidateOnStart();
+
 // Server Workspace V2 is an emergency-safe rollout switch, not an entitlement or an
 // authorization boundary. The deploy template maps TENANT_SERVER_WORKSPACE_V2 onto this
 // section, and the frontend reads the additive anonymous tenant-features endpoint. A
@@ -826,6 +831,8 @@ builder.Services.AddOrderDetailServices();
 builder.Services.AddOrderCreationServices();
 builder.Services.AddStaffOrderServices();
 builder.Services.AddCustomerCheckoutServices();
+builder.Services.AddCustomerNativeAccounts(builder.Configuration);
+builder.Services.AddCustomerNativeSocial(builder.Configuration);
 builder.Services.AddServerWorkspaceServices();
 builder.Services.AddKitchenBoardServices();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
@@ -883,6 +890,7 @@ builder.Services.Configure<DeviceTelemetryRetentionSettings>(builder.Configurati
 builder.Services.Configure<FleetPushSettings>(builder.Configuration.GetSection("FleetPush"));
 builder.Services.AddHostedService<BasketCleanupService>();
 builder.Services.AddHostedService<AccountCleanupService>();
+builder.Services.AddHostedService<NativeSocialChallengeCleanupService>();
 builder.Services.AddHostedService<TableReservationCleanupService>();
 builder.Services.AddHostedService<ReservationRetentionService>();
 builder.Services.AddHostedService<DeviceTelemetryRetentionService>();

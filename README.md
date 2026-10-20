@@ -181,8 +181,9 @@ For a legacy run with duplicate names, preserve both artifact ZIPs, digests and 
 belongs to the failed attempt, remove only that incomplete copy, then rerun the aggregate against the successful
 replacement. Never alter discovery counts, test reports or coverage floors to make a retry pass.
 
-Integration tests are partitioned by namespace: shard 1 owns Common, Products, Payments, Menus and
-DeliveryChannels; shard 2 includes Basket and the remaining namespaces; shard 3 owns Orders. The
+Integration tests are partitioned by namespace: shard 1 owns Common, Products, Payments, Menus,
+DeliveryChannels, ServerWorkspace and Account-prefixed Orders classes; shard 2 catches the remaining namespaces;
+shard 3 owns other Orders classes; shard 4 owns Basket, Auth and Customer-prefixed Orders classes. The
 aggregate checks discovery counts and unique execution across the complete suite.
 
 Each integration shard has a 30-minute whole-job budget covering restore/build, tests, coverage/discovery and artifact uploads. Test selection, assertions and merged-coverage floors remain enforced.

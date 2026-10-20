@@ -2637,6 +2637,172 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("CustomerFormFieldConfigurations", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerOrderCancellationOperation", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<int>("ExpectedVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_version");
+
+                    b.Property<int>("ObservedVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("observed_version");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("OwnerHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("owner_hash");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("OperationId")
+                        .HasName("pk_customer_order_cancellation_operations");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_customer_order_cancellation_operations_order_id");
+
+                    b.ToTable("customer_order_cancellation_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_order_cancellation_operation_shape", "operation_id <> '00000000-0000-0000-0000-000000000000'::uuid AND order_id <> '00000000-0000-0000-0000-000000000000'::uuid AND owner_hash ~ '^[0-9a-f]{64}$' AND payload_hash ~ '^[0-9a-f]{64}$' AND expected_version > 0 AND observed_version > 0 AND ((outcome = 'Cancelled' AND reason IS NULL AND observed_version > expected_version) OR (outcome = 'Refused' AND reason IS NOT NULL AND reason IN ('OrderChanged', 'NotAwaitingCustomerApproval', 'RestaurantManaged', 'FinancialReview', 'OrderingUnavailable')))");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerOrderCheckoutJournal", b =>
+                {
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<long?>("ApplicationFeeMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("application_fee_minor");
+
+                    b.Property<string>("CreateIdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("create_idempotency_key");
+
+                    b.Property<string>("CreatePayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("create_payload_hash");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<DateTime?>("EffectsCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effects_completed_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime?>("LastVerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_verified_at");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTime>("MaximumCreateRetryAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("maximum_create_retry_at");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("order_number");
+
+                    b.Property<string>("ProviderAccountId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("provider_account_id");
+
+                    b.Property<bool>("ProviderLiveMode")
+                        .HasColumnType("boolean")
+                        .HasColumnName("provider_live_mode");
+
+                    b.Property<string>("ProviderSessionId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("provider_session_id");
+
+                    b.Property<string>("ReturnUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("return_url");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("OrderId");
+
+                    b.HasIndex("CreateIdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("ProviderSessionId")
+                        .IsUnique()
+                        .HasFilter("provider_session_id IS NOT NULL");
+
+                    b.ToTable("customer_order_checkout_journals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_order_checkout_journal_shape", "order_id <> '00000000-0000-0000-0000-000000000000'::uuid AND operation_id <> '00000000-0000-0000-0000-000000000000'::uuid AND amount_minor > 0 AND currency ~ '^[a-z]{3}$' AND (application_fee_minor IS NULL OR (application_fee_minor > 0 AND application_fee_minor < amount_minor)) AND expires_at > started_at AND maximum_create_retry_at > started_at AND maximum_create_retry_at <= started_at + INTERVAL '23 hours' AND ((lease_id IS NULL AND lease_expires_at IS NULL) OR (lease_id IS NOT NULL AND lease_expires_at IS NOT NULL))");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerOrderOperation", b =>
                 {
                     b.Property<Guid>("OperationId")
@@ -2674,6 +2840,130 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_customer_order_operations_outcome", "(is_cancelled AND order_id IS NULL) OR (NOT is_cancelled AND order_id IS NOT NULL AND order_id <> '00000000-0000-0000-0000-000000000000'::uuid)");
                         });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerSocialChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Flow")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("flow");
+
+                    b.Property<string>("Nonce")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("nonce");
+
+                    b.Property<string>("ProofHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("proof_hash");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("SecurityStampHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("security_stamp_hash");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_customer_social_challenges");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("customer_social_challenges", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_social_challenge_flow", "(flow = 'login' AND user_id IS NULL AND security_stamp_hash IS NULL) OR (flow = 'link' AND user_id IS NOT NULL AND security_stamp_hash IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_customer_social_challenge_lifetime", "expires_at > created_at");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerSocialIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Issuer")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("issuer");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("subject");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_customer_social_identities");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TenantId", "UserId", "Provider")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Provider", "Issuer", "Subject")
+                        .IsUnique();
+
+                    b.ToTable("customer_social_identities", (string)null);
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.DeviceEvent", b =>
@@ -12031,6 +12321,23 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_customer_discount_rules_asp_net_users_user_id");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerSocialChallenge", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerSocialIdentity", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ExternalOrderReference", b =>
