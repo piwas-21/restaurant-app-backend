@@ -63,11 +63,11 @@ public sealed class CustomerReservationOperationService(ApplicationDbContext con
         Func<CustomerReservationOperationOwner, Task<ReservationCreationDraft>>? create,
         Func<CustomerReservationOperationOwner>? verifyInput, bool cancelAttempt, CancellationToken cancellationToken)
     {
-        var previous = await ReadPreviousAsync(proof.OperationId, owner, cancellationToken);
+        var previous = await CustomerReservationDecisions.ReadAsync(context, proof.OperationId, owner, cancellationToken);
         // Check original owner before full-body verification, retaining uniform foreign-owner404.
         verifyInput?.Invoke();
         // Cancel-attempt cannot cancel an applied booking, and recovery never replays mail.
-        if (previous is not null) return new(ToResolution(previous), null);
+        if (previous is not null) return new(CustomerReservationDecisions.ToResolution(previous), null);
         if (create is null && !cancelAttempt)
             return new(new(1, proof.OperationId, CustomerReservationOperationOutcome.Unseen, null), null);
         var draft = create is null ? null : await create(owner);
@@ -84,25 +84,9 @@ public sealed class CustomerReservationOperationService(ApplicationDbContext con
         };
         context.Set<CustomerReservationOperation>().Add(receipt);
         await context.SaveChangesAsync(cancellationToken);
-        return new(ToResolution(receipt), draft);
+        return new(CustomerReservationDecisions.ToResolution(receipt), draft);
     }
 
     private sealed record AttemptResult(CustomerReservationResolutionDto Resolution, ReservationCreationDraft? Draft);
 
-    private async Task<CustomerReservationOperation?> ReadPreviousAsync(Guid operationId,
-        CustomerReservationOperationOwner owner, CancellationToken cancellationToken)
-    {
-        var previous = await context.Set<CustomerReservationOperation>().AsNoTracking()
-            .SingleOrDefaultAsync(row => row.OperationId == operationId, cancellationToken);
-        if (previous is null) return null;
-        if (!string.Equals(previous.OwnerHash, owner.OwnerHash, StringComparison.Ordinal))
-            throw new NotFoundException("Customer reservation operation unavailable.");
-        if (!string.Equals(previous.PayloadHash, owner.PayloadHash, StringComparison.Ordinal))
-            throw new ConflictException("This operation ID was already used for different reservation details.");
-        return previous;
-    }
-
-    private static CustomerReservationResolutionDto ToResolution(CustomerReservationOperation row) => new(1,
-        row.OperationId, row.IsCancelled ? CustomerReservationOperationOutcome.Cancelled : CustomerReservationOperationOutcome.Applied,
-        row.ReservationId);
 }
