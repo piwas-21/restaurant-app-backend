@@ -34,10 +34,10 @@ internal static class OrderAmendmentCapturedPortionGuard
         }
 
         var frozen = FrozenOrderChargeMath.Read(source, money);
-        var due = frozen.FoodLines.SelectMany(line => AccountDebtMath.CreateLine(
-            source.Id, line.Item.Id, line.Item.Quantity, line.AmountMinor, 0))
+        var adjustments = RestaurantSystem.Api.Features.BillCharges.Services.OrderBillChargeReader.Read(source);
+        var due = RestaurantSystem.Api.Features.BillCharges.Services.BillDiscountMath.Food(source, money)
             .Concat(AccountDebtMath.CreateUnitemized(source.Id,
-                checked(frozen.TipMinor + frozen.FeeMinor), 0)).ToArray();
+                checked(frozen.TipMinor + frozen.FeeMinor + money.ToMinor(adjustments.Where(value => value.Amount > 0).Sum(value => value.Amount))), 0)).ToArray();
         // This sweep sums overlapping monetary portions per ordinal without expanding quantities.
         _ = AccountDebtMath.Subtract(due, captured);
     }

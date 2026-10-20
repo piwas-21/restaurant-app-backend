@@ -18,6 +18,10 @@ public static class OrderDetailServiceExtensions
             .BindConfiguration(CashierPrintSettings.SectionName)
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<CurrentStaffTicketSettings>()
+            .BindConfiguration(CurrentStaffTicketSettings.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddScoped<IRetainedCustomerDataScrubber, RetainedCustomerDataScrubber>();
         services.AddScoped<IOrderStatusTransitionPolicy, OrderStatusTransitionPolicy>();
         services.AddScoped<IOrderStatusUpdateServices, OrderStatusUpdateServices>();

@@ -148,9 +148,6 @@ internal static class OrderAmendmentPolicy
         if (request.Changes.Count == 0)
             return;
 
-        if (string.IsNullOrWhiteSpace(request.Reason))
-            throw new BadRequestException("A reason is required when changing an existing order line.");
-
         var requiresManager = source.Status is OrderStatus.OutForDelivery or OrderStatus.Delivered
             or OrderStatus.Completed;
         var requiresPreparingOverride = source.Status is OrderStatus.Preparing or OrderStatus.Ready;
@@ -162,7 +159,7 @@ internal static class OrderAmendmentPolicy
         if (requiresPreparingOverride && (!isAmendmentStaff || !request.PreparingOverrideAcknowledged))
         {
             throw new BadRequestException(
-                "A Server, cashier, or admin must acknowledge the preparing-order override and provide a reason.");
+                "A Server, cashier, or admin must acknowledge the preparing-order override.");
         }
 
         if (!source.IsKitchenReleased && request.Changes.Any(

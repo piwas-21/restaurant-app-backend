@@ -44,6 +44,7 @@ public record ZReportDto
 public record ZReportDiscountsDto
 {
     public decimal TotalDiscounts { get; init; }
+    public decimal StaffDiscounts { get; init; }
     public decimal PromoCodeDiscounts { get; init; }
     public decimal CustomerDiscounts { get; init; }
     public decimal FidelityPointsDiscounts { get; init; }
