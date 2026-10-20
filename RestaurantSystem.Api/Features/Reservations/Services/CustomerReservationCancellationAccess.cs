@@ -55,13 +55,6 @@ public sealed class CustomerReservationCancellationAccess(ApplicationDbContext c
             || bootstrap.Capabilities.GetValueOrDefault("accounts") != "enabled")
             throw new NotFoundException("Customer reservations are unavailable. Refresh this restaurant.");
     }
-    public void EnsureEditable(Reservation reservation)
-    {
-        var now = clock.Now;
-        var day = DateOnly.FromDateTime(reservation.ReservationDate);
-        var today = DateOnly.FromDateTime(now.DateTime);
-        if (reservation.Status is not (ReservationStatus.Pending or ReservationStatus.Confirmed)
-            || day < today || day == today && reservation.StartTime <= now.TimeOfDay)
-            throw new ConflictException("This booking can no longer be cancelled here. Check its current details.");
-    }
+    public void EnsureEditable(Reservation reservation) => CustomerReservationEditability.RequireFuture(
+        reservation.Status, DateOnly.FromDateTime(reservation.ReservationDate), reservation.StartTime, clock.Now);
 }

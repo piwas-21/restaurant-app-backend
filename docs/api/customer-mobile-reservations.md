@@ -28,7 +28,7 @@ machine credentials cannot substitute for the owning customer.
 
 Responses use no-store and the existing native basket read IP budget. This adds no migration or
 configuration activation and changes no existing web contract. The deployed OpenAPI fixture is
-not evidence that these source-only routes are available on a tenant. Reservation creation, edits/cancellation and installed native journeys remain separate implementation.
+not evidence that these source-only routes are available on a tenant. Creation and cancellation use their separate durable-operation contracts; owned edit writes and installed native journeys remain separate implementation.
 Public availability is specified below.
 
 ## Public availability
@@ -51,4 +51,44 @@ Anonymous availability does not authorize reading or changing any reservation.
 
 Availability is advisory and reserves nothing. Creation must revalidate current capacity and conflicts
 atomically, bind the original customer/guest authority and give retries a durable operation identity.
-That write contract and the dependent native availability UI are separate implementation gates.
+Creation uses the separately documented durable-operation contract. Deployed and installed acceptance remain separate gates.
+
+
+## Private owned editor reads
+
+Two additive Customer-only GETs prepare the current owner to edit a future Pending or Confirmed
+booking. Both require `schemaVersion=1`, enabled native accounts and reservations, the Reservations
+module, active lifecycle, known currency and the current database Customer role/ownership. A started
+or terminal booking returns 409. Missing, guest and foreign bookings return the same 404. Responses
+use no-store and the existing shared native read budget; staff/API credentials cannot substitute.
+
+| Route | Additional required query | Response data |
+| --- | --- | --- |
+| `/api/customer-mobile/reservations/{reservationId}/edit` | None | `schemaVersion`, `tenantId`, `timeZone`, `reservation`, `contact` |
+| `/api/customer-mobile/reservations/{reservationId}/edit/availability` | Calendar `date`, `numberOfGuests` 1–20, exact restaurant `timeZone` | `schemaVersion`, `reservationId`, `date`, `timeZone`, `numberOfGuests`, `slots` |
+
+The editor's `reservation` retains the seven-field customer projection above. Only this private
+editor returns `contact`: `customerName`, `customerEmail`, nullable `customerPhone`. It never returns
+staff notes, primary/combined-table identifiers, QR data, revision, customer ID or audit fields.
+History and general details remain contact-free. Native consumers must keep editor contact input
+volatile, outside Query persistence, route parameters and durable recovery proofs.
+
+Both reads use fresh scalar database projections and revalidate current ownership, tenant,
+capabilities, currency, zone, booking UUID revision and restaurant time after materialization.
+Parent or combined-table changes that return to their old values still invalidate the snapshot.
+Stored non-midnight calendar markers retain their calendar date without timezone conversion.
+
+Owned availability excludes only this authenticated owner's booking from the shared engine's
+occupancy scan. An internal query property supplies that exclusion; public query parameters cannot
+bind it. Every table already assigned to the booking must remain active, have positive capacity,
+be unoccupied for the entire sitting and collectively fit the requested party. A larger free spare
+table cannot silently replace an assigned table. The response contains at most 48 unique ordered
+start/end pairs and no table information. Legacy/public callers keep normal occupancy semantics.
+Fresh no-tracking table/reservation reads also prevent EF identity-map state from hiding committed
+changes. Split shifts and two-hour sittings retain the shared engine's rules.
+
+These are advisory reads: they hold no capacity, create no operation receipt, send no mail and
+perform no reservation writes. They introduce no migration. An owned edit still needs a separate
+review-bound durable write/recovery contract that rechecks current capacity and revision under
+schedule, booking and customer locks, preserves assigned tables, and returns a confirmed booking
+to Pending when its date, sitting or party size changes. Contact-only edits retain confirmation.
