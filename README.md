@@ -11,6 +11,7 @@ Restaurant management system backend — REST API, CQRS, EF Core, PostgreSQL.
 - **.NET 10** (Web API)
 - **EF Core 10** + PostgreSQL
 - **Custom CQRS mediator** ([CustomMediator.cs](RestaurantSystem.Api/Common/CustomMediator.cs)) — NOT MediatR. See [ADR-001](docs/adr/ADR-001-custom-cqrs-mediator.md).
+- **Cashier printing:** Durable dashboard bills use the same current-ticket projection as staff/browser receipts, including committed amendments and related rounds. Structured ingredient selections/removals remain available to printer apps; free-text kitchen notes stay off cashier bills. Printer app 1.0.41 exposes the optional ingredient/sauce display switch (off by default).
 - **JWT Bearer auth** with role-based authorization (Customer / Server / Cashier / Admin). See [ADR-003](docs/adr/ADR-003-jwt-scope-and-claims.md).
 - **Soft-delete** via global query filter. See [ADR-002](docs/adr/ADR-002-soft-delete-strategy.md).
 - **xUnit** integration tests
@@ -125,37 +126,43 @@ Set the selected provider's cost fields for its model and processing tier before
 
 ### Reservation quick-action links
 
-`GET /api/reservations/{id}/quick-approve` and `.../quick-reject` are opened from the restaurant's
-alert mail, so they carry no session and stay `[AllowAnonymous]`. What authorises them is a `?token=`
-the mail puts on the link: an HMAC-SHA256 over the reservation id, the action, and the booking's
-**current status**, with an expiry (backend #402). Signing the status is what makes a link one-shot —
-once the booking is approved or rejected, both buttons in that mail stop working.
+`GET /api/reservations/{id}/quick-approve` and `.../quick-reject` remain anonymous email entry
+routes. Authority is a version2 HMAC-SHA256 token over booking ID, action, current status, expiry
+and the **actual saved database UUID revision**. Status returning to Pending cannot revive an old
+link. Both initial lookup and fresh locked dispatch verify the same original token.
 
-Before this, the bare reservation id was the whole authorisation, and `POST /api/Reservations` is
-anonymous and returns that id to whoever made the booking. A guest could approve their own table.
+All parent/combined-table saves finish before writers refresh the revision used by mailers. A
+Pending customer contact-only or no-op edit refreshes operator buttons; Confirmed contact-only
+edits retain confirmation and send no operator alert. Mail follows commit.
 
 | Key | Default | Meaning |
-|---|---|---|
-| `ReservationQuickActions:SigningKey` | `""` | HMAC key material. **Leave empty on an existing box:** the key is then derived (HKDF, purpose-labelled) from the already-required `JwtSettings:Secret`, so no new environment variable is needed to deploy. Set it to rotate link signatures independently of the JWT secret — every link already in an inbox stops working when you do |
-| `ReservationQuickActions:LinkLifetimeDays` | `7` | How long a freshly minted link is valid. After that the restaurant decides in the dashboard |
-| `ReservationQuickActions:LegacyLinkGraceDays` | `14` | Migration window for alert mails sent **before** signing shipped, which carry no token. Measured from each reservation's own `CreatedAt`, so it closes booking by booking. Every legacy use is logged at **warning** level |
-| `ReservationQuickActions:LegacyLinkCutoffUtc` | unset | Optional instant; a reservation created at or after it can never take the token-less path |
+| --- | --- | --- |
+| `ReservationQuickActions:SigningKey` | empty | Purpose-separated HKDF derivation uses the configured key, or the already-required `JwtSettings:Secret`. No new environment setting is required. |
+| `ReservationQuickActions:LinkLifetimeDays` | `7` | New link lifetime; after expiry the operator uses the reservations dashboard. |
+| `ReservationQuickActions:LegacyLinkGraceDays` | `14` | Accepted configuration compatibility only; cannot grant revisionless authority. |
+| `ReservationQuickActions:LegacyLinkCutoffUtc` | unset | Accepted configuration compatibility only; cannot grant revisionless authority. |
 
-**Closing the migration window.** The grace window is anchored per booking, so it needs no follow-up:
-once every reservation created before the release is older than `LegacyLinkGraceDays`, nothing can use
-a token-less link again. Two ways to close it sooner, both config-only — no code change, no redeploy of
-new code:
+**Release compatibility:** unsigned and old status-only version1 links are refused conservatively,
+even inside their former grace window. Previously issued links, or current links invalidated by
+later staff/booking changes, open the uniform unavailable page with dashboard recovery. Do not
+restore an old signing/unsigned fallback to revive them. New version2 mail works after the revision
+migration already required by owned cancellation; this fix adds no migration or tenant activation.
 
-1. **Recommended, at release:** set `ReservationQuickActions__LegacyLinkCutoffUtc` to the release
-   timestamp (e.g. `2026-08-24T00:00:00Z`). Mails already sent keep working; bookings made after the
-   release are signed-only from the first minute. Without it, the window also covers **new** bookings,
-   which leaves #402 open for its length.
-2. **Once the inbox is drained:** set `ReservationQuickActions__LegacyLinkGraceDays=0`. Every
-   token-less link then lands on the "this link can no longer be used" page, which links to the
-   reservations dashboard.
+### Native table payment account reads
 
-Watch for `Accepted a LEGACY unsigned quick-…` warnings in the box logs to tell when the old mails have
-stopped being used.
+`GET /api/customer-mobile/table-payments/account` requires schema1, the configured tenant UUID,
+the original table-visit UUID, a canonical `X-Session-Id`, and a separate live `X-Table-Participant`.
+Customer authentication never replaces the participant grant; invalid, staff or deleted-account
+credentials cannot fall back to guest access. Current native capabilities, currency and participant
+authority are checked again after the shared ledger read. Responses are private and `no-store`.
+
+The response wraps the shared server account, including reserved contribution amounts and redacted
+foreign attempt summaries. Schema1 refuses inexact JavaScript integers, more than 5,000 allocation
+segments, 1,000 active summaries or 1,000 shares, and unsupported allocation versions. These are
+response limits; the existing shared debt reader still scans the visit ledger without a row bound.
+Account reads do not create a quote, reserve money or authorize provider navigation. Durable native
+quote/reserve/start/recovery, all payment modes and their installed/provider acceptance remain open.
+The endpoint adds no migration, configuration activation or change to web/staff/printer contracts.
 
 ## Pull requests
 
@@ -182,9 +189,10 @@ belongs to the failed attempt, remove only that incomplete copy, then rerun the 
 replacement. Never alter discovery counts, test reports or coverage floors to make a retry pass.
 
 Integration tests are partitioned by namespace: shard 1 owns Common, Products, Payments, Menus,
-DeliveryChannels, ServerWorkspace and Account-prefixed Orders classes; shard 2 catches the remaining namespaces;
-shard 3 owns other Orders classes; shard 4 owns Basket, Auth and Customer-prefixed Orders classes. The
-aggregate checks discovery counts and unique execution across the complete suite.
+DeliveryChannels, ServerWorkspace and Account-prefixed Orders classes; shard 2 owns CustomerNativeReservation-prefixed
+Reservations classes except Edit-prefixed classes, plus the remaining namespaces; shard 3 owns other Orders classes,
+legacy Reservations, TableGuestVisits and CustomerNativeReservationEditRead-prefixed Reservations classes;
+shard 4 owns Basket, Auth, Customer-prefixed Orders classes and other CustomerNativeReservationEdit-prefixed Reservations classes. The aggregate checks discovery counts and unique execution across the complete suite.
 
 Each integration shard has a 30-minute whole-job budget covering restore/build, tests, coverage/discovery and artifact uploads. Test selection, assertions and merged-coverage floors remain enforced.
 

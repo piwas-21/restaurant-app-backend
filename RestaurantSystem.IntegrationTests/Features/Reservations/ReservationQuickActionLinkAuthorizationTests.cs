@@ -193,6 +193,10 @@ public class ReservationQuickActionLinkAuthorizationTests : IntegrationTestBase
         var body = await response.Content.ReadAsStringAsync();
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
         body.Should().Contain(RefusalMarker);
+        var frontendUrl = Factory.Services.GetRequiredService<IOptions<EmailSettings>>()
+            .Value.FrontendBaseUrl.TrimEnd('/');
+        body.Should().Contain($"href='{WebUtility.HtmlEncode(frontendUrl)}/admin/reservations-management'",
+            "the deployed frontend provides its authenticated booking page at this exact route");
         body.Should().NotContain("Exception", "an anonymous caller must never be shown a stack trace");
     }
 
@@ -218,10 +222,13 @@ public class ReservationQuickActionLinkAuthorizationTests : IntegrationTestBase
     /// </summary>
     private string MintFor(Guid id, ReservationQuickAction action, DateTimeOffset? mintedAt = null)
     {
+        using var scope = Factory.Services.CreateScope();
+        var revision = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Reservations.AsNoTracking()
+            .Where(row => row.Id == id).Select(row => (Guid?)row.Revision).SingleOrDefault() ?? Guid.NewGuid();
         if (mintedAt is null)
         {
             return Factory.Services.GetRequiredService<IReservationQuickActionLinks>()
-                .Mint(id, action, ReservationStatus.Pending);
+                .Mint(id, action, ReservationStatus.Pending, revision);
         }
 
         var links = new ReservationQuickActionLinks(
@@ -230,7 +237,7 @@ public class ReservationQuickActionLinkAuthorizationTests : IntegrationTestBase
             new FrozenClock(mintedAt.Value),
             NullLogger<ReservationQuickActionLinks>.Instance);
 
-        return links.Mint(id, action, ReservationStatus.Pending);
+        return links.Mint(id, action, ReservationStatus.Pending, revision);
     }
 
     private sealed class FrozenClock(DateTimeOffset now) : TimeProvider

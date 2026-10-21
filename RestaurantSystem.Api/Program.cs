@@ -798,6 +798,22 @@ builder.Services.AddScoped<IOrderDisplayCurrencyResolver, OrderDisplayCurrencyRe
 builder.Services.AddScoped<IOrderDisplayTranslator, OrderDisplayTranslator>();
 builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
 builder.Services.AddScoped<IOrderFactory, OrderFactory>();
+RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationCancellationRegistration
+    .AddCustomerReservationCancellation(builder.Services);
+RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationEditReadRegistration
+    .AddCustomerReservationEditReads(builder.Services);
+RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationEditRegistration
+    .AddCustomerReservationEdits(builder.Services);
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationProofService,
+    RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationProofService>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationOperationGuard,
+    RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationOperationGuard>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationCreator,
+    RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationCreator>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationOperationService,
+    RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationOperationService>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.IReservationDraftWriter,
+    RestaurantSystem.Api.Features.Reservations.Services.ReservationDraftWriter>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.IReservationCreatedMailer,
     RestaurantSystem.Api.Features.Reservations.Services.ReservationCreatedMailer>();
 // Signs and checks the anonymous quick-approve / quick-reject email links (backend #402).
@@ -810,6 +826,8 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Features.Reservations.Service
     RestaurantSystem.Api.Features.Reservations.Services.ReservationQuickActionPages>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.IReservationChangedMailer,
     RestaurantSystem.Api.Features.Reservations.Services.ReservationChangedMailer>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.IReservationRejectedMailer,
+    RestaurantSystem.Api.Features.Reservations.Services.ReservationRejectedMailer>();
 builder.Services.AddScoped<IOrderItemFactory, OrderItemFactory>();
 builder.Services.AddScoped<IBasketToOrderTranslator, BasketToOrderTranslator>();
 builder.Services.AddScoped<IOrderPricingService, OrderPricingService>();

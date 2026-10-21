@@ -5,6 +5,9 @@ namespace RestaurantSystem.Domain.Entities;
 
 public class Reservation : Entity
 {
+    /// <summary>Database-generated revision of the booking, including table assignments.</summary>
+    public Guid Revision { get; private set; }
+
     public Guid? CustomerId { get; set; } // Nullable for guest reservations
     public string CustomerName { get; set; } = string.Empty;
     public string CustomerEmail { get; set; } = string.Empty;

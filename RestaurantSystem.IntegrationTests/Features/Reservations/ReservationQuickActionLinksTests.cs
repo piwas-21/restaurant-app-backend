@@ -11,8 +11,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Reservations;
 /// The signature itself, away from HTTP and the database (backend #402).
 /// <para>
 /// Everything a forger can control is exercised here: the expiry, the signature bytes, the action,
-/// the reservation, and the booking's status — which is in the payload precisely so that deciding
-/// a booking retires both of its links without a column to update. The endpoint-level proof lives
+/// the reservation, status and database revision. A returned status cannot revive a link. The endpoint-level proof lives
 /// in <c>ReservationQuickActionLinkAuthorizationTests</c>; this file is where a broken rule names
 /// itself instead of showing up as "the page said no".
 /// </para>
@@ -23,6 +22,7 @@ public class ReservationQuickActionLinksTests
     private const string JwtSecret = "unit-test-jwt-secret-at-least-32-characters"; // pragma: allowlist secret
 
     private static readonly Guid Booking = Guid.Parse("aaaaaaaa-1111-2222-3333-444444444444");
+    private static readonly Guid Revision = Guid.Parse("cccccccc-1111-4222-8333-444444444444");
     private static readonly Guid OtherBooking = Guid.Parse("bbbbbbbb-1111-2222-3333-444444444444");
 
     /// <summary>Reservations in these tests were created the moment the clock starts.</summary>
@@ -77,43 +77,45 @@ public class ReservationQuickActionLinksTests
         string? token,
         ReservationQuickAction action = ReservationQuickAction.Approve,
         ReservationStatus status = ReservationStatus.Pending,
-        Guid? reservation = null) =>
-        subject.Verify(reservation ?? Booking, action, status, CreatedAt, token);
+        Guid? reservation = null, Guid? revision = null) =>
+        subject.Verify(reservation ?? Booking, action, status, revision ?? Revision, token);
 
     [Fact]
     public void A_freshly_minted_token_verifies()
     {
         var subject = Subject();
 
-        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         Verify(subject, token).Should().Be(QuickActionLinkVerdict.SignatureValid);
     }
 
     [Fact]
-    public void The_token_carries_nothing_but_an_expiry_and_a_signature()
+    public void The_token_carries_only_its_version_expiry_and_signature()
     {
         // Pins the shape the endpoint parses, and pins the absence of a second secret in the URL:
         // the reservation id is already in the path and everything else is inside the MAC.
-        var token = Subject().Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = Subject().Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         var parts = token.Split('.');
-        parts.Should().HaveCount(2);
-        long.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture)
+        parts.Should().HaveCount(3);
+        parts[0].Should().Be("v2");
+        long.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture)
             .Should().Be(_clock.GetUtcNow().AddDays(7).ToUnixTimeSeconds());
-        parts[1].Should().NotContain(Booking.ToString("N"));
+        parts[2].Should().NotContain(Booking.ToString("N"));
+        parts[2].Should().NotContain(Revision.ToString("N"));
     }
 
     [Fact]
     public void A_token_with_a_flipped_signature_is_refused()
     {
         var subject = Subject();
-        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         // Change one character of the signature, keeping the length and the alphabet valid.
-        var signature = token[(token.IndexOf('.', StringComparison.Ordinal) + 1)..];
+        var signature = token[(token.LastIndexOf('.') + 1)..];
         var flipped = (signature[0] == 'A' ? 'B' : 'A') + signature[1..];
-        var tampered = token[..(token.IndexOf('.', StringComparison.Ordinal) + 1)] + flipped;
+        var tampered = token[..(token.LastIndexOf('.') + 1)] + flipped;
 
         Verify(subject, tampered).Should().Be(QuickActionLinkVerdict.Refused);
     }
@@ -124,11 +126,11 @@ public class ReservationQuickActionLinksTests
         // The expiry is in the clear. It has to be signed too, or extending a link would be a
         // matter of editing the URL.
         var subject = Subject();
-        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
         var later = _clock.GetUtcNow().AddDays(3650).ToUnixTimeSeconds();
 
-        var extended = later.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            + token[token.IndexOf('.', StringComparison.Ordinal)..];
+        var parts = token.Split('.'); parts[1] = later.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var extended = string.Join('.', parts);
 
         Verify(subject, extended).Should().Be(QuickActionLinkVerdict.Refused);
     }
@@ -137,7 +139,7 @@ public class ReservationQuickActionLinksTests
     public void An_expired_token_is_refused()
     {
         var subject = Subject(lifetimeDays: 7);
-        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         _clock.Advance(TimeSpan.FromDays(7) + TimeSpan.FromSeconds(1));
 
@@ -148,7 +150,7 @@ public class ReservationQuickActionLinksTests
     public void A_token_still_verifies_one_second_before_it_expires()
     {
         var subject = Subject(lifetimeDays: 7);
-        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         _clock.Advance(TimeSpan.FromDays(7) - TimeSpan.FromSeconds(1));
 
@@ -159,7 +161,7 @@ public class ReservationQuickActionLinksTests
     public void An_approve_token_cannot_reject()
     {
         var subject = Subject();
-        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         Verify(subject, token, action: ReservationQuickAction.Reject)
             .Should().Be(QuickActionLinkVerdict.Refused);
@@ -169,7 +171,7 @@ public class ReservationQuickActionLinksTests
     public void A_token_minted_for_one_booking_cannot_act_on_another()
     {
         var subject = Subject();
-        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         Verify(subject, token, reservation: OtherBooking).Should().Be(QuickActionLinkVerdict.Refused);
     }
@@ -184,7 +186,7 @@ public class ReservationQuickActionLinksTests
         // The replay guard, and the reason the status is in the payload: the link was signed over
         // Pending, so the same URL clicked twice cannot decide the booking twice.
         var subject = Subject();
-        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         Verify(subject, token, status: decided).Should().Be(QuickActionLinkVerdict.Refused);
     }
@@ -198,8 +200,7 @@ public class ReservationQuickActionLinksTests
     [InlineData("1893456000.not base64url!")]
     public void Junk_in_the_token_parameter_is_refused_rather_than_thrown(string token)
     {
-        // "" takes the legacy path and is refused by the window, not by the parser — both must be
-        // a verdict, never an exception, because the caller is an anonymous GET.
+        // Missing or malformed authority always produces a verdict, never an anonymous exception.
         var subject = Subject(graceDays: 0);
 
         Verify(subject, token).Should().Be(QuickActionLinkVerdict.Refused);
@@ -209,7 +210,7 @@ public class ReservationQuickActionLinksTests
     public void A_token_signed_with_a_different_key_is_refused()
     {
         var token = Subject(signingKey: "a-completely-different-key-of-32-characters") // pragma: allowlist secret
-            .Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+            .Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         Verify(Subject(), token).Should().Be(QuickActionLinkVerdict.Refused);
     }
@@ -221,7 +222,7 @@ public class ReservationQuickActionLinksTests
         // signs, with a key DERIVED from the JWT secret rather than equal to it.
         var derived = Subject(signingKey: "");
 
-        var token = derived.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = derived.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         Verify(derived, token).Should().Be(QuickActionLinkVerdict.SignatureValid);
         Verify(Subject(signingKey: "", jwtSecret: "another-jwt-secret-of-at-least-32-characters"), token)
@@ -236,34 +237,29 @@ public class ReservationQuickActionLinksTests
         var fromJwtSecret = Subject(signingKey: "");
         var fromSameStringAsExplicitKey = Subject(signingKey: JwtSecret);
 
-        var token = fromJwtSecret.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = fromJwtSecret.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         Verify(fromSameStringAsExplicitKey, token).Should().Be(QuickActionLinkVerdict.SignatureValid,
             "both sides derive from the same material with the same purpose label");
-        fromJwtSecret.Mint(Booking, ReservationQuickAction.Reject, ReservationStatus.Pending)
+        fromJwtSecret.Mint(Booking, ReservationQuickAction.Reject, ReservationStatus.Pending, Revision)
             .Should().NotBe(token, "the action is part of what is signed");
     }
 
     [Fact]
-    public void A_legacy_token_less_link_works_inside_the_grace_window_and_says_so_in_the_log()
+    public void A_token_less_link_is_refused_even_with_a_configured_grace_window_and_logs_no_acceptance()
     {
         var subject = Subject(graceDays: 14);
-        _clock.Advance(TimeSpan.FromDays(13));
-
-        Verify(subject, token: null).Should().Be(QuickActionLinkVerdict.Legacy);
-
-        _log.Entries.Should().ContainSingle()
-            .Which.Should().Match<(LogLevel Level, string Message)>(entry =>
-                entry.Level == LogLevel.Warning
-                && entry.Message.Contains("LEGACY", StringComparison.Ordinal)
-                && entry.Message.Contains("LegacyLinkGraceDays", StringComparison.Ordinal));
+        Verify(subject, token: null).Should().Be(QuickActionLinkVerdict.Refused);
+        _log.Entries.Should().ContainSingle().Which.Level.Should().Be(LogLevel.Warning);
+        _log.Entries.Should().NotContain(entry => entry.Message.Contains("Accepted", StringComparison.Ordinal));
+        Verify(subject, subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision))
+            .Should().Be(QuickActionLinkVerdict.SignatureValid);
     }
 
     [Fact]
     public void A_legacy_link_is_refused_once_its_own_booking_is_older_than_the_window()
     {
-        // Measured from the RESERVATION's CreatedAt, not from a global switch-off date: the window
-        // then closes booking by booking with nothing left to remember.
+        // Expired historical settings cannot grant revisionless authority either.
         var subject = Subject(graceDays: 14);
         _clock.Advance(TimeSpan.FromDays(14));
 
@@ -273,35 +269,33 @@ public class ReservationQuickActionLinksTests
     [Fact]
     public void Setting_the_grace_window_to_zero_refuses_every_token_less_link_immediately()
     {
-        // The switch-off documented in the README: one config value, no deploy of new code.
+        // Old configuration remains accepted; it never authorizes a revisionless link.
         Verify(Subject(graceDays: 0), token: null).Should().Be(QuickActionLinkVerdict.Refused);
     }
 
     [Fact]
     public void A_cutoff_shuts_the_legacy_path_for_a_booking_made_after_it()
     {
-        // The recommended production setting. Without it the window also covers bookings made
-        // AFTER this fix shipped — whose mail always carries a token — which is #402 left open for
-        // the length of the window.
+        // A historical cutoff cannot bypass the current revision-bound requirement.
         var subject = Subject(graceDays: 14, legacyCutoff: CreatedAt.AddDays(-1));
 
         Verify(subject, token: null).Should().Be(QuickActionLinkVerdict.Refused);
     }
 
     [Fact]
-    public void A_cutoff_still_honours_a_mail_sent_before_it()
+    public void A_cutoff_cannot_authorize_a_revisionless_mail_sent_before_it()
     {
         var subject = Subject(graceDays: 14, legacyCutoff: CreatedAt.AddSeconds(1));
 
-        Verify(subject, token: null).Should().Be(QuickActionLinkVerdict.Legacy);
+        Verify(subject, token: null).Should().Be(QuickActionLinkVerdict.Refused);
     }
 
     [Fact]
     public void A_cutoff_never_touches_a_properly_signed_link()
     {
-        // It governs the migration path only. A signed link is authorised by its signature.
+        // Deprecated legacy settings cannot disable a valid current signature.
         var subject = Subject(graceDays: 0, legacyCutoff: CreatedAt.AddDays(-1));
-        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         Verify(subject, token).Should().Be(QuickActionLinkVerdict.SignatureValid);
     }
@@ -316,11 +310,38 @@ public class ReservationQuickActionLinksTests
     }
 
     [Fact]
+    public void A_returned_status_cannot_revive_a_token_for_an_older_revision()
+    {
+        var subject = Subject(); var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
+        Verify(subject, token).Should().Be(QuickActionLinkVerdict.SignatureValid);
+        Verify(subject, token, status: ReservationStatus.Confirmed).Should().Be(QuickActionLinkVerdict.Refused);
+        Verify(subject, token, revision: Guid.NewGuid()).Should().Be(QuickActionLinkVerdict.Refused);
+    }
+
+    [Fact]
+    public void An_empty_revision_cannot_mint_or_verify_action_authority()
+    {
+        var subject = Subject();
+        var mint = () => subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Guid.Empty);
+        mint.Should().Throw<ArgumentException>();
+        Verify(subject, subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision), revision: Guid.Empty)
+            .Should().Be(QuickActionLinkVerdict.Refused);
+    }
+
+    [Fact]
+    public void An_oversized_token_is_refused_with_a_valid_current_token_as_a_positive_control()
+    {
+        var subject = Subject(); var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
+        Verify(subject, token).Should().Be(QuickActionLinkVerdict.SignatureValid);
+        Verify(subject, token + new string('A', 128)).Should().Be(QuickActionLinkVerdict.Refused);
+    }
+
+    [Fact]
     public void A_refusal_never_writes_the_supplied_token_to_the_log()
     {
         // A log that stores credential guesses turns a near miss into a written-down secret.
         var subject = Subject();
-        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending);
+        var token = subject.Mint(Booking, ReservationQuickAction.Approve, ReservationStatus.Pending, Revision);
 
         Verify(subject, token, status: ReservationStatus.Confirmed);
 

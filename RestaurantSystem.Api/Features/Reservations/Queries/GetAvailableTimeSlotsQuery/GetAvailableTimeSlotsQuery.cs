@@ -12,7 +12,11 @@ namespace RestaurantSystem.Api.Features.Reservations.Queries.GetAvailableTimeSlo
 public record GetAvailableTimeSlotsQuery(
     DateTime Date,
     int NumberOfGuests
-) : IQuery<ApiResponse<AvailableTimeSlotsDto>>;
+) : IQuery<ApiResponse<AvailableTimeSlotsDto>>
+{
+    // Internal only: an authorized owned editor may ignore its own occupancy. Public callers cannot bind this.
+    internal Guid? ExcludedReservationId { get; init; }
+}
 
 public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeSlotsQuery, ApiResponse<AvailableTimeSlotsDto>>
 {
@@ -76,7 +80,7 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
                 string.Join(", ", servingWindows.Select(w => $"{w.Open}-{w.Close}")));
 
             // Get ALL active tables (not filtered by capacity)
-            var allTables = await _context.Tables
+            var allTables = await _context.Tables.AsNoTracking()
                 .Where(t => t.IsActive)
                 .ToListAsync(cancellationToken);
 
@@ -87,10 +91,11 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
 
             // Get all confirmed/pending reservations for the requested date
             var queryDateUtc = DateTime.SpecifyKind(query.Date.Date, DateTimeKind.Utc);
-            var existingReservations = await _context.Reservations
+            var existingReservations = await _context.Reservations.AsNoTracking()
                 .Include(r => r.CombinedTables)
                 .Where(r => r.ReservationDate.Date == queryDateUtc &&
-                           (r.Status == ReservationStatus.Pending || r.Status == ReservationStatus.Confirmed))
+                           (r.Status == ReservationStatus.Pending || r.Status == ReservationStatus.Confirmed)
+                           && (query.ExcludedReservationId == null || r.Id != query.ExcludedReservationId))
                 .ToListAsync(cancellationToken);
 
             // For today's date, filter out past time slots. `now.TimeOfDay` used to be UTC, which

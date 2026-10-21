@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Features.Reservations.Services;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
@@ -26,6 +27,7 @@ public class DeleteReservationCommandHandler : ICommandHandler<DeleteReservation
 
     public async Task<ApiResponse<bool>> Handle(DeleteReservationCommand command, CancellationToken cancellationToken)
     {
+        await using var transaction = await ReservationWriteLock.BeginAsync(_context, cancellationToken);
         // Check if reservation exists
         var reservation = await _context.Reservations
             .FirstOrDefaultAsync(r => r.Id == command.ReservationId, cancellationToken);
@@ -45,6 +47,8 @@ public class DeleteReservationCommandHandler : ICommandHandler<DeleteReservation
         {
             return ApiResponse<bool>.Failure("Failed to delete reservation");
         }
+
+        await transaction.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Reservation with ID {ReservationId} permanently deleted by user {UserId}",

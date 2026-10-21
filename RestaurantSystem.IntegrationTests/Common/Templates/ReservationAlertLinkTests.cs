@@ -85,6 +85,16 @@ public class ReservationAlertLinkTests
 
     [Theory]
     [MemberData(nameof(Alerts))]
+    public void Dashboard_links_target_the_actual_authenticated_reservations_page(string alert)
+    {
+        var html = Render(alert, "approve-signature", "reject-signature");
+
+        html.Should().Contain("href='https://demo.test/admin/reservations-management'",
+            "the deployed frontend provides this route for operator recovery");
+    }
+
+    [Theory]
+    [MemberData(nameof(Alerts))]
     public void The_plain_text_body_carries_no_quick_action_link_at_all(string alert)
     {
         // It never did. Asserted so that "every template emits a signed URL" cannot be satisfied

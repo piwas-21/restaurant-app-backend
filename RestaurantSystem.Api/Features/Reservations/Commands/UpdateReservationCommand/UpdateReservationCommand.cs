@@ -42,6 +42,7 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
     {
         try
         {
+            await using var transaction = await ReservationWriteLock.BeginAsync(_context, cancellationToken);
             var reservation = await _context.Reservations
                 .Include(r => r.Table)
                 .Include(r => r.CombinedTables).ThenInclude(c => c.Table)
@@ -120,6 +121,7 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
             reservation.Notes = data.Notes;
 
             await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
             // Send approval email if status changed to Confirmed
             if (previousStatus != ReservationStatus.Confirmed && data.Status == ReservationStatus.Confirmed)

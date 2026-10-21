@@ -98,18 +98,18 @@ public class CancelReservationOwnershipTests : IntegrationTestBase
     [Fact]
     public async Task The_restaurants_own_quick_reject_link_still_works_with_no_caller_at_all()
     {
-        // The [AllowAnonymous] link in the admin alert mail is the ONE documented opt-out
-        // (EnforceOwnership: false). If the ownership check reached it, the restaurant could no
-        // longer reject a booking from its own inbox.
+        // A freshly revalidated internal email proof is the only replacement for caller ownership.
+        // The restaurant can still reject a booking from its own inbox without a signed-in session.
         var id = await SeedReservationAsync(OtherUserId);
         AuthenticateAsAnonymous();
 
         // The link now carries the signature the alert mail puts on it (backend #402). What this
         // test still pins is the OWNERSHIP opt-out: a signed link works with no caller at all.
         // Everything about the signature itself is ReservationQuickActionLinkAuthorizationTests.
-        var token = Factory.Services
-            .GetRequiredService<IReservationQuickActionLinks>()
-            .Mint(id, ReservationQuickAction.Reject, ReservationStatus.Pending);
+        await using var observer = DatabaseFixture.CreateContext();
+        var revision = await observer.Reservations.Where(row => row.Id == id).Select(row => row.Revision).SingleAsync();
+        var token = Factory.Services.GetRequiredService<IReservationQuickActionLinks>()
+            .Mint(id, ReservationQuickAction.Reject, ReservationStatus.Pending, revision);
 
         var response = await Client.GetAsync($"/api/reservations/{id}/quick-reject?token={Uri.EscapeDataString(token)}");
 
