@@ -11,6 +11,7 @@ Restaurant management system backend — REST API, CQRS, EF Core, PostgreSQL.
 - **.NET 10** (Web API)
 - **EF Core 10** + PostgreSQL
 - **Custom CQRS mediator** ([CustomMediator.cs](RestaurantSystem.Api/Common/CustomMediator.cs)) — NOT MediatR. See [ADR-001](docs/adr/ADR-001-custom-cqrs-mediator.md).
+- **Cashier printing:** Durable dashboard bills use the same current-ticket projection as staff/browser receipts, including committed amendments and related rounds. Structured ingredient selections/removals remain available to printer apps; free-text kitchen notes stay off cashier bills. Printer app 1.0.41 exposes the optional ingredient/sauce display switch (off by default).
 - **JWT Bearer auth** with role-based authorization (Customer / Server / Cashier / Admin). See [ADR-003](docs/adr/ADR-003-jwt-scope-and-claims.md).
 - **Soft-delete** via global query filter. See [ADR-002](docs/adr/ADR-002-soft-delete-strategy.md).
 - **xUnit** integration tests
@@ -189,8 +190,9 @@ replacement. Never alter discovery counts, test reports or coverage floors to ma
 
 Integration tests are partitioned by namespace: shard 1 owns Common, Products, Payments, Menus,
 DeliveryChannels, ServerWorkspace and Account-prefixed Orders classes; shard 2 owns CustomerNativeReservation-prefixed
-Reservations classes and the remaining namespaces; shard 3 owns other Orders classes and legacy Reservations;
-shard 4 owns Basket, Auth and Customer-prefixed Orders classes. The aggregate checks discovery counts and unique execution across the complete suite.
+Reservations classes except Edit-prefixed classes, plus the remaining namespaces; shard 3 owns other Orders classes,
+legacy Reservations, TableGuestVisits and CustomerNativeReservationEditRead-prefixed Reservations classes;
+shard 4 owns Basket, Auth, Customer-prefixed Orders classes and other CustomerNativeReservationEdit-prefixed Reservations classes. The aggregate checks discovery counts and unique execution across the complete suite.
 
 Each integration shard has a 30-minute whole-job budget covering restore/build, tests, coverage/discovery and artifact uploads. Test selection, assertions and merged-coverage floors remain enforced.
 

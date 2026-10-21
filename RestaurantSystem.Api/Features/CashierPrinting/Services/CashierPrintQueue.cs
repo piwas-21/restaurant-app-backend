@@ -14,18 +14,18 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.CashierPrinting.Services;
 
 public sealed partial class CashierPrintQueue(ApplicationDbContext context,
-    ITableBillAssembler bills, IOrderMappingService mapping, ICurrentUserService currentUser, IOptions<CashierPrintSettings> settings) : ICashierPrintQueue
+    ITableBillAssembler bills, IOrderMappingService mapping, ICurrentStaffTicketReader tickets, ICurrentUserService currentUser, IOptions<CashierPrintSettings> settings) : ICashierPrintQueue
 {
     private readonly CashierPrintSettings _settings = settings.Value;
 
-    public async Task<CashierPrintJobDto> QueueAsync(QueueCashierPrintRequest request,
+    private async Task<CashierPrintJobDto> QueueOnceAsync(QueueCashierPrintRequest request,
         bool automatic, CancellationToken cancellationToken)
     {
         if (request.OperationId == Guid.Empty || request.ExpectedVersion < 1
             || request.OrderId.HasValue == request.ServiceSessionId.HasValue)
             throw new BadRequestException("Select exactly one order or table visit with its current version.");
         await using var transaction = context.Database.CurrentTransaction is null
-            ? await context.Database.BeginTransactionAsync(cancellationToken) : null;
+            ? await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, cancellationToken) : null;
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({request.OperationId.ToString()}, 0))",
             cancellationToken);

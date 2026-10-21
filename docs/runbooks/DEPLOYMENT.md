@@ -10,7 +10,8 @@ of truth for production infra):
 - **Deploy:** merge to `develop` → promote to `main`. The push to `main` builds
   the image and `deploy.yml` auto-deploys `:latest` to the prod box.
 - **Rollback:** **Actions → deploy → Run workflow** → `image_tag = sha-<40hex>`
-  (a previous build's commit SHA). Rolls back **only the backend** service.
+  (a previous build's commit SHA). Overrides `BACKEND_TAG`; the shared `deploy.sh`
+  pulls and reconciles the whole legacy stack, so verify both application revisions.
 - ⚠️ A backend code-only rollback does **not** revert an EF migration the bad
   build already applied — prefer rolling *forward* with a fix for schema issues.
 

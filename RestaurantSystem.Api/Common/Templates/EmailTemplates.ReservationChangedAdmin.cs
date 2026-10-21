@@ -1,4 +1,5 @@
 using System.Globalization;
+using RestaurantSystem.Api.Common.Utilities;
 
 namespace RestaurantSystem.Api.Common.Templates;
 
@@ -94,7 +95,7 @@ public static partial class EmailTemplates
             <!-- Action Buttons -->
             {ReservationQuickActions(t, p, approveUrl, rejectUrl)}
 
-            {AdminFooter(t, p, brand, email, frontendUrl, "/admin/reservations")}
+            {AdminFooter(t, p, brand, email, frontendUrl, FrontendRoutes.ReservationsManagement)}
     </div>";
 
             return DualSchemeDocument(t[HeadingKey], Block);

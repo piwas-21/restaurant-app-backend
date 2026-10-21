@@ -107,7 +107,7 @@
             </div>
 
             <p style='text-align: center; margin: 20px 0; padding: 16px; background: #f3f4f6; border-radius: 8px; font-size: 13px; color: #6b7280;'>
-                Need to modify details? <a href='https://demo.test/admin/reservations' style='color: #3b82f6; text-decoration: none; font-weight: 600;'>Open dashboard</a> for advanced management
+                Need to modify details? <a href='https://demo.test/admin/reservations-management' style='color: #3b82f6; text-decoration: none; font-weight: 600;'>Open dashboard</a> for advanced management
             </p>
 
             <div style='margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;'>
@@ -212,7 +212,7 @@
             </div>
 
             <p style='text-align: center; margin: 20px 0; padding: 16px; background: #374151; border-radius: 8px; font-size: 13px; color: #9ca3af;'>
-                Need to modify details? <a href='https://demo.test/admin/reservations' style='color: #60a5fa; text-decoration: none; font-weight: 600;'>Open dashboard</a> for advanced management
+                Need to modify details? <a href='https://demo.test/admin/reservations-management' style='color: #60a5fa; text-decoration: none; font-weight: 600;'>Open dashboard</a> for advanced management
             </p>
 
             <div style='margin-top: 32px; padding-top: 24px; border-top: 1px solid #4b5563;'>
