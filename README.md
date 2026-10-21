@@ -191,8 +191,8 @@ replacement. Never alter discovery counts, test reports or coverage floors to ma
 Integration tests are partitioned by namespace: shard 1 owns Common, Products, Payments, Menus,
 DeliveryChannels, ServerWorkspace and Account-prefixed Orders classes; shard 2 owns CustomerNativeReservation-prefixed
 Reservations classes except Edit-prefixed classes, plus the remaining namespaces; shard 3 owns other Orders classes,
-legacy Reservations and TableGuestVisits; shard 4 owns Basket, Auth, Customer-prefixed Orders classes and
-CustomerNativeReservationEdit-prefixed Reservations classes. The aggregate checks discovery counts and unique execution across the complete suite.
+legacy Reservations, TableGuestVisits and CustomerNativeReservationEditRead-prefixed Reservations classes;
+shard 4 owns Basket, Auth, Customer-prefixed Orders classes and other CustomerNativeReservationEdit-prefixed Reservations classes. The aggregate checks discovery counts and unique execution across the complete suite.
 
 Each integration shard has a 30-minute whole-job budget covering restore/build, tests, coverage/discovery and artifact uploads. Test selection, assertions and merged-coverage floors remain enforced.
 
