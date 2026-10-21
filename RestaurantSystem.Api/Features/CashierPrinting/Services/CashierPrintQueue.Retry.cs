@@ -7,15 +7,13 @@ namespace RestaurantSystem.Api.Features.CashierPrinting.Services;
 
 public sealed partial class CashierPrintQueue
 {
-    private const int MaximumSnapshotAttempts = 3;
-
     public async Task<CashierPrintJobDto> QueueAsync(QueueCashierPrintRequest request,
         bool automatic, CancellationToken cancellationToken)
     {
         // A visit close owns its existing transaction and session lock. A standalone request owns
         // a repeatable snapshot; an advisory-lock waiter may need a fresh snapshot to see a replay.
         var ownsTransaction = context.Database.CurrentTransaction is null;
-        for (var attempt = 0; attempt < MaximumSnapshotAttempts; attempt++)
+        for (var attempt = 0; attempt < _settings.MaximumSnapshotAttempts; attempt++)
         {
             try
             {

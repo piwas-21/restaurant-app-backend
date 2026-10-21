@@ -9,6 +9,9 @@ public sealed class CashierPrintSettings
     [Range(1, 1440)]
     public int CapabilityFreshnessMinutes { get; set; } = 5;
 
+    [Range(1, 10)]
+    public int MaximumSnapshotAttempts { get; set; } = 3;
+
     [Range(1, 365)]
     public int QueueLifetimeDays { get; set; } = 1;
 }
