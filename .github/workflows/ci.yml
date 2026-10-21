@@ -102,10 +102,11 @@ jobs:
   # PostgreSQL service and the existing four xUnit database lanes.
   # Shard 1 owns its listed namespaces and Account-prefixed Orders classes;
   # shard 4 owns Basket, Auth and Customer-prefixed Orders classes; shard 3 owns
-  # other Orders classes plus legacy Reservations; shard 2 owns native Reservations and remaining namespaces.
+  # other Orders classes, legacy Reservations and TableGuestVisits; shard 2 owns native Reservations and remaining namespaces.
   # The HTTP-heavy Basket/Auth/customer-order work has its own runner so the
   # catch-all shard can finish within the existing whole-job budget. Native reservation HTTP
-  # cases use shard 2; legacy Reservations share Orders. The whole-job cap stays at 30 minutes.
+  # cases use shard 2; legacy Reservations and table visits share Orders. Moving table visits
+  # off the near-limit catch-all uses the measured spare capacity in shard 3. The cap stays at 30 minutes.
   # VSTest discovery and merged JUnit output below verify an exhaustive, disjoint
   # partition on every run. All tests and merged-coverage floors remain enforced.
   dotnet_test:
@@ -123,10 +124,10 @@ jobs:
               FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.Account|FullyQualifiedName~RestaurantSystem.IntegrationTests.Infrastructure.
           - shard: 2
             filter: >-
-              (FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Auth.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Infrastructure.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Reservations.)|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Reservations.CustomerNativeReservation
+              (FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.ServerWorkspace.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Auth.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Infrastructure.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Reservations.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.TableGuestVisits.)|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Reservations.CustomerNativeReservation
           - shard: 3
             filter: >-
-              (FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Account&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Customer)|(FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Reservations.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Reservations.CustomerNativeReservation)
+              (FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Account&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.Customer)|(FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Reservations.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Reservations.CustomerNativeReservation)|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.TableGuestVisits.
           - shard: 4
             filter: >-
               FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Basket.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Auth.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.Customer

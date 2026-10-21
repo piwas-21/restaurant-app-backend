@@ -57,10 +57,11 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 250 includes four native Google challenge/completion actions and five strict native account-email actions alongside owned native cancellation and original-proof preparation/recovery alongside private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
+    /// Floor 258 includes four protected native table-round actions and four owned reservation-edit
+    /// actions, four native Google challenge/completion actions and five strict native account-email actions alongside owned native cancellation and original-proof preparation/recovery alongside private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
     /// root edits, durable cancellations, channel operations, account payments and guest checkout.
     /// </summary>
-    private const int KnownMutatingActionCount = 250;
+    private const int KnownMutatingActionCount = 258;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -70,6 +71,15 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// </summary>
     private static readonly string[] AnonymousWrites =
     [
+        // Native rounds prepare only after current participant/session/basket/rollout checks.
+        // A purpose-bound private original proof permits minimal recovery/stopping after visit
+        // expiry or module withdrawal; invalid JWTs never become guests. Submit rechecks current
+        // participant/revision/server price and atomically commits the shared visit/order and
+        // both receipts. All four share coarse-IP and participant-bounded table-round ingress.
+        "CustomerMobileTableRoundsController.Prepare [POST]",
+        "CustomerMobileTableRoundsController.Submit [POST]",
+        "CustomerMobileTableRoundsController.Recover [POST]",
+        "CustomerMobileTableRoundsController.Stop [POST]",
         // Native booking ingress requires canonical session/principal and a server-protected,
         // purpose/tenant/owner/input-bound preparation. Invalid JWTs never become guests.
         // Create rechecks current rollout/time/capacity under schedule/account authority and

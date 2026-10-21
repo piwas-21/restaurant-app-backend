@@ -11,6 +11,6 @@ public static class TableGuestVisitServiceExtensions
         services.AddScoped<ITableGuestParticipantPaymentAuthorization, TableGuestParticipantPaymentAuthorization>();
         services.AddScoped<ITableGuestVisitRevoker, TableGuestVisitRevoker>();
         services.AddScoped<ITableGuestRoundOperationStore, TableGuestRoundOperationStore>();
-        return services;
+        return services.AddCustomerTableRoundServices();
     }
 }
