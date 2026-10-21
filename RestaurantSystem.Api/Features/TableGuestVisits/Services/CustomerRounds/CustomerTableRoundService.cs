@@ -38,14 +38,16 @@ public sealed class CustomerTableRoundService(ApplicationDbContext context, IBas
             proofs.RequireInput(request, owner, binding);
         }
         var decision = await UnderLockAsync(sessionId, owner, proof.OperationId, () =>
-            DecideAsync(sessionId, owner, proof, binding, request, token, cancelAttempt, cancellationToken), cancellationToken);
+            DecideAsync(owner, proof, binding, request, token, cancelAttempt, cancellationToken), cancellationToken);
         if (decision.Order is { } order) await delivery.NotifyAsync(order, proof.OperationId, cancellationToken);
         return decision.Resolution;
     }
-    private async Task<CustomerTableRoundDecision> DecideAsync(string sessionId, CustomerTableRoundOwner owner, CustomerTableRoundProofDto proof,
+    private async Task<CustomerTableRoundDecision> DecideAsync(CustomerTableRoundOwner owner, CustomerTableRoundProofDto proof,
         CustomerTableRoundBinding binding, CustomerTableRoundIntentDto? request, string? token, bool cancelAttempt,
         CancellationToken cancellationToken)
     {
+        // Capture has already required the exact canonical session spelling.
+        var sessionId = owner.BasketSessionId.ToString("D");
         var previous = await receipts.ReadAsync(owner, proof, binding, cancellationToken);
         if (previous is not null)
         {
