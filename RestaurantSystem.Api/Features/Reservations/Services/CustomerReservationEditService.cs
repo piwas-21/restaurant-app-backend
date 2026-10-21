@@ -67,29 +67,36 @@ public sealed class CustomerReservationEditService(ApplicationDbContext context,
         if (previous is not null) return new(CustomerReservationDecisions.ToResolution(previous), null);
         if (request is null && !cancelAttempt)
             return new(new(1, proof.OperationId, CustomerReservationOperationOutcome.Unseen, null), null);
-        var draft = row is null || request is null ? null
-            : await ApplyUnderLockAsync(request, row, owner, binding, cancellationToken);
-        var applied = draft is null ? null : await reads.ReadAsync(draft.Reservation.Id, cancellationToken);
-        if (applied is not null && applied.Currency != binding.Currency) throw Unavailable();
-        if (applied is not null && applied.Revision != draft?.Reservation.Revision)
+        if (request is null)
+        {
+            await RecordAsync(proof, owner, null, cancelAttempt, cancellationToken);
+            return new(new(1, proof.OperationId, CustomerReservationOperationOutcome.Cancelled, null), null);
+        }
+        // A new submit locked its booking before Customer authority; canonical replay returned above.
+        var draft = await ApplyUnderLockAsync(request, row!, owner, binding, cancellationToken);
+        var applied = await reads.ReadAsync(draft.Reservation.Id, cancellationToken);
+        if (applied.Currency != binding.Currency) throw Unavailable();
+        if (applied.Revision != draft.Reservation.Revision)
             throw new ConflictException("This booking changed before its receipt could be saved.");
+        await RecordAsync(proof, owner, draft.Reservation.Id, cancelAttempt, cancellationToken);
+        await editor.RevalidateAsync(request, applied, draft.Edit, cancellationToken);
+        if (Capture(sessionId, proof) != owner) throw Unavailable();
+        return new(new(1, proof.OperationId, cancelAttempt ? CustomerReservationOperationOutcome.Cancelled
+            : CustomerReservationOperationOutcome.Applied, draft.Reservation.Id), draft);
+    }
+    private async Task RecordAsync(CustomerReservationProofDto proof, CustomerReservationOperationOwner owner,
+        Guid? reservationId, bool cancelAttempt, CancellationToken cancellationToken)
+    {
         context.Set<CustomerReservationOperation>().Add(new CustomerReservationOperation
         {
             OperationId = proof.OperationId,
             OwnerHash = owner.OwnerHash,
             PayloadHash = owner.PayloadHash,
-            ReservationId = draft?.Reservation.Id,
+            ReservationId = reservationId,
             IsCancelled = cancelAttempt,
             CompletedAt = clock.GetUtcNow().UtcDateTime
         });
         await context.SaveChangesAsync(cancellationToken);
-        if (draft is not null && request is not null && applied is not null)
-        {
-            await editor.RevalidateAsync(request, applied, draft.Edit, cancellationToken);
-            if (Capture(sessionId, proof) != owner) throw Unavailable();
-        }
-        return new(new(1, proof.OperationId, cancelAttempt ? CustomerReservationOperationOutcome.Cancelled
-            : CustomerReservationOperationOutcome.Applied, draft?.Reservation.Id), draft);
     }
     private async Task<CustomerReservationEditDraft> ApplyUnderLockAsync(CustomerReservationEditDto request, Reservation row,
         CustomerReservationOperationOwner owner, CustomerReservationEditBinding binding, CancellationToken cancellationToken)

@@ -46,7 +46,7 @@ public sealed class CustomerReservationEditor(ApplicationDbContext context, ICus
         await RequireFieldsAsync(request, cancellationToken);
         await RequireArrangementAsync(request, original.AssignedTables, edit.ShapeChanged, cancellationToken);
         await reads.RevalidateAsync(original, cancellationToken);
-        CustomerReservationEditability.RequireFuture(ReservationStatus.Pending, request.Date!.Value, request.StartTime!.Value, clock.Now);
+        CustomerReservationEditability.RequireFuture(ReservationStatus.Pending, request.Date.Value, request.StartTime.Value, clock.Now);
         var tableNumber = await context.Tables.AsNoTracking().Where(table => table.Id == row.TableId)
             .Select(table => table.TableNumber).SingleAsync(cancellationToken);
         return new(original, row, edit, tableNumber);
