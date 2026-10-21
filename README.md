@@ -147,6 +147,22 @@ later staff/booking changes, open the uniform unavailable page with dashboard re
 restore an old signing/unsigned fallback to revive them. New version2 mail works after the revision
 migration already required by owned cancellation; this fix adds no migration or tenant activation.
 
+### Native table payment account reads
+
+`GET /api/customer-mobile/table-payments/account` requires schema1, the configured tenant UUID,
+the original table-visit UUID, a canonical `X-Session-Id`, and a separate live `X-Table-Participant`.
+Customer authentication never replaces the participant grant; invalid, staff or deleted-account
+credentials cannot fall back to guest access. Current native capabilities, currency and participant
+authority are checked again after the shared ledger read. Responses are private and `no-store`.
+
+The response wraps the shared server account, including reserved contribution amounts and redacted
+foreign attempt summaries. Schema1 refuses inexact JavaScript integers, more than 5,000 allocation
+segments, 1,000 active summaries or 1,000 shares, and unsupported allocation versions. These are
+response limits; the existing shared debt reader still scans the visit ledger without a row bound.
+Account reads do not create a quote, reserve money or authorize provider navigation. Durable native
+quote/reserve/start/recovery, all payment modes and their installed/provider acceptance remain open.
+The endpoint adds no migration, configuration activation or change to web/staff/printer contracts.
+
 ## Pull requests
 
 Every pull request uses [.github/pull_request_template.md](.github/pull_request_template.md). Include acceptance coverage, validation and deployment notes before creating it with the GitHub UI or `gh pr create`.
