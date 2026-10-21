@@ -193,6 +193,10 @@ public class ReservationQuickActionLinkAuthorizationTests : IntegrationTestBase
         var body = await response.Content.ReadAsStringAsync();
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
         body.Should().Contain(RefusalMarker);
+        var frontendUrl = Factory.Services.GetRequiredService<IOptions<EmailSettings>>()
+            .Value.FrontendBaseUrl.TrimEnd('/');
+        body.Should().Contain($"href='{WebUtility.HtmlEncode(frontendUrl)}/admin/reservations-management'",
+            "the deployed frontend provides its authenticated booking page at this exact route");
         body.Should().NotContain("Exception", "an anonymous caller must never be shown a stack trace");
     }
 

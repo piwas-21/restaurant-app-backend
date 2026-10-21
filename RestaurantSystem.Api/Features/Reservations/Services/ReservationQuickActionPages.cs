@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.Reservations.Services;
@@ -48,7 +49,7 @@ public sealed class ReservationQuickActionPages : IReservationQuickActionPages
             "<p>Reservation links expire, and they stop working once the booking has been " +
             "approved or rejected \u2014 including by this same link.</p>" +
             "<p>Open the reservations dashboard to see the booking and decide it there.</p>" +
-            $"<div class='details'><p><a href='{_html.Escape(_emailSettings.FrontendBaseUrl)}/admin/reservations'>" +
+            $"<div class='details'><p><a href='{_html.Escape(UrlJoin.Join(_emailSettings.FrontendBaseUrl, FrontendRoutes.ReservationsManagement))}'>" +
             "Go to the reservations dashboard</a></p></div>",
     });
 
