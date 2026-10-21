@@ -802,6 +802,8 @@ RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationCancellat
     .AddCustomerReservationCancellation(builder.Services);
 RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationEditReadRegistration
     .AddCustomerReservationEditReads(builder.Services);
+RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationEditRegistration
+    .AddCustomerReservationEdits(builder.Services);
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationProofService,
     RestaurantSystem.Api.Features.Reservations.Services.CustomerReservationProofService>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.ICustomerReservationOperationGuard,
