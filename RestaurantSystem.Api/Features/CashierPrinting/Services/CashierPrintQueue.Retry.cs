@@ -15,7 +15,7 @@ public sealed partial class CashierPrintQueue
         // A visit close owns its existing transaction and session lock. A standalone request owns
         // a repeatable snapshot; an advisory-lock waiter may need a fresh snapshot to see a replay.
         var ownsTransaction = context.Database.CurrentTransaction is null;
-        for (var attempt = 1; ; attempt++)
+        for (var attempt = 0; attempt < MaximumSnapshotAttempts; attempt++)
         {
             try
             {
@@ -25,10 +25,9 @@ public sealed partial class CashierPrintQueue
             {
                 var tracked = context.CashierPrintJobs.Local.SingleOrDefault(job => job.Id == request.OperationId);
                 if (tracked is not null) context.Entry(tracked).State = EntityState.Detached;
-                if (attempt >= MaximumSnapshotAttempts)
-                    throw new ConflictException("The bill changed while printing. Refresh before printing again.");
             }
         }
+        throw new ConflictException("The bill changed while printing. Refresh before printing again.");
     }
 
     private static bool IsSnapshotRace(Exception exception) => exception switch

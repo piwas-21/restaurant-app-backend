@@ -37,9 +37,16 @@ internal static class CurrentCashierReceipt
             TotalPaid = paid,
             RemainingAmount = due,
             IsFullyPaid = due <= 0,
-            PaymentStatus = due < 0 ? "Overpaid" : due == 0 ? "Completed" : paid > 0 ? "PartiallyPaid" : "Pending",
+            PaymentStatus = PaymentStatus(due, paid),
             Payments = orders.SelectMany(order => order.Payments).ToList(),
         };
         return CashierReceiptSnapshot.Sanitize(receipt);
+    }
+
+    private static string PaymentStatus(decimal due, decimal paid)
+    {
+        if (due < 0) return "Overpaid";
+        if (due == 0) return "Completed";
+        return paid > 0 ? "PartiallyPaid" : "Pending";
     }
 }
