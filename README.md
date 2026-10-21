@@ -11,6 +11,7 @@ Restaurant management system backend — REST API, CQRS, EF Core, PostgreSQL.
 - **.NET 10** (Web API)
 - **EF Core 10** + PostgreSQL
 - **Custom CQRS mediator** ([CustomMediator.cs](RestaurantSystem.Api/Common/CustomMediator.cs)) — NOT MediatR. See [ADR-001](docs/adr/ADR-001-custom-cqrs-mediator.md).
+- **Cashier printing:** Durable dashboard bills use the same current-ticket projection as staff/browser receipts, including committed amendments and related rounds. Structured ingredient selections/removals remain available to printer apps; free-text kitchen notes stay off cashier bills. Printer app 1.0.41 exposes the optional ingredient/sauce display switch (off by default).
 - **JWT Bearer auth** with role-based authorization (Customer / Server / Cashier / Admin). See [ADR-003](docs/adr/ADR-003-jwt-scope-and-claims.md).
 - **Soft-delete** via global query filter. See [ADR-002](docs/adr/ADR-002-soft-delete-strategy.md).
 - **xUnit** integration tests

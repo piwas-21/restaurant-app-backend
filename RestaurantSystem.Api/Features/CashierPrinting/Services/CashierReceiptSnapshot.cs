@@ -8,9 +8,9 @@ internal static class CashierReceiptSnapshot
 {
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    internal static OrderDto FromBill(TableBillDto bill)
+    internal static OrderDto FromBill(TableBillDto bill, IReadOnlyList<OrderDto>? current = null)
     {
-        var orders = bill.Orders.Where(order => order.Status != "Cancelled").ToList();
+        var orders = (current ?? bill.Orders).Where(order => order.Status != "Cancelled").ToList();
         var remaining = bill.Rounds.Where(round => round.SettlementState is not ("Refunded" or "PartiallyRefunded"))
             .Sum(round => round.Outstanding);
         var refunded = bill.Rounds.Sum(round => round.RefundedAmount);
@@ -26,10 +26,11 @@ internal static class CashierReceiptSnapshot
             TableNumber = bill.TableNumber,
             Currency = bill.Currency,
             OrderDate = bill.GeneratedAt,
-            SubTotal = bill.SubTotal,
-            Tax = bill.Tax,
-            Discount = bill.Discount,
+            SubTotal = current is null ? bill.SubTotal : orders.Sum(order => order.SubTotal),
+            Tax = current is null ? bill.Tax : orders.Sum(order => order.Tax),
+            Discount = current is null ? bill.Discount : orders.Sum(order => order.Discount),
             CustomerDiscountAmount = orders.Sum(order => order.CustomerDiscountAmount),
+            FidelityPointsDiscount = orders.Sum(order => order.FidelityPointsDiscount),
             DeliveryFee = orders.Sum(order => order.DeliveryFee),
             Tip = bill.Tip,
             Total = bill.Total,
@@ -43,7 +44,7 @@ internal static class CashierReceiptSnapshot
             PaymentTipMinor = orders.Sum(order => order.PaymentTipMinor),
             BillChargeAmount = orders.Sum(order => order.BillChargeAmount),
             BillCharges = orders.SelectMany(order => order.BillCharges).ToList(),
-            BillingCreditAmount = bill.BillingCreditAmount,
+            BillingCreditAmount = current is null ? bill.BillingCreditAmount : 0,
             PaymentStatus = PaymentStatus(bill, remaining, refunded),
             Items = orders.SelectMany(order => order.Items).ToList(),
             Payments = orders.SelectMany(order => order.Payments).ToList(),
@@ -86,7 +87,7 @@ internal static class CashierReceiptSnapshot
 
     private static void SanitizeItem(OrderItemDto item)
     {
-        item.SpecialInstructions = null; item.IngredientCustomizations = [];
+        item.SpecialInstructions = null;
         foreach (var child in item.SideItems ?? []) SanitizeItem(child);
     }
 }
