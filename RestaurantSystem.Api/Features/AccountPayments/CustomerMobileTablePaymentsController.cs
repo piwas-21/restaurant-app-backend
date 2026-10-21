@@ -10,13 +10,15 @@ using RestaurantSystem.Api.Features.AccountPayments.Queries;
 namespace RestaurantSystem.Api.Features.AccountPayments;
 
 [ApiController]
-[AllowAnonymous]
 [Route("api/customer-mobile/table-payments")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 [EnableRateLimiting(TableGuestVisitRateLimitPolicies.AccountPolicyName)]
 public sealed class CustomerMobileTablePaymentsController(CustomMediator mediator) : ControllerBase
 {
+    private const int MaximumPreparationBodyBytes = 128 * 1024;
+
     [HttpGet("account")]
+    [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<CustomerTablePaymentAccountDto>>> Account(
         [FromHeader(Name = "X-Session-Id")] string sessionId,
         [FromHeader(Name = "X-Table-Participant")] string? participantToken,
@@ -24,4 +26,12 @@ public sealed class CustomerMobileTablePaymentsController(CustomMediator mediato
         CancellationToken cancellationToken) => Ok(await mediator.SendQuery(
             new GetCustomerTablePaymentAccountQuery(sessionId, participantToken, schemaVersion, tenantId, serviceSessionId),
             cancellationToken));
+    [HttpPost("prepare")]
+    [AllowAnonymous]
+    [RequestSizeLimit(MaximumPreparationBodyBytes)]
+    public async Task<ActionResult<ApiResponse<CustomerTablePaymentPreparedDto>>> Prepare(
+        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromHeader(Name = "X-Table-Participant")] string? participantToken,
+        [FromBody] CustomerTablePaymentIntentDto request, CancellationToken cancellationToken) =>
+        Ok(await mediator.SendQuery(new PrepareCustomerTablePaymentQuery(sessionId, participantToken, request), cancellationToken));
 }

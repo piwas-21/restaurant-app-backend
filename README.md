@@ -164,6 +164,17 @@ Account reads do not create a quote, reserve money or authorize provider navigat
 quote/reserve/start/recovery, all payment modes and their installed/provider acceptance remain open.
 The endpoint adds no migration, configuration activation or change to web/staff/printer contracts.
 
+### Native table-payment preparation
+
+The additive schema1 `POST /api/customer-mobile/table-payments/prepare` reviews an item, amount,
+full-account or existing shared-plan contribution using the same selection rules as web/staff
+quotes. Separate native owner/session and current participant authority, explicit rollout,
+configured guest/provider policy and reviewed hosted settings are required. Fresh authority is
+checked after the ledger snapshot ends. Its exact server allocations and protected original proof
+create no quote row, reservation, payment decision or provider request; `table-payments` stays
+unknown. Durable writes, original recovery and deployed/provider/installed acceptance follow.
+See [the preparation contract](docs/api/customer-mobile-table-payments.md). No migration is added.
+
 ## Pull requests
 
 Every pull request uses [.github/pull_request_template.md](.github/pull_request_template.md). Include acceptance coverage, validation and deployment notes before creating it with the GitHub UI or `gh pr create`.
