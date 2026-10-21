@@ -50,8 +50,10 @@ public sealed class CustomerTableRoundIngressTests(DatabaseFixture fixture) : Cu
             .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
         actions.Select(value => value.Name).Should().BeEquivalentTo("Prepare", "Submit", "Recover", "Stop");
         foreach (var action in actions)
-            action.GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName
-                .Should().Be(TableGuestVisitRateLimitPolicies.RoundPolicyName);
+        {
+            var policy = action.GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName;
+            policy.Should().Be(TableGuestVisitRateLimitPolicies.RoundPolicyName);
+        }
     }
 
     private async Task<HttpResponseMessage> SendUntrustedAsync<T>(string path, T body)
