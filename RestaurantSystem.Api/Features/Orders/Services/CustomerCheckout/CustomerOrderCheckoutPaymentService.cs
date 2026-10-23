@@ -16,7 +16,6 @@ public sealed class CustomerOrderCheckoutPaymentService(ApplicationDbContext con
     ICustomerOrderCheckoutCreationPolicy creation, IOptions<CustomerHostedCheckoutSettings> settings)
     : ICustomerOrderCheckoutPaymentService
 {
-    private const int MaximumHostedUrlLength = 8192;
 
     public async Task<CustomerOrderPaymentDto> RecoverAsync(string sessionId, CustomerOrderRecoveryDto proof,
         CancellationToken cancellationToken)
@@ -31,7 +30,7 @@ public sealed class CustomerOrderCheckoutPaymentService(ApplicationDbContext con
             var outcome = Outcome(row, journal, evidence);
             string? url = null;
             if (outcome == "pending" && row is null && evidence.IsOpen && evidence.PaymentStatus == "unpaid"
-                && now < journal.ExpiresAt && TrustedPage(evidence.Url))
+                && now < journal.ExpiresAt && RestaurantSystem.Api.Features.Payments.Services.TrustedHostedCheckoutUrl.IsAllowed(evidence.Url, settings.Value.HostedPageOrigins))
             {
                 try
                 {
@@ -65,8 +64,4 @@ public sealed class CustomerOrderCheckoutPaymentService(ApplicationDbContext con
         return "pending";
     }
 
-    private bool TrustedPage(string? url) => url is { Length: > 0 and <= MaximumHostedUrlLength }
-        && !url.Any(char.IsControl) && !url.Contains('\\') && Uri.TryCreate(url, UriKind.Absolute, out var uri)
-        && uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort && uri.UserInfo.Length == 0
-        && settings.Value.HostedPageOrigins.Contains(uri.GetLeftPart(UriPartial.Authority), StringComparer.Ordinal);
 }

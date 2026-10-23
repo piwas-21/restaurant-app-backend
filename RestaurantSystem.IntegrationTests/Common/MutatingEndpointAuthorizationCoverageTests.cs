@@ -57,11 +57,11 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 262 includes three original-proof native contribution actions alongside read-only native table-payment preparation and four protected native table-round actions and four owned reservation-edit
+    /// Floor 265 includes three original-proof native checkout actions and three original-proof native contribution actions alongside read-only native table-payment preparation and four protected native table-round actions and four owned reservation-edit
     /// actions, four native Google challenge/completion actions and five strict native account-email actions alongside owned native cancellation and original-proof preparation/recovery alongside private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
     /// root edits, durable cancellations, channel operations, account payments and guest checkout.
     /// </summary>
-    private const int KnownMutatingActionCount = 262;
+    private const int KnownMutatingActionCount = 265;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -83,6 +83,12 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
         "CustomerMobileTablePaymentsController.Submit [POST]",
         "CustomerMobileTablePaymentsController.Recover [POST]",
         "CustomerMobileTablePaymentsController.Stop [POST]",
+        // Frozen native table checkout requires the original principal/proof/retained reservation.
+        // First freeze also rechecks live participant/policy; recover/stop retain original unknown
+        // outcomes after expiry/withdrawal. Provider I/O runs only after the short journal transaction.
+        "CustomerMobileTableCheckoutController.Start [POST]",
+        "CustomerMobileTableCheckoutController.Recover [POST]",
+        "CustomerMobileTableCheckoutController.Stop [POST]",
         // Native rounds prepare only after current participant/session/basket/rollout checks.
         // A purpose-bound private original proof permits minimal recovery/stopping after visit
         // expiry or module withdrawal; invalid JWTs never become guests. Submit rechecks current

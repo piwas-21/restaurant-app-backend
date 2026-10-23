@@ -7,5 +7,6 @@ public sealed record AccountStripeExpectation
     public required long AmountMinor { get; init; }
     public required string Currency { get; init; }
     public string? SessionId { get; init; }
+    public Services.NativeAccountCheckoutScope? NativeScope { get; init; }
     public string? IntentId { get; init; }
 }

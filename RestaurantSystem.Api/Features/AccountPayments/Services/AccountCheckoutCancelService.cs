@@ -39,6 +39,7 @@ public sealed class AccountCheckoutCancelService(ApplicationDbContext context,
             .Select(value => value.Id).SingleOrDefaultAsync(cancellationToken);
         if (attemptId == Guid.Empty) throw Unavailable();
         var locked = await AccountCheckoutLocks.LoadAsync(context, attemptId, cancellationToken);
+        if (locked.Journal.NativeOperationId.HasValue) throw Unavailable();
         var attempt = locked.Attempt;
         if (locked.Journal.CancelRequestedAt is not null
             || attempt.State is AccountPaymentState.Captured or AccountPaymentState.Released)

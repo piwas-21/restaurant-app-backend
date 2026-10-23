@@ -3,10 +3,11 @@ using RestaurantSystem.IntegrationTests.Features.MobileDirectory;
 
 namespace RestaurantSystem.IntegrationTests.Features.MobileLinks;
 
-public sealed class MobilePaymentReturnHttpTests
+public abstract class MobilePaymentReturnHttpFixture
 {
     private const string Origin = "https://links.example";
-    private static string Path => $"/r/alpha/payment-return/{MobileDirectoryFixture.AlphaId:D}?operation={MobileDirectoryFixture.BetaId:D}";
+    protected abstract string ReturnSegment { get; }
+    private string Path => $"/r/alpha/{ReturnSegment}/{MobileDirectoryFixture.AlphaId:D}?operation={MobileDirectoryFixture.BetaId:D}";
 
     [Theory]
     [InlineData("active")]
@@ -27,12 +28,12 @@ public sealed class MobilePaymentReturnHttpTests
         Assert.Null(response.Headers.Location);
         Assert.False(response.Headers.Contains("Set-Cookie"));
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("does not confirm payment or cancel your order", html, StringComparison.Ordinal);
+        Assert.Contains("does not confirm payment or cancel", html, StringComparison.Ordinal);
         Assert.DoesNotContain(MobileDirectoryFixture.AlphaId.ToString(), html, StringComparison.Ordinal);
         Assert.DoesNotContain(MobileDirectoryFixture.BetaId.ToString(), html, StringComparison.Ordinal);
         Assert.DoesNotContain("script", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("href", html, StringComparison.OrdinalIgnoreCase);
-        using var other = await client.GetAsync($"/r/alpha/payment-return/{Guid.NewGuid():D}?operation={Guid.NewGuid():D}");
+        using var other = await client.GetAsync($"/r/alpha/{ReturnSegment}/{Guid.NewGuid():D}?operation={Guid.NewGuid():D}");
         Assert.Equal(HttpStatusCode.OK, other.StatusCode);
         Assert.Equal(html, await other.Content.ReadAsStringAsync());
     }
@@ -84,4 +85,14 @@ public sealed class MobilePaymentReturnHttpTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+}
+
+public sealed class MobilePaymentReturnHttpTests : MobilePaymentReturnHttpFixture
+{
+    protected override string ReturnSegment => "payment-return";
+}
+
+public sealed class MobileTablePaymentReturnHttpTests : MobilePaymentReturnHttpFixture
+{
+    protected override string ReturnSegment => "table-payment-return";
 }

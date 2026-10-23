@@ -16,6 +16,8 @@ public sealed class AccountCheckoutEvidenceReader(IAccountStripeCheckoutClient p
     public async Task<AccountCheckoutCanonicalEvidence> ReadAsync(AccountCheckoutJournal journal,
         bool allowOriginalCreateRetry, CancellationToken cancellationToken)
     {
+        if (journal.NativeOperationId.HasValue || journal.NativeTenantId.HasValue)
+            AccountCheckoutReplayPayload.Frozen(journal);
         if (provider.ReadContext() != new AccountStripeContext(journal.ProviderAccountId, journal.ProviderLiveMode))
             throw new ConflictException("Reconcile the original provider account and environment.");
         AccountStripeSession session;

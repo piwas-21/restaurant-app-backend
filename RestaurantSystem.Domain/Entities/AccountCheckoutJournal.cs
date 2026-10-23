@@ -6,6 +6,8 @@ namespace RestaurantSystem.Domain.Entities;
 public sealed class AccountCheckoutJournal : Entity
 {
     public Guid AttemptId { get; set; }
+    public Guid? NativeOperationId { get; set; }
+    public Guid? NativeTenantId { get; set; }
     public int StartedAttemptVersion { get; set; }
     public long AmountMinor { get; set; }
     public string Currency { get; set; } = string.Empty;

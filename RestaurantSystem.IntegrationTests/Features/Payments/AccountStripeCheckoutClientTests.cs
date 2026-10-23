@@ -12,7 +12,7 @@ using Stripe.Checkout;
 
 namespace RestaurantSystem.IntegrationTests.Features.Payments;
 
-public sealed class AccountStripeCheckoutClientTests
+public sealed partial class AccountStripeCheckoutClientTests
 {
     private static readonly Guid AttemptId = Guid.Parse("57b60e3e-ebec-40bc-a4e3-f31ee46e7efb");
     private const string Account = "acct_transport";

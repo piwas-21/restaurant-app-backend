@@ -50,7 +50,7 @@ public sealed class CustomerTablePaymentOperationMigrationTests(DatabaseFixture 
         var downgrade = () => context.GetService<IMigrator>().MigrateAsync(Previous);
         (await downgrade.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
         (await context.Set<CustomerTablePaymentOperation>().SingleAsync()).OperationId.Should().Be(operation.OperationId);
-        (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
+        (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be("20261023010734_" + nameof(AddCustomerTablePaymentOperations));
     }
 
     [Fact]
