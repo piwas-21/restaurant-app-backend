@@ -171,8 +171,8 @@ full-account or existing shared-plan contribution using the same selection rules
 quotes. Separate native owner/session and current participant authority, explicit rollout,
 configured guest/provider policy and reviewed hosted settings are required. Fresh authority is
 checked after the ledger snapshot ends. Its exact server allocations and protected original proof
-create no quote row, reservation, payment decision or provider request; `table-payments` stays
-unknown. Deployed/provider/installed acceptance remain separate.
+create no quote row, reservation, payment decision or provider request. Native creation remains
+unknown until separately approved readiness. Deployed/provider/installed acceptance remain separate.
 Native `submit` atomically records the shared quote/reservation and a permanent original-operation
 decision; original-proof `recover`/`stop` remain available after participant expiry or feature
 withdrawal. Stopping unseen work seals late submission. Applied work retains its original attempt,
@@ -182,8 +182,11 @@ downgrade. Ordinary web checkout/cancellation cannot operate native journals. Or
 checkout freezes a distinct tenant/operation/attempt identity and central table return path before
 provider I/O. Shared leased reconciliation requires complete canonical capture before paid; unknown
 outcomes retain the original reservation. Optional native journal fields preserve ordinary frozen
-payload bytes. Bootstrap activation, native client integration and signed/deployed acceptance remain
-open. See [the contribution contract](docs/api/customer-mobile-table-payments.md).
+payload bytes. Bootstrap reports table payments enabled only with separate
+`CustomerHostedCheckout:TablePaymentsEnabled` approval (default false), all existing native/module/visit
+gates, valid hosted routing and current matching guest/provider limits. The same gate protects new
+preparation/submission/checkout; original recovery and stopping survive withdrawal. Native client
+integration and signed/deployed acceptance remain open. See [the contribution contract](docs/api/customer-mobile-table-payments.md).
 
 ## Pull requests
 

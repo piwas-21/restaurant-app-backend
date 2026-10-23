@@ -34,7 +34,7 @@ public abstract class CustomerTablePaymentPreparationFixture(DatabaseFixture fix
             value.EnabledCapabilities = ["ordering", "accounts", "table-visits", "table-payments"]);
         services.PostConfigure<CustomerHostedCheckoutSettings>(value =>
         {
-            value.Enabled = true; value.LinkOrigin = "https://links.example.test";
+            value.Enabled = true; value.TablePaymentsEnabled = true; value.LinkOrigin = "https://links.example.test";
             value.TenantSlug = "fixture"; value.HostedPageOrigins = ["https://checkout.example.test"];
         });
         services.PostConfigure<AccountOnlineContributionSettings>(value => value.SettlementCurrency = "CHF");

@@ -20,7 +20,7 @@ public sealed record GetCustomerMobileBootstrapQuery(int ContractVersion)
 public sealed class GetCustomerMobileBootstrapQueryHandler(
     ApplicationDbContext context,
     IOptions<CustomerMobileSettings> mobile,
-    ICustomerNativeAuthenticationCapabilities authentication,
+    ICustomerNativeCapabilities nativeCapabilities,
     IOptions<LocalizationSettings> localization,
     ITenantModules modules,
     ITenantFeatures features,
@@ -37,9 +37,10 @@ public sealed class GetCustomerMobileBootstrapQueryHandler(
         var currency = await context.RestaurantInfo.AsNoTracking()
             .Select(info => info.Currency).FirstOrDefaultAsync(cancellationToken);
         var supported = query.ContractVersion == 1;
-        var capabilities = MobileCapabilityPolicy.Resolve(settings, modules, features,
-            !string.IsNullOrWhiteSpace(currency), supported);
-        var native = authentication.Resolve(capabilities.GetValueOrDefault("accounts") == "enabled");
+        var resolved = nativeCapabilities.Resolve(MobileCapabilityPolicy.Resolve(settings, modules, features,
+            !string.IsNullOrWhiteSpace(currency), supported), currency);
+        var capabilities = resolved.Capabilities;
+        var native = resolved.Authentication;
         var dto = new CustomerMobileBootstrapDto(1, settings.TenantId, currency,
             localization.Value.DefaultLanguage, clock.TimeZone.Id, settings.Lifecycle,
             supported ? "supported" : "unavailable", modules.EnabledModules, modules.IsEnforced,

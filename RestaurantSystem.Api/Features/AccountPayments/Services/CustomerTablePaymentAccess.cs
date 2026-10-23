@@ -32,6 +32,7 @@ public sealed class CustomerTablePaymentAccess(ApplicationDbContext context, ICu
         var bootstrap = (await mediator.SendQuery(new GetCustomerMobileBootstrapQuery(1), cancellationToken)).Data;
         if (bootstrap is null || bootstrap.TenantId != tenantId || bootstrap.Lifecycle != "active"
             || bootstrap.Capabilities.GetValueOrDefault("table-visits") != "enabled"
+            || bootstrap.Capabilities.GetValueOrDefault("table-payments") != "enabled"
             || !settings.Value.EnabledCapabilities.Contains("table-payments", StringComparer.Ordinal)
             || owner.CustomerId.HasValue && bootstrap.Capabilities.GetValueOrDefault("accounts") != "enabled"
             || !hosted.Value.Enabled || !hosted.Value.IsValid() || string.IsNullOrWhiteSpace(bootstrap.Currency))
