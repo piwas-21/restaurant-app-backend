@@ -62,9 +62,15 @@ public sealed class AccountEqualSharePlanService(
         var shares = request.CustomAmountsMinor.Count == 0
             ? Enumerable.Range(1, request.ShareCount).Select(AccountShareMath.Equal(total, request.ShareCount, increment).At).ToArray()
             : request.CustomAmountsMinor.ToArray();
-        foreach (var share in shares) guestPolicy.RequireContribution(share, account.Money.Currency);
-        return new(account.Session.TableId.Value, total, account.Money.Currency, checked((int)increment),
+        var review = new AccountSharePlanReviewDto(account.Session.TableId.Value, total, account.Money.Currency, checked((int)increment),
             AccountPaymentSnapshots.ToDtos(scope), shares);
+        RequireOnlineShares(review);
+        return review;
+    }
+
+    public void RequireOnlineShares(AccountSharePlanReviewDto review)
+    {
+        foreach (var share in review.SharesMinor) guestPolicy.RequireContribution(share, review.Currency);
     }
 
     private async Task<AccountEqualSharePlanDto> CreateCoreAsync(

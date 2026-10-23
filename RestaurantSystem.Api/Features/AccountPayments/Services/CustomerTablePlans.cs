@@ -13,7 +13,7 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
 public sealed class CustomerTablePlans(ApplicationDbContext context, ICustomerTablePaymentAccess access,
     ITableGuestParticipantPaymentAuthorization participants, IAccountEqualSharePlanService plans,
-    ICustomerTablePlanProofs proofs, ICustomerTablePlanDecisions decisions, IGuestAccountPaymentPolicy policy, TimeProvider clock) : ICustomerTablePlans
+    ICustomerTablePlanProofs proofs, ICustomerTablePlanDecisions decisions, TimeProvider clock) : ICustomerTablePlans
 {
     private const int MaximumNativeShares = 100;
 
@@ -92,7 +92,7 @@ public sealed class CustomerTablePlans(ApplicationDbContext context, ICustomerTa
                         || CustomerBasketOperationHash.Payload(reviewed.Scope) != binding.ScopeHash)
                         throw new ConflictException("The reviewed split changed. Refresh the account before creating a plan.");
                     var created = await plans.CreateGuestAsync(binding.ServiceSessionId, token, shared, cancellationToken);
-                    foreach (var share in reviewed.SharesMinor) policy.RequireContribution(share, binding.Currency);
+                    plans.RequireOnlineShares(reviewed);
                     planId = created.PlanId;
                 }
                 context.Set<CustomerTablePlanOperation>().Add(new()

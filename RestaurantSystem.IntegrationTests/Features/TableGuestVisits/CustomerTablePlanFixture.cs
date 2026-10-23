@@ -59,6 +59,7 @@ public abstract class CustomerTablePlanFixture(DatabaseFixture fixture) : Custom
     }
     private sealed class PlanHook(IAccountEqualSharePlanService inner, Func<AccountSharePlanReviewDto, AccountSharePlanReviewDto> review, Action after) : IAccountEqualSharePlanService
     {
+        public void RequireOnlineShares(AccountSharePlanReviewDto value) => inner.RequireOnlineShares(value);
         public async Task<AccountSharePlanReviewDto> ReviewGuestAsync(Guid session, string? token,
             CreateAccountEqualSharePlanRequest request, CancellationToken cancellationToken) =>
             review(await inner.ReviewGuestAsync(session, token, request, cancellationToken));
