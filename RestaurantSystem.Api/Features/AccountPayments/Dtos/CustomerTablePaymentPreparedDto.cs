@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Enums;
+using System.Text.Json.Serialization;
 
 namespace RestaurantSystem.Api.Features.AccountPayments.Dtos;
 
@@ -6,8 +7,10 @@ public sealed record CustomerTablePaymentPreparedDto(int SchemaVersion, Customer
     Guid ServiceSessionId, long AccountRevision, AccountPaymentMode Mode, long AmountMinor, string Currency,
     IReadOnlyList<AccountPaymentAllocationDto> Allocations);
 
-public sealed record CustomerTablePaymentProofDto(int SchemaVersion, Guid TenantId, Guid OperationId,
-    string PayloadHash, string OwnerProof);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CustomerTablePaymentProofDto([property: JsonRequired] int SchemaVersion,
+    [property: JsonRequired] Guid TenantId, [property: JsonRequired] Guid OperationId,
+    [property: JsonRequired] string PayloadHash, [property: JsonRequired] string OwnerProof);
 
 public sealed record CustomerTablePaymentBinding(Guid ServiceSessionId, Guid TableId, Guid ParticipantId,
     string ParticipantTokenHash, Guid GuestOperationId, long AccountRevision, long AmountMinor,

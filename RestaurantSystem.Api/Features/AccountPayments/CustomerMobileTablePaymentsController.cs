@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Extensions;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Features.AccountPayments.Commands;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.AccountPayments.Queries;
 
@@ -34,4 +35,28 @@ public sealed class CustomerMobileTablePaymentsController(CustomMediator mediato
         [FromHeader(Name = "X-Table-Participant")] string? participantToken,
         [FromBody] CustomerTablePaymentIntentDto request, CancellationToken cancellationToken) =>
         Ok(await mediator.SendQuery(new PrepareCustomerTablePaymentQuery(sessionId, participantToken, request), cancellationToken));
+    [HttpPost("submit")]
+    [AllowAnonymous]
+    [RequestSizeLimit(MaximumPreparationBodyBytes)]
+    public async Task<ActionResult<ApiResponse<CustomerTablePaymentResolutionDto>>> Submit(
+        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromHeader(Name = "X-Table-Participant")] string? participantToken,
+        [FromBody] CustomerTablePaymentSubmissionDto request, CancellationToken cancellationToken) =>
+        Ok(await mediator.SendCommand(new SubmitCustomerTablePaymentCommand(sessionId, participantToken, request), cancellationToken));
+
+    [HttpPost("recover")]
+    [AllowAnonymous]
+    [RequestSizeLimit(MaximumPreparationBodyBytes)]
+    public async Task<ActionResult<ApiResponse<CustomerTablePaymentResolutionDto>>> Recover(
+        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromBody] CustomerTablePaymentProofDto proof, CancellationToken cancellationToken) =>
+        Ok(await mediator.SendQuery(new RecoverCustomerTablePaymentQuery(sessionId, proof), cancellationToken));
+
+    [HttpPost("stop")]
+    [AllowAnonymous]
+    [RequestSizeLimit(MaximumPreparationBodyBytes)]
+    public async Task<ActionResult<ApiResponse<CustomerTablePaymentResolutionDto>>> Stop(
+        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromBody] CustomerTablePaymentProofDto proof, CancellationToken cancellationToken) =>
+        Ok(await mediator.SendCommand(new StopCustomerTablePaymentCommand(sessionId, proof), cancellationToken));
 }

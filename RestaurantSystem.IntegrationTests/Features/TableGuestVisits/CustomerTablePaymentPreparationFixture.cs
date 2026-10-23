@@ -79,6 +79,13 @@ public abstract class CustomerTablePaymentPreparationFixture(DatabaseFixture fix
         return (await response.Content.ReadFromJsonAsync<ApiResponse<CustomerTablePaymentPreparedDto>>(JsonOptions))!.Data!;
     }
 
+    protected static async Task<CustomerTablePaymentResolutionDto> PaymentResolutionAsync(HttpResponseMessage response)
+    {
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        response.Headers.CacheControl!.NoStore.Should().BeTrue();
+        return (await response.Content.ReadFromJsonAsync<ApiResponse<CustomerTablePaymentResolutionDto>>(JsonOptions))!.Data!;
+    }
+
     protected async Task NoPaymentEffectsAsync()
     {
         await using var context = DatabaseFixture.CreateContext();

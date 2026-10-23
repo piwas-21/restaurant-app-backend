@@ -3007,6 +3007,51 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("customer_social_identities", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerTablePaymentOperation", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid?>("AttemptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attempt_id");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<bool>("IsStopped")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_stopped");
+
+                    b.Property<string>("OwnerHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("owner_hash");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.HasKey("OperationId")
+                        .HasName("pk_customer_table_payment_operations");
+
+                    b.HasIndex("AttemptId")
+                        .IsUnique()
+                        .HasFilter("attempt_id IS NOT NULL");
+
+                    b.ToTable("customer_table_payment_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_table_payment_operations_outcome", "(is_stopped AND attempt_id IS NULL) OR (NOT is_stopped AND attempt_id IS NOT NULL AND attempt_id <> '00000000-0000-0000-0000-000000000000'::uuid)");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.DeviceEvent", b =>
                 {
                     b.Property<Guid>("Id")

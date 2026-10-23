@@ -54,9 +54,9 @@ public sealed class CustomerReservationOperationMigrationTests(DatabaseFixture f
         refusal.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
         refusal.MessageText.Should().Be("Reservation revision protects permanent operation history");
         (await context.Set<CustomerReservationOperation>().AsNoTracking().SingleAsync()).OperationId.Should().Be(operation.OperationId);
-        // The newer revision barrier must remain while permanent operation history exists.
+        // Later empty additive migrations can roll back; the permanent booking revision barrier remains.
         (await context.Database.GetAppliedMigrationsAsync()).Last().Should()
-            .Be(TestDatabaseCluster.CurrentSchemaMigration);
+            .Be("20261020200457_" + nameof(AddReservationRevision));
     }
     [Fact]
     public async Task In_flight_and_committed_receipt_history_both_refuse_downgrade()

@@ -22,6 +22,8 @@ public static class AccountPaymentServiceExtensions
         services.AddScoped<ICustomerTablePaymentAccess, CustomerTablePaymentAccess>();
         services.AddScoped<ICustomerTablePaymentProofs, CustomerTablePaymentProofs>();
         services.AddScoped<ICustomerTablePaymentPreparation, CustomerTablePaymentPreparation>();
+        services.AddScoped<ICustomerTablePaymentOperations, CustomerTablePaymentOperations>();
+        services.AddScoped<ICustomerTablePaymentAcceptance, CustomerTablePaymentAcceptance>();
         services.AddScoped<IAccountPaymentCaptureWriter, AccountPaymentCaptureWriter>();
         services.AddScoped<IAccountPaymentCaptureService, AccountPaymentCaptureService>();
         services.AddScoped<RestaurantSystem.Api.Features.OrderAmendments.Services.IOrderAmendmentReservationGuard,

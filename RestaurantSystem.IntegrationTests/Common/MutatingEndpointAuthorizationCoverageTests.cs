@@ -57,11 +57,11 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 259 includes read-only native table-payment preparation and four protected native table-round actions and four owned reservation-edit
+    /// Floor 262 includes three original-proof native contribution actions alongside read-only native table-payment preparation and four protected native table-round actions and four owned reservation-edit
     /// actions, four native Google challenge/completion actions and five strict native account-email actions alongside owned native cancellation and original-proof preparation/recovery alongside private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
     /// root edits, durable cancellations, channel operations, account payments and guest checkout.
     /// </summary>
-    private const int KnownMutatingActionCount = 259;
+    private const int KnownMutatingActionCount = 262;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -76,6 +76,13 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
         // proof carries no write authority; no financial row/provider call is created. The endpoint
         // shares coarse-IP and participant account ingress budgets and returns no-store responses.
         "CustomerMobileTablePaymentsController.Prepare [POST]",
+        // Original proof and canonical principal bind permanent decisions. Submit revalidates
+        // live participant/policy and atomically commits the quote, reservation and receipt.
+        // Recover/stop work after participant expiry or rollout withdrawal, disclose only the
+        // original outcome and never release provider uncertainty or create a replacement.
+        "CustomerMobileTablePaymentsController.Submit [POST]",
+        "CustomerMobileTablePaymentsController.Recover [POST]",
+        "CustomerMobileTablePaymentsController.Stop [POST]",
         // Native rounds prepare only after current participant/session/basket/rollout checks.
         // A purpose-bound private original proof permits minimal recovery/stopping after visit
         // expiry or module withdrawal; invalid JWTs never become guests. Submit rechecks current

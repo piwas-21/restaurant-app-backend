@@ -173,7 +173,13 @@ configured guest/provider policy and reviewed hosted settings are required. Fres
 checked after the ledger snapshot ends. Its exact server allocations and protected original proof
 create no quote row, reservation, payment decision or provider request; `table-payments` stays
 unknown. Durable writes, original recovery and deployed/provider/installed acceptance follow.
-See [the preparation contract](docs/api/customer-mobile-table-payments.md). No migration is added.
+Native `submit` atomically records the shared quote/reservation and a permanent original-operation
+decision; original-proof `recover`/`stop` remain available after participant expiry or feature
+withdrawal. Stopping unseen work seals late submission. Applied work retains its original attempt,
+and neither a stop nor an unknown outcome authorizes a replacement payment. The additive
+`AddCustomerTablePaymentOperations` migration retains these decisions and refuses destructive
+downgrade. Ordinary web checkout cannot start native reservations. Provider start/native return
+routing remain unavailable. See [the contribution contract](docs/api/customer-mobile-table-payments.md).
 
 ## Pull requests
 

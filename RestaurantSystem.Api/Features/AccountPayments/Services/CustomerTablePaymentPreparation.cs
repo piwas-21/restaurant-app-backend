@@ -58,13 +58,15 @@ public sealed class CustomerTablePaymentPreparation(ApplicationDbContext context
         if (request.SchemaVersion != 1 || request.TenantId == Guid.Empty || request.ServiceSessionId == Guid.Empty
             || request.ExpectedAccountRevision > CustomerTablePaymentHashes.MaximumExactInteger)
             throw new BadRequestException("Review a supported current table account.");
+        if (request.SelectedUnits is null) throw new BadRequestException("Selected units are required.");
         var quote = new CreateAccountPaymentQuoteRequest
         {
             OperationId = request.OperationId,
             ExpectedAccountRevision = request.ExpectedAccountRevision,
             Mode = request.Mode,
             PaymentMethod = PaymentMethod.OnlinePayment,
-            SelectedUnits = request.SelectedUnits,
+            SelectedUnits = request.SelectedUnits.OrderBy(value => value.OrderId)
+                .ThenBy(value => value.OrderItemId).ThenBy(value => value.Ordinal).ToArray(),
             AmountMinor = request.AmountMinor,
             EqualSharePlanId = request.EqualSharePlanId,
             EqualShareOrdinal = request.EqualShareOrdinal,
