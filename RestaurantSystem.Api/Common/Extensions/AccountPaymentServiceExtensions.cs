@@ -22,6 +22,7 @@ public static class AccountPaymentServiceExtensions
         services.AddScoped<ICustomerTablePaymentAccountReader, CustomerTablePaymentAccountReader>();
         services.AddScoped<ICustomerTablePaymentAccess, CustomerTablePaymentAccess>();
         services.AddScoped<ICustomerNativeTablePaymentReadiness, CustomerNativeTablePaymentReadiness>();
+        services.AddScoped<ICustomerNativeCapabilities, CustomerNativeCapabilities>();
         services.AddScoped<ICustomerTablePaymentProofs, CustomerTablePaymentProofs>();
         services.AddScoped<ICustomerTablePaymentPreparation, CustomerTablePaymentPreparation>();
         services.AddScoped<ICustomerTablePaymentOperations, CustomerTablePaymentOperations>();
