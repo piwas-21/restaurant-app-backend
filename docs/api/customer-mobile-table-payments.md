@@ -171,8 +171,11 @@ schema1 intent and purpose-bound original proof. Preparation is read-only: revie
 visit/revision, share count, ordered custom amounts (or an empty list for equal shares), and an
 optional explicitly superseded plan. It returns the exact server-owned total, currency, frozen
 allocation scope, cash rounding increment and individual share amounts. Each share must satisfy
-current online contribution limits. The native bound is100 shares and the existing configured
-segment bound; no quantity expansion is performed.
+current online contribution limits. `AccountPayments:MaximumNativePlanShares` defaults to `100` and
+may be lowered within 2–100, independently of existing shared plans' `MaximumEqualShares` limit.
+The existing configured segment bound also applies; no quantity expansion is performed. Lowering
+the native limit refuses a new submission prepared above it; original recovery/stop and replay of
+an already applied decision remain available.
 
 Submit needs the current original participant/session/customer, native approval and current
 policy. It revalidates the frozen scope and distribution, calls the shared plan writer under a

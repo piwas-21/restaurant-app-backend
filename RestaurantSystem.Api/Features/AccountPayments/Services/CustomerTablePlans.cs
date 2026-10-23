@@ -1,11 +1,13 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.Basket.Services.Operations;
 using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Api.Features.User.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -13,10 +15,9 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
 public sealed class CustomerTablePlans(ApplicationDbContext context, ICustomerTablePaymentAccess access,
     ITableGuestParticipantPaymentAuthorization participants, IAccountEqualSharePlanService plans,
-    ICustomerTablePlanProofs proofs, ICustomerTablePlanDecisions decisions, TimeProvider clock) : ICustomerTablePlans
+    ICustomerTablePlanProofs proofs, ICustomerTablePlanDecisions decisions, TimeProvider clock,
+    IOptions<AccountPaymentSettings> limits) : ICustomerTablePlans
 {
-    private const int MaximumNativeShares = 100;
-
     public async Task<CustomerTablePlanPreparedDto> PrepareAsync(string sessionId, string? participantToken,
         CustomerTablePlanIntentDto request, CancellationToken cancellationToken)
     {
@@ -140,12 +141,12 @@ public sealed class CustomerTablePlans(ApplicationDbContext context, ICustomerTa
             || review.Scope.Any(row => row.AmountMinor > CustomerTablePaymentHashes.MaximumExactInteger))
             throw new ConflictException("Refresh a supported table account before reviewing the split.");
     }
-    internal static CreateAccountEqualSharePlanRequest SharedRequest(CustomerTablePlanIntentDto request, Guid operationId)
+    private CreateAccountEqualSharePlanRequest SharedRequest(CustomerTablePlanIntentDto request, Guid operationId)
     {
         if (request.SchemaVersion != 1 || request.TenantId == Guid.Empty || request.OperationId == Guid.Empty
             || request.ServiceSessionId == Guid.Empty || request.ExpectedAccountRevision is < 1 or > CustomerTablePaymentHashes.MaximumExactInteger
-            || request.ShareCount is < 2 or > MaximumNativeShares
-            || request.CustomAmountsMinor is null || request.CustomAmountsMinor.Count > MaximumNativeShares)
+            || request.ShareCount < 2 || request.ShareCount > limits.Value.MaximumNativePlanShares
+            || request.CustomAmountsMinor is null || request.CustomAmountsMinor.Count > limits.Value.MaximumNativePlanShares)
             throw new BadRequestException("Review a supported current table split.");
         return new()
         {
