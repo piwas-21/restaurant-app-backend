@@ -186,7 +186,10 @@ payload bytes. Bootstrap reports table payments enabled only with separate
 `CustomerHostedCheckout:TablePaymentsEnabled` approval (default false), all existing native/module/visit
 gates, valid hosted routing and current matching guest/provider limits. The same gate protects new
 preparation/submission/checkout; original recovery and stopping survive withdrawal. Native client
-integration and signed/deployed acceptance remain open. See [the contribution contract](docs/api/customer-mobile-table-payments.md).
+integration and signed/deployed acceptance remain open. Separate original-proof native split-plan
+preparation/submission/recovery/stopping reuses shared equal/custom distribution and supersession
+rules; reviewed scope, per-share online limits and a permanent decision are atomic on submission.
+Stopping seals unseen work and never invalidates an accepted plan. See [the contribution contract](docs/api/customer-mobile-table-payments.md).
 
 ## Pull requests
 

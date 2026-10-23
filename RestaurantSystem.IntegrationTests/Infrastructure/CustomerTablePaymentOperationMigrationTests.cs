@@ -66,6 +66,8 @@ public sealed class CustomerTablePaymentOperationMigrationTests(DatabaseFixture 
         refusal.InnerException.Should().BeOfType<PostgresException>().Which.SqlState.Should().Be(PostgresErrorCodes.LockNotAvailable);
         await transaction.CommitAsync();
         (await context.Set<CustomerTablePaymentOperation>().CountAsync()).Should().Be(1);
+        // A failed older downgrade can already have removed newer empty additive tables.
+        await context.GetService<IMigrator>().MigrateAsync();
         (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
     }
 }

@@ -57,11 +57,11 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// Floor 265 includes three original-proof native checkout actions and three original-proof native contribution actions alongside read-only native table-payment preparation and four protected native table-round actions and four owned reservation-edit
+    /// Floor 269 includes four protected native split-plan review/decision actions and three original-proof native checkout actions and three original-proof native contribution actions alongside read-only native table-payment preparation and four protected native table-round actions and four owned reservation-edit
     /// actions, four native Google challenge/completion actions and five strict native account-email actions alongside owned native cancellation and original-proof preparation/recovery alongside private-proof native payment recovery, native address writes, owned native receipt reads and account-deletion requests alongside native
     /// root edits, durable cancellations, channel operations, account payments and guest checkout.
     /// </summary>
-    private const int KnownMutatingActionCount = 265;
+    private const int KnownMutatingActionCount = 269;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -71,6 +71,15 @@ public class MutatingEndpointAuthorizationCoverageTests(ITestOutputHelper output
     /// </summary>
     private static readonly string[] AnonymousWrites =
     [
+        // Native split-plan review is read-only and requires current rollout/session/participant.
+        // A separate purpose-bound original proof gates atomic shared-plan+decision submission;
+        // recovery/stop disclose only the original outcome after participant/rollout withdrawal.
+        // Stop seals unseen work only, never invalidates an accepted shared plan or releases money.
+        // All actions use the existing coarse-IP/participant account ingress and no-store responses.
+        "CustomerMobileTablePlansController.Prepare [POST]",
+        "CustomerMobileTablePlansController.Submit [POST]",
+        "CustomerMobileTablePlansController.Recover [POST]",
+        "CustomerMobileTablePlansController.Stop [POST]",
         // Read-only native payment preparation requires explicit rollout/provider policy, canonical
         // session/current Customer plus a separate live participant. A protected owner/input/scope
         // proof carries no write authority; no financial row/provider call is created. The endpoint

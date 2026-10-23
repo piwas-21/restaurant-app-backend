@@ -4,6 +4,11 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
 public interface IAccountEqualSharePlanService
 {
+    void RequireOnlineShares(AccountSharePlanReviewDto review);
+
+    Task<AccountSharePlanReviewDto> ReviewGuestAsync(Guid sessionId, string? participantCredential,
+        CreateAccountEqualSharePlanRequest request, CancellationToken cancellationToken);
+
     Task<AccountEqualSharePlanDto> CreateAsync(
         Guid sessionId, CreateAccountEqualSharePlanRequest request, CancellationToken cancellationToken);
 

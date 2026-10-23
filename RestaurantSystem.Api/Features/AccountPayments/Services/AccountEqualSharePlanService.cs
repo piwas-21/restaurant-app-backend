@@ -42,6 +42,37 @@ public sealed class AccountEqualSharePlanService(
         return await CreateCoreAsync(sessionId, participantCredential, request, null, guest: true, cancellationToken);
     }
 
+    public async Task<AccountSharePlanReviewDto> ReviewGuestAsync(Guid sessionId, string? participantCredential,
+        CreateAccountEqualSharePlanRequest request, CancellationToken cancellationToken)
+    {
+        guestPolicy.RequireNewPayment();
+        ValidateCreateRequest(sessionId, request);
+        var actor = await guestAuthorization.AuthorizeActiveAsync(sessionId, participantCredential, cancellationToken);
+        var account = await new AccountDebtSnapshotReader(context).ReadAsync(sessionId, cancellationToken);
+        if (account.Session.Status != TableServiceSessionStatus.Open || account.Session.ReleasedAt.HasValue
+            || !account.Session.TableId.HasValue || account.Session.BillingAllocationVersion is < 0 or > 1)
+            throw new ConflictException("Refresh the open table account before reviewing a split.");
+        AccountPaymentRequestRules.RequireCurrentRevision(account.Session.AccountRevision, request.ExpectedAccountRevision);
+        await FindSupersededPlanAsync(sessionId, request.SupersedesPlanId, actor, cancellationToken);
+        var scope = account.Debt.Available;
+        var total = AccountDebtMath.Total(scope);
+        var increment = request.CustomAmountsMinor.Count == 0
+            ? AccountShareMath.EqualShareIncrementMinorUnits(account.Money.Currency) : 1;
+        AccountSharePlanRules.RequireScope(scope, total, request, increment, options.Value);
+        var shares = request.CustomAmountsMinor.Count == 0
+            ? Enumerable.Range(1, request.ShareCount).Select(AccountShareMath.Equal(total, request.ShareCount, increment).At).ToArray()
+            : request.CustomAmountsMinor.ToArray();
+        var review = new AccountSharePlanReviewDto(account.Session.TableId.Value, total, account.Money.Currency, checked((int)increment),
+            AccountPaymentSnapshots.ToDtos(scope), shares);
+        RequireOnlineShares(review);
+        return review;
+    }
+
+    public void RequireOnlineShares(AccountSharePlanReviewDto review)
+    {
+        foreach (var share in review.SharesMinor) guestPolicy.RequireContribution(share, review.Currency);
+    }
+
     private async Task<AccountEqualSharePlanDto> CreateCoreAsync(
         Guid sessionId,
         string? participantCredential,
@@ -87,7 +118,7 @@ public sealed class AccountEqualSharePlanService(
             var roundingIncrement = request.CustomAmountsMinor.Count == 0
                 ? AccountShareMath.EqualShareIncrementMinorUnits(account.Money.Currency)
                 : 1;
-            ValidateScope(scope, total, request, roundingIncrement);
+            AccountSharePlanRules.RequireScope(scope, total, request, roundingIncrement, options.Value);
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
             var plan = CreatePlan(new PlanCreationData(
@@ -112,48 +143,7 @@ public sealed class AccountEqualSharePlanService(
     {
         if (!features.TableAccountPaymentsV1)
             throw new NotFoundException("Table account payments are not enabled.");
-        if (sessionId == Guid.Empty || request.OperationId == Guid.Empty
-            || request.ExpectedAccountRevision <= 0 || request.CustomAmountsMinor is null)
-            throw new BadRequestException("A valid table visit, operation and account revision are required.");
-        if (request.ShareCount < 2 || request.ShareCount > options.Value.MaximumEqualShares)
-            throw new BadRequestException("The equal-share count is outside the configured limit.");
-        if (request.SupersedesPlanId == Guid.Empty)
-            throw new BadRequestException("The superseded plan id is invalid.");
-        if (request.CustomAmountsMinor.Count > 0
-            && (request.CustomAmountsMinor.Count != request.ShareCount
-                || request.CustomAmountsMinor.Any(value => value <= 0 || value > 9_999_999_999)))
-            throw new BadRequestException("Every custom guest amount must be positive and match the guest count.");
-    }
-
-    private void ValidateScope(
-        IReadOnlyList<AccountDebtSegment> scope, long total, CreateAccountEqualSharePlanRequest request,
-        long roundingIncrement)
-    {
-        if (scope.Count == 0)
-            throw new BadRequestException("The reviewed table balance has no payable value.");
-        if (request.CustomAmountsMinor.Count == 0)
-        {
-            var distribution = AccountShareMath.Equal(total, request.ShareCount, roundingIncrement);
-            if (Enumerable.Range(1, request.ShareCount).Any(ordinal => distribution.At(ordinal) <= 0))
-                throw new BadRequestException(
-                    "The balance is too small for positive equal shares at this currency's cash increment.");
-        }
-        if (request.CustomAmountsMinor.Count > 0)
-        {
-            long customTotal;
-            try
-            {
-                customTotal = request.CustomAmountsMinor.Aggregate(0L, (sum, amount) => checked(sum + amount));
-            }
-            catch (OverflowException)
-            {
-                throw new BadRequestException("The custom guest amounts exceed the supported balance.");
-            }
-            if (customTotal != total)
-                throw new BadRequestException("Custom guest amounts must add up to the full available table balance.");
-        }
-        if (scope.Count > options.Value.MaximumScopeSegments)
-            throw new BadRequestException("The equal-share scope exceeds the configured segment limit.");
+        AccountSharePlanRules.RequireRequest(sessionId, request, options.Value);
     }
 
     private static AccountEqualSharePlan CreatePlan(PlanCreationData data) => new()

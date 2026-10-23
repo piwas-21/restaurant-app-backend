@@ -31,6 +31,9 @@ public sealed class AccountPaymentSettings
     [Range(1, 1000)]
     public int MaximumEqualShares { get; set; } = 100;
 
+    [Range(2, 100)]
+    public int MaximumNativePlanShares { get; set; } = 100;
+
     [Range(1, 1000)]
     public int MaximumActiveAttemptSummaries { get; set; } = 100;
 }
