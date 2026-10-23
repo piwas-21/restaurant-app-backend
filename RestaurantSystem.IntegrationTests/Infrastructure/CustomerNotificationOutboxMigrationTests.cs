@@ -88,4 +88,25 @@ public sealed class CustomerNotificationOutboxMigrationTests(DatabaseFixture fix
         var orphanFailure = await Assert.ThrowsAsync<DbUpdateException>(() => orphan.SaveChangesAsync());
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, Assert.IsType<PostgresException>(orphanFailure.InnerException).SqlState);
     }
+
+    [Fact]
+    public async Task In_flight_order_capture_refuses_downgrade_without_waiting_or_losing_its_hint()
+    {
+        await using var db = fixture.CreateContext();
+        var id = Guid.NewGuid();
+        await HistoricalOrderSeed.InsertAsync(db, id, "OUTBOX-LOCK", DateTime.UtcNow, "test");
+        db.Add(new CustomerNotificationWatch { SubjectKind = "order", SubjectId = id });
+        await db.SaveChangesAsync();
+        await using var writer = new NpgsqlConnection(fixture.ConnectionString);
+        await writer.OpenAsync();
+        await using var transaction = await writer.BeginTransactionAsync();
+        await using var update = new NpgsqlCommand("UPDATE orders SET status = 'Ready' WHERE id = @id", writer, transaction);
+        update.Parameters.AddWithValue("id", id);
+        Assert.Equal(1, await update.ExecuteNonQueryAsync());
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => db.GetService<IMigrator>().MigrateAsync(Previous));
+        Assert.Equal(PostgresErrorCodes.LockNotAvailable, Assert.IsType<PostgresException>(failure.InnerException).SqlState);
+        await transaction.CommitAsync();
+        Assert.Equal(id, (await db.Set<CustomerNotificationEvent>().AsNoTracking().SingleAsync()).SubjectId);
+        Assert.Equal(TestDatabaseCluster.CurrentSchemaMigration, (await db.Database.GetAppliedMigrationsAsync()).Last());
+    }
 }

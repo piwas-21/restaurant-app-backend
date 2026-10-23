@@ -50,6 +50,10 @@ public sealed class StaffBillChargeMigrationTests(DatabaseFixture fixture) : IAs
     public async Task Concurrent_charge_commit_is_seen_before_downgrade_can_remove_columns()
     {
         await using var context = fixture.CreateContext();
+        // Exercise the historical fee barrier itself. The later notification migration refuses
+        // an in-flight order write immediately, before this older waiting barrier is reached.
+        await context.GetService<IMigrator>().MigrateAsync(
+            "20261023085828_" + nameof(AddCustomerTablePlanOperations));
         var order = new Order
         {
             Id = Guid.NewGuid(),
