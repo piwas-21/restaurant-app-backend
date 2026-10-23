@@ -19,6 +19,7 @@ public static class MobileLinkExtensions
             .Bind(configuration.GetSection(MobileLinkSettings.SectionName), options => options.ErrorOnUnknownConfiguration = true)
             .ValidateOnStart();
         services.AddSingleton<IGetMobilePaymentReturnQueryHandler, GetMobilePaymentReturnQueryHandler>();
+        services.AddSingleton<IGetMobileTablePaymentReturnQueryHandler, GetMobileTablePaymentReturnQueryHandler>();
         services.AddSingleton<IGetMobileAccountLinkQueryHandler, GetMobileAccountLinkQueryHandler>();
         return services;
     }
@@ -29,16 +30,34 @@ public static class MobileLinkExtensions
         endpoints.MapGet("/r/{slug}/payment-return/{reference}",
             (string slug, string reference, HttpContext context, IGetMobilePaymentReturnQueryHandler query) =>
             {
-                context.Response.Headers.CacheControl = "no-store";
-                context.Response.Headers["Referrer-Policy"] = "no-referrer";
-                context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-                context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
+                ApplyHeaders(context);
                 var operations = context.Request.Query["operation"];
                 var input = new MobilePaymentReturnQuery(slug, reference, operations.FirstOrDefault(),
                     context.Request.Query.Count, operations.Count, context.Request.Host.ToUriComponent());
                 return query.Handle(input) ? Results.Content(PaymentReturnHtml, "text/html; charset=utf-8")
                     : Results.NotFound();
             });
+        endpoints.MapGet("/r/{slug}/table-payment-return/{attemptReference}",
+            (string slug, string attemptReference, HttpContext context, IGetMobileTablePaymentReturnQueryHandler query) =>
+            {
+                ApplyHeaders(context);
+                var operations = context.Request.Query["operation"];
+                var input = new MobileTablePaymentReturnQuery(slug, attemptReference, operations.FirstOrDefault(),
+                    context.Request.Query.Count, operations.Count, context.Request.Host.ToUriComponent());
+                return query.Handle(input) ? Results.Content(TablePaymentReturnHtml, "text/html; charset=utf-8")
+                    : Results.NotFound();
+            });
         return endpoints.MapMobileAccountLinks();
+    }
+    private static string TablePaymentReturnHtml => PaymentReturnHtml
+        .Replace("choose Orders", "choose your original table contribution", StringComparison.Ordinal)
+        .Replace("cancel your order", "cancel your contribution", StringComparison.Ordinal);
+
+    private static void ApplyHeaders(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
     }
 }

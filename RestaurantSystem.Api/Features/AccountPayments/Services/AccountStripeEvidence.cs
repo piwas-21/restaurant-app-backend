@@ -33,7 +33,8 @@ public static class AccountStripeEvidence
         AccountStripeExpectation expected, AccountStripeSession session, AccountStripeIntent intent)
     {
         RequireIntent(expected, session, intent);
-        return intent.Status == "succeeded" && intent.ReceivedMinor == expected.AmountMinor
+        return (expected.NativeScope is null || session.Status == "complete" && session.PaymentStatus == "paid")
+            && intent.Status == "succeeded" && intent.ReceivedMinor == expected.AmountMinor
             && !string.IsNullOrWhiteSpace(intent.ChargeId);
     }
 
@@ -58,7 +59,14 @@ public static class AccountStripeEvidence
             || !metadata.TryGetValue(AccountStripeCheckoutClient.AttemptMetadataKey, out var attemptId)
             || attemptId != expected.AttemptId.ToString("D")
             || !metadata.TryGetValue(AccountStripeCheckoutClient.SchemaMetadataKey, out var schema)
-            || schema != AccountStripeCheckoutClient.SchemaVersion)
+            || schema != (expected.NativeScope is null ? AccountStripeCheckoutClient.SchemaVersion : NativeAccountCheckoutScope.SchemaVersion))
             throw new ConflictException("The provider identity does not match the contribution. Reconciliation is required.");
+        if (expected.NativeScope is { } native)
+        {
+            native.RequireValid();
+            if (metadata.GetValueOrDefault(NativeAccountCheckoutScope.TenantMetadataKey) != native.TenantId.ToString("D")
+                || metadata.GetValueOrDefault(NativeAccountCheckoutScope.OperationMetadataKey) != native.OperationId.ToString("D"))
+                throw new ConflictException("The provider native scope differs from the original contribution.");
+        }
     }
 }

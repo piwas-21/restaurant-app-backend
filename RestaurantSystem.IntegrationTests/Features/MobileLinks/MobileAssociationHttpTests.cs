@@ -30,11 +30,13 @@ public sealed class MobileAssociationHttpTests
             Assert.Equal(["appIDs", "components"], app.EnumerateObject().Select(value => value.Name).ToArray());
             Assert.Equal([MobileAssociationFixture.AppleId], app.GetProperty("appIDs").EnumerateArray().Select(value => Assert.IsType<string>(value.GetString())).ToArray());
             var components = app.GetProperty("components");
-            Assert.Equal(3, components.GetArrayLength());
-            Assert.Equal("/r/*/verify", components[1].GetProperty("/").GetString());
-            Assert.Equal("/r/*/recover", components[2].GetProperty("/").GetString());
-            Assert.Empty(components[1].GetProperty("?").EnumerateObject());
+            Assert.Equal(4, components.GetArrayLength());
+            Assert.Equal("/r/*/table-payment-return/*", components[1].GetProperty("/").GetString());
+            Assert.Equal("*", components[1].GetProperty("?").GetProperty("operation").GetString());
+            Assert.Equal("/r/*/verify", components[2].GetProperty("/").GetString());
+            Assert.Equal("/r/*/recover", components[3].GetProperty("/").GetString());
             Assert.Empty(components[2].GetProperty("?").EnumerateObject());
+            Assert.Empty(components[3].GetProperty("?").EnumerateObject());
             var component = components[0];
             Assert.Equal(["/", "?"], component.EnumerateObject().Select(value => value.Name).ToArray());
             Assert.Equal("/r/*/payment-return/*", component.GetProperty("/").GetString());

@@ -172,14 +172,18 @@ quotes. Separate native owner/session and current participant authority, explici
 configured guest/provider policy and reviewed hosted settings are required. Fresh authority is
 checked after the ledger snapshot ends. Its exact server allocations and protected original proof
 create no quote row, reservation, payment decision or provider request; `table-payments` stays
-unknown. Durable writes, original recovery and deployed/provider/installed acceptance follow.
+unknown. Deployed/provider/installed acceptance remain separate.
 Native `submit` atomically records the shared quote/reservation and a permanent original-operation
 decision; original-proof `recover`/`stop` remain available after participant expiry or feature
 withdrawal. Stopping unseen work seals late submission. Applied work retains its original attempt,
 and neither a stop nor an unknown outcome authorizes a replacement payment. The additive
 `AddCustomerTablePaymentOperations` migration retains these decisions and refuses destructive
-downgrade. Ordinary web checkout cannot start native reservations. Provider start/native return
-routing remain unavailable. See [the contribution contract](docs/api/customer-mobile-table-payments.md).
+downgrade. Ordinary web checkout/cancellation cannot operate native journals. Original-proof native
+checkout freezes a distinct tenant/operation/attempt identity and central table return path before
+provider I/O. Shared leased reconciliation requires complete canonical capture before paid; unknown
+outcomes retain the original reservation. Optional native journal fields preserve ordinary frozen
+payload bytes. Bootstrap activation, native client integration and signed/deployed acceptance remain
+open. See [the contribution contract](docs/api/customer-mobile-table-payments.md).
 
 ## Pull requests
 

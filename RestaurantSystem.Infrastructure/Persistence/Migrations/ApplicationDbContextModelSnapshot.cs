@@ -604,6 +604,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("maximum_create_retry_at");
 
+                    b.Property<Guid?>("NativeOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("native_operation_id");
+
+                    b.Property<Guid?>("NativeTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("native_tenant_id");
+
                     b.Property<DateTime>("NextReconcileAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("next_reconcile_at");
@@ -696,6 +704,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreateIdempotencyKey")
                         .IsUnique();
 
+                    b.HasIndex("NativeOperationId")
+                        .IsUnique()
+                        .HasFilter("native_operation_id IS NOT NULL");
+
                     b.HasIndex("ProviderChargeId")
                         .IsUnique()
                         .HasFilter("provider_charge_id IS NOT NULL");
@@ -713,6 +725,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("account_checkout_journals", null, t =>
                         {
                             t.HasCheckConstraint("ck_account_checkout_journal_shape", "amount_minor > 0 AND started_attempt_version > 0 AND provider_captured_minor >= 0 AND provider_captured_minor <= amount_minor AND provider_refunded_minor >= 0 AND provider_refunded_minor <= provider_captured_minor AND expires_at > started_at AND maximum_create_retry_at > started_at AND maximum_create_retry_at <= started_at + INTERVAL '23 hours' AND ((lease_id IS NULL AND lease_expires_at IS NULL) OR (lease_id IS NOT NULL AND lease_expires_at IS NOT NULL)) AND currency ~ '^[A-Z]{3}$' AND reconcile_failure_count >= 0 AND ((receipt_credential_hash IS NULL AND receipt_expires_at IS NULL) OR (receipt_credential_hash IS NOT NULL AND receipt_expires_at IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_account_checkout_native_scope", "(native_operation_id IS NULL AND native_tenant_id IS NULL) OR (native_operation_id IS NOT NULL AND native_tenant_id IS NOT NULL AND native_operation_id <> '00000000-0000-0000-0000-000000000000'::uuid AND native_tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid)");
                         });
                 });
 
@@ -12195,6 +12209,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_account_checkout_journals_accountpaymentattempts_attempt_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.CustomerTablePaymentOperation", null)
+                        .WithMany()
+                        .HasForeignKey("NativeOperationId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Attempt");
                 });

@@ -17,6 +17,15 @@ public static class AccountCheckoutReplayPayload
 
     public static AccountStripeCheckoutRequest Read(AccountCheckoutJournal journal, DateTime now)
     {
+        var request = Frozen(journal);
+        if (now >= journal.MaximumCreateRetryAt || journal.ProviderSessionId is not null
+            || request.NativeScope is not null && now >= journal.ExpiresAt)
+            throw new ConflictException("Read canonical provider evidence before retrying this contribution.");
+        return request;
+    }
+
+    public static AccountStripeCheckoutRequest Frozen(AccountCheckoutJournal journal)
+    {
         if (journal.AttemptId == Guid.Empty || journal.StartedAttemptVersion <= 0 || journal.AmountMinor <= 0
             || journal.Currency.Length != 3 || journal.Currency.Any(value => !char.IsAsciiLetterUpper(value))
             || !journal.ProviderAccountId.StartsWith("acct_", StringComparison.Ordinal)
@@ -24,9 +33,6 @@ public static class AccountCheckoutReplayPayload
             || journal.MaximumCreateRetryAt > journal.StartedAt.AddHours(23)
             || journal.CreateIdempotencyKey != CreateKey(journal.AttemptId))
             throw new ConflictException("The frozen provider request requires reconciliation.");
-        if (now >= journal.MaximumCreateRetryAt || journal.ProviderSessionId is not null)
-            throw new ConflictException("Read canonical provider evidence before retrying this contribution.");
-
         var request = new AccountStripeCheckoutRequest
         {
             AttemptId = journal.AttemptId,
@@ -35,10 +41,19 @@ public static class AccountCheckoutReplayPayload
             Currency = journal.Currency,
             ExpiresAt = journal.ExpiresAt,
             IdempotencyKey = journal.CreateIdempotencyKey,
-            ReturnBaseUrl = journal.ReturnBaseUrl
+            ReturnBaseUrl = journal.ReturnBaseUrl,
+            NativeScope = NativeScope(journal)
         };
+        request.NativeScope?.RequireReturnBase(request.ReturnBaseUrl, request.AttemptId);
         if (!string.Equals(Hash(request), journal.CreatePayloadHash, StringComparison.Ordinal))
             throw new ConflictException("The frozen provider request changed. Reconciliation is required.");
         return request;
+    }
+    public static NativeAccountCheckoutScope? NativeScope(AccountCheckoutJournal journal)
+    {
+        if (journal.NativeOperationId is null && journal.NativeTenantId is null) return null;
+        var scope = new NativeAccountCheckoutScope(journal.NativeTenantId.GetValueOrDefault(), journal.NativeOperationId.GetValueOrDefault());
+        scope.RequireValid();
+        return scope;
     }
 }

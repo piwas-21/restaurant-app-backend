@@ -1,4 +1,4 @@
-# Native table-payment preparation and original decisions
+# Native table contributions and hosted checkout
 
 `POST /api/customer-mobile/table-payments/prepare` is a schema1 advisory read. It creates no
 quote, hold, operation receipt, provider journal or tender and makes no provider request.
@@ -88,8 +88,48 @@ become `Unseen` or authorize replacement. Reads verify the protected original sc
 frozen quote and persisted allocations; SQL child ordering does not change identity.
 
 The ordinary web checkout journal refuses native reservations before provider request creation,
-even if the caller knows the private shared operation ID. Native hosted checkout is not offered by
-this slice. All actions share the existing bounded ingress policy and private/no-store responses.
+even if the caller knows the private shared operation ID. Ordinary web cancellation also refuses
+native journals. All actions share the existing bounded ingress policy and private/no-store responses.
+
+## Frozen hosted checkout
+
+The three `POST /api/customer-mobile/table-payments/checkout/{start|recover|stop}` actions accept
+only the original proof as the body, with the same canonical session/principal. `start` additionally
+requires the original current participant when no journal exists. It rechecks current tenant policy,
+feature/module/provider settings, currency, visit/table, reservation expiry and outstanding debt,
+then commits the frozen journal and `Starting` state in a short visit→customer→attempt→journal
+transaction. No provider network call runs in that transaction. First-party native request authority
+cannot be replaced with a web receipt credential or another preparation.
+
+The shared leased reconciler makes the provider call after commit. A lost response replays the same
+merchant, environment, amount, currency, expiry, return base, idempotency key and native tenant/public
+operation/attempt tuple. A known session is read canonically and never recreated. After the original
+expiry or retry deadline, missing evidence stays pending. Native metadata is copied to both Checkout
+Session and PaymentIntent. Session, intent and charge identity must all match; complete+paid Session,
+succeeded full intent, exact unreversed captured charge and posted financial allocations are required
+before `paid`. Contradictory capture evidence is retained for reconciliation without releasing debt.
+Ordinary frozen request JSON omits the optional native scope, preserving existing hashes byte for byte.
+
+Recovery and stopping continue with the original proof after participant expiry, closure or rollout
+withdrawal. A reserved attempt with no journal and no escaped-provider markers can be stopped locally;
+late start cannot revive it. A frozen journal receives a cancellation request and retains its reservation
+until canonical provider evidence proves non-payment. Capture winning cancellation is posted once.
+An unknown provider result cannot authorize release, a new operation or replacement checkout.
+
+The minimal schema1 response carries `tenantId`, public `operationId`, `serviceSessionId`, explicit
+`attemptId` (nullable for a stopped original decision), original `amountMinor`/`currency`, frozen
+`expiresAt`, `outcome` and nullable `checkoutUrl`. Outcomes are `reserved`, `pending`, `ready`,
+`paid` or `stopped`. A browser URL is returned only for canonical open unpaid evidence, an unexpired
+journal, current participant/creation policy and an approved HTTPS hosted origin. Recovery after
+withdrawal retains the original decision with no browser offer. Private owner authority is rechecked
+after provider and posting work. There are no order, allocation, merchant or participant fields.
+
+The frozen central return is `/r/{tenantSlug}/table-payment-return/{attemptId}?operation={publicOperationId}`.
+Success and cancel use the same path. A separate attempt-reference navigation contract validates
+configured host, directory status, schema and canonical IDs. The public page discloses no payment
+state or private proof; it only asks the customer to reopen the original contribution. Association
+paths explicitly include this route. A URL or browser return never proves payment or cancellation.
+Actual OS link verification remains a signed/deployed acceptance gate.
 
 ## Release boundary
 
@@ -98,6 +138,12 @@ UUID-keyed decision with bounded owner/payload digests, a nullable unique attemp
 marker and UTC completion time. No account/attempt foreign key may erase the decision. Downgrade
 refuses committed history and in-flight writers. Historical migrations are unchanged. The migration
 has only local disposable PostgreSQL evidence; staging/production application is separate.
+
+The additive `20261023015615_AddNativeTableCheckoutScope` migration adds nullable paired native
+tenant/operation identity to the existing checkout journal, a unique operation reference and a
+restrictive foreign key to the permanent decision. Ordinary rows retain null scope. Downgrade uses
+NOWAIT and refuses any retained native provider request; ordinary frozen journal data survives an
+empty-scope rollback/upgrade. Background reconciliation cadence and retention are unchanged.
 
 No tenant activation, frontend/printer contract change or production/provider/device acceptance is
 included. Deploy the accepted source separately, verify disabled/enabled behavior

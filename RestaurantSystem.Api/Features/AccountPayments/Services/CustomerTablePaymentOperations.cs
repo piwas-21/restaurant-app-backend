@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
-using RestaurantSystem.Api.Features.Basket.Services.Operations;
-using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Api.Features.User.Services;
 using RestaurantSystem.Domain.Entities;
@@ -11,7 +9,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
 public sealed class CustomerTablePaymentOperations(ApplicationDbContext context, ICustomerTablePaymentAccess access,
-    ICustomerTablePaymentProofs proofs, ICustomerTablePaymentAcceptance acceptance, TimeProvider clock)
+    ICustomerTablePaymentProofs proofs, ICustomerTablePaymentAcceptance acceptance, ICustomerTablePaymentDecisions decisions, TimeProvider clock)
     : ICustomerTablePaymentOperations
 {
     public Task<CustomerTablePaymentResolutionDto> SubmitAsync(string sessionId, string? participantToken,
@@ -44,13 +42,10 @@ public sealed class CustomerTablePaymentOperations(ApplicationDbContext context,
                 $"SELECT pg_advisory_xact_lock(hashtextextended({CustomerTablePaymentHashes.Purpose + proof.OperationId.ToString("N")}, 0))",
                 cancellationToken);
             RequireOwner(sessionId, proof, owner);
-            var previous = await context.Set<CustomerTablePaymentOperation>().SingleOrDefaultAsync(
-                row => row.OperationId == proof.OperationId, cancellationToken);
-            if (previous is not null && (previous.OwnerHash != owner.OwnerHash || previous.PayloadHash != proof.PayloadHash))
-                throw new NotFoundException("Customer table payment operation unavailable.");
+            var previous = await decisions.ReadAsync(owner, proof, binding, cancellationToken);
             if (intent is not null) proofs.RequireInput(intent, owner, binding, proof);
             CustomerTablePaymentResolutionDto result;
-            if (previous is not null) result = await ResolutionAsync(previous, binding, cancellationToken);
+            if (previous is not null) result = previous;
             else if (intent is null && !stop)
                 result = new(1, proof.OperationId, binding.ServiceSessionId, CustomerTablePaymentOutcome.Unseen, null, null);
             else
@@ -68,47 +63,14 @@ public sealed class CustomerTablePaymentOperations(ApplicationDbContext context,
                 };
                 context.Set<CustomerTablePaymentOperation>().Add(receipt);
                 await context.SaveChangesAsync(cancellationToken);
-                result = await ResolutionAsync(receipt, binding, cancellationToken);
+                result = await decisions.ReadAsync(owner, proof, binding, cancellationToken)
+                    ?? throw new ConflictException("The original contribution decision was not retained.");
             }
             RequireOwner(sessionId, proof, owner);
             await transaction.CommitAsync(cancellationToken);
             return result;
         }
         catch { context.ChangeTracker.Clear(); throw; }
-    }
-
-    private async Task<CustomerTablePaymentResolutionDto> ResolutionAsync(CustomerTablePaymentOperation receipt,
-        CustomerTablePaymentBinding binding, CancellationToken cancellationToken)
-    {
-        if (receipt.IsStopped && receipt.AttemptId is null)
-            return new(1, receipt.OperationId, binding.ServiceSessionId, CustomerTablePaymentOutcome.Stopped, null, null);
-        var attempt = await context.AccountPaymentAttempts.AsNoTracking().Where(row => row.Id == receipt.AttemptId
-            && row.OperationId == binding.GuestOperationId && row.ServiceSessionId == binding.ServiceSessionId
-            && row.ActorId == binding.ParticipantId && row.ActorKind == AccountPaymentActorKind.GuestParticipant
-            && row.AmountMinor == binding.AmountMinor && row.Currency == binding.Currency
-            && row.ExpectedAccountRevision == binding.AccountRevision && row.PaymentMethod == PaymentMethod.OnlinePayment
-            && row.TipMinor == 0)
-            .Select(row => new
-            {
-                row.Id,
-                row.State,
-                row.SnapshotJson,
-                Allocations = row.Allocations.Take(CustomerTablePaymentHashes.MaximumSegments + 1).Select(value =>
-                    new AccountPaymentAllocationDto(value.OrderId, value.OrderItemId, value.StartOrdinal,
-                        value.UnitCount, value.MinorPerUnit, value.AmountMinor)).ToArray()
-            })
-            .SingleOrDefaultAsync(cancellationToken)
-            ?? throw new ConflictException("The original contribution requires reconciliation. Do not replace it.");
-        // Retain the prepared ordering from the immutable quote; SQL child order is unspecified.
-        var frozen = AccountPaymentSnapshots.Deserialize<AccountPaymentQuoteSnapshot>(attempt.SnapshotJson);
-        var sorted = frozen.Allocations.OrderBy(row => row.OrderId).ThenBy(row => row.OrderItemId)
-            .ThenBy(row => row.StartOrdinal).ToArray();
-        if (frozen.ExpectedAccountRevision != binding.AccountRevision || frozen.AmountMinor != binding.AmountMinor
-            || frozen.Currency != binding.Currency || CustomerBasketOperationHash.Payload(frozen.Allocations) != binding.ScopeHash
-            || !attempt.Allocations.OrderBy(row => row.OrderId).ThenBy(row => row.OrderItemId)
-                .ThenBy(row => row.StartOrdinal).SequenceEqual(sorted))
-            throw new ConflictException("The original contribution allocation requires reconciliation. Do not replace it.");
-        return new(1, receipt.OperationId, binding.ServiceSessionId, CustomerTablePaymentOutcome.Applied, attempt.Id, attempt.State);
     }
 
     private void RequireOwner(string sessionId, CustomerTablePaymentProofDto proof, CustomerTablePaymentOwner owner)

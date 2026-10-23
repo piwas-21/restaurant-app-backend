@@ -22,6 +22,7 @@ public sealed class GetMobileAssociationsQueryHandler : IGetMobileAssociationsQu
         var components = Array.AsReadOnly(new[]
         {
             new AppleLinkComponentDto("/r/*/payment-return/*", query),
+            new AppleLinkComponentDto("/r/*/table-payment-return/*", query),
             new AppleLinkComponentDto("/r/*/verify", noQuery),
             new AppleLinkComponentDto("/r/*/recover", noQuery)
         });

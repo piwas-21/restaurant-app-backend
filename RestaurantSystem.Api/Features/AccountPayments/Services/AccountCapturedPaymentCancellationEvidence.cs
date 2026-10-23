@@ -88,7 +88,8 @@ internal static class AccountCapturedPaymentCancellationEvidence
             Currency = journal.Currency,
             ExpiresAt = journal.ExpiresAt,
             IdempotencyKey = journal.CreateIdempotencyKey,
-            ReturnBaseUrl = journal.ReturnBaseUrl
+            ReturnBaseUrl = journal.ReturnBaseUrl,
+            NativeScope = AccountCheckoutReplayPayload.NativeScope(journal)
         };
         if (!string.Equals(AccountCheckoutReplayPayload.Hash(request), journal.CreatePayloadHash,
                 StringComparison.Ordinal))

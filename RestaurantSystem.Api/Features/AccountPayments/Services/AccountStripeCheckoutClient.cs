@@ -38,7 +38,8 @@ public sealed class AccountStripeCheckoutClient(
             || request.Currency.Length != 3 || request.Currency.Any(value => !char.IsAsciiLetter(value)))
             throw new BadRequestException("A frozen contribution and safe provider replay key are required.");
         var attemptId = request.AttemptId.ToString("D", CultureInfo.InvariantCulture);
-        var metadata = new Dictionary<string, string>
+        request.NativeScope?.RequireReturnBase(request.ReturnBaseUrl, request.AttemptId);
+        var metadata = request.NativeScope?.Metadata(request.AttemptId) ?? new Dictionary<string, string>
         {
             [AttemptMetadataKey] = attemptId,
             [SchemaMetadataKey] = SchemaVersion
@@ -66,8 +67,10 @@ public sealed class AccountStripeCheckoutClient(
                     }
                 }
             ],
-            SuccessUrl = BuildReturnUrl(request.ReturnBaseUrl, attemptId, canceled: false),
-            CancelUrl = BuildReturnUrl(request.ReturnBaseUrl, attemptId, canceled: true)
+            SuccessUrl = request.NativeScope?.ReturnUrl(request.ReturnBaseUrl, request.AttemptId)
+                ?? BuildReturnUrl(request.ReturnBaseUrl, attemptId, canceled: false),
+            CancelUrl = request.NativeScope?.ReturnUrl(request.ReturnBaseUrl, request.AttemptId)
+                ?? BuildReturnUrl(request.ReturnBaseUrl, attemptId, canceled: true)
         };
         var session = await new SessionService(gateway.Client).CreateAsync(
             options, gateway.BuildRequestOptions(request.IdempotencyKey), cancellationToken);

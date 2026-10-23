@@ -49,7 +49,7 @@ public sealed class AccountCheckoutJournalStore(ApplicationDbContext context,
         policy.RequireContribution(attempt.AmountMinor, attempt.Currency);
         // Provider dates have whole-second precision; the persisted replay payload must match.
         var now = DateTimeOffset.FromUnixTimeSeconds(clock.GetUtcNow().ToUnixTimeSeconds()).UtcDateTime;
-        RequireReserved(attempt, expectedVersion, now);
+        AccountCheckoutFreeze.RequireReserved(attempt, expectedVersion, now);
         var account = await new AccountDebtSnapshotReader(context).ReadAsync(sessionId, cancellationToken);
         var scope = attempt.Allocations.Select(value => new AccountDebtSegment(
             value.OrderId, value.OrderItemId, value.StartOrdinal, value.UnitCount, value.MinorPerUnit)).ToArray();
@@ -57,14 +57,9 @@ public sealed class AccountCheckoutJournalStore(ApplicationDbContext context,
             || AccountDebtMath.Total(scope) != attempt.AmountMinor)
             throw new ConflictException("The reserved contribution requires reconciliation.");
         AccountDebtMath.Subtract(account.Debt.Outstanding, scope);
-        journal = CreateJournal(attempt, receiptHash, now);
+        journal = AccountCheckoutFreeze.Create(attempt, receiptHash, now, options.Value, provider);
         context.AccountCheckoutJournals.Add(journal);
-        attempt.State = AccountPaymentState.Starting;
-        attempt.StartedAt = now;
-        attempt.ProviderAccountId = journal.ProviderAccountId;
-        attempt.Version++;
-        attempt.UpdatedAt = now;
-        attempt.UpdatedBy = actor.AuditIdentifier;
+        AccountCheckoutFreeze.MarkStarting(attempt, journal, now, actor.AuditIdentifier);
         session.RecordAccountChange();
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -74,40 +69,6 @@ public sealed class AccountCheckoutJournalStore(ApplicationDbContext context,
     public async Task<AccountCheckoutJournal> ReadAsync(Guid attemptId, CancellationToken cancellationToken) =>
         await context.AccountCheckoutJournals.AsNoTracking().SingleOrDefaultAsync(
             value => value.AttemptId == attemptId, cancellationToken) ?? throw Unavailable();
-
-    private AccountCheckoutJournal CreateJournal(AccountPaymentAttempt attempt, string receiptHash, DateTime now)
-    {
-        var request = new AccountStripeCheckoutRequest
-        {
-            AttemptId = attempt.Id,
-            AmountMinor = attempt.AmountMinor,
-            Currency = attempt.Currency,
-            Context = provider.ReadContext(),
-            ReturnBaseUrl = provider.ReadReturnBaseUrl(),
-            IdempotencyKey = AccountCheckoutReplayPayload.CreateKey(attempt.Id),
-            ExpiresAt = now.AddMinutes(options.Value.CheckoutLifetimeMinutes)
-        };
-        return new AccountCheckoutJournal
-        {
-            Id = Guid.NewGuid(),
-            AttemptId = attempt.Id,
-            StartedAttemptVersion = attempt.Version,
-            AmountMinor = request.AmountMinor,
-            Currency = request.Currency,
-            ProviderAccountId = request.Context.ConnectedAccountId,
-            ProviderLiveMode = request.Context.LiveMode,
-            ReturnBaseUrl = request.ReturnBaseUrl,
-            CreateIdempotencyKey = request.IdempotencyKey,
-            CreatePayloadHash = AccountCheckoutReplayPayload.Hash(request),
-            StartedAt = now,
-            ExpiresAt = request.ExpiresAt,
-            MaximumCreateRetryAt = now.AddHours(options.Value.MaximumCreateRetryHours),
-            NextReconcileAt = now,
-            ReceiptCredentialHash = receiptHash,
-            ReceiptExpiresAt = now.AddHours(options.Value.ReceiptLifetimeHours),
-            CreatedBy = attempt.CreatedBy
-        };
-    }
 
     private static void RequireOwner(AccountPaymentAttempt attempt, Guid sessionId, AccountPaymentActor actor)
     {
@@ -122,14 +83,6 @@ public sealed class AccountCheckoutJournalStore(ApplicationDbContext context,
         if (journal.StartedAttemptVersion != version
             || !AccountReceiptCredentialCrypto.Verify(receiptCredential, journal.ReceiptCredentialHash))
             throw new ConflictException("Recover the original checkout with its original receipt credential and version.");
-    }
-
-    private static void RequireReserved(AccountPaymentAttempt attempt, int version, DateTime now)
-    {
-        if (attempt.PaymentMethod != PaymentMethod.OnlinePayment || attempt.State != AccountPaymentState.Reserved
-            || attempt.Version != version || attempt.AmountMinor <= 0
-            || attempt.ReservationExpiresAt is not DateTime expires || expires <= now)
-            throw new ConflictException("Review and reserve this online contribution before starting checkout.");
     }
 
     private static NotFoundException Unavailable() => new("The payment operation is unavailable for this visit.");

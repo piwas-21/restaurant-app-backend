@@ -16,7 +16,8 @@ public sealed record AccountCheckoutCanonicalEvidence(
         Currency = journal.Currency,
         Context = new AccountStripeContext(journal.ProviderAccountId, journal.ProviderLiveMode),
         SessionId = journal.ProviderSessionId,
-        IntentId = journal.ProviderIntentId
+        IntentId = journal.ProviderIntentId,
+        NativeScope = AccountCheckoutReplayPayload.NativeScope(journal)
     };
 
     public void Validate(AccountCheckoutJournal journal)

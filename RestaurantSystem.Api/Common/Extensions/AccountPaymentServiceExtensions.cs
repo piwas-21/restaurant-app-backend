@@ -23,6 +23,12 @@ public static class AccountPaymentServiceExtensions
         services.AddScoped<ICustomerTablePaymentProofs, CustomerTablePaymentProofs>();
         services.AddScoped<ICustomerTablePaymentPreparation, CustomerTablePaymentPreparation>();
         services.AddScoped<ICustomerTablePaymentOperations, CustomerTablePaymentOperations>();
+        services.AddScoped<ICustomerTablePaymentDecisions, CustomerTablePaymentDecisions>();
+        services.AddScoped<ICustomerTableCheckoutAuthority, CustomerTableCheckoutAuthority>();
+        services.AddScoped<ICustomerTableCheckoutFreezer, CustomerTableCheckoutFreezer>();
+        services.AddScoped<ICustomerTableCheckoutStore, CustomerTableCheckoutStore>();
+        services.AddScoped<ICustomerTableCheckoutProjection, CustomerTableCheckoutProjection>();
+        services.AddScoped<ICustomerTableCheckoutService, CustomerTableCheckoutService>();
         services.AddScoped<ICustomerTablePaymentAcceptance, CustomerTablePaymentAcceptance>();
         services.AddScoped<IAccountPaymentCaptureWriter, AccountPaymentCaptureWriter>();
         services.AddScoped<IAccountPaymentCaptureService, AccountPaymentCaptureService>();

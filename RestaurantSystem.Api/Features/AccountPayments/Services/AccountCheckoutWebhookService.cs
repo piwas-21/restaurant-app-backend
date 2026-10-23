@@ -120,8 +120,8 @@ public sealed class AccountCheckoutWebhookService(
     {
         if (!providerObject.TryGetProperty("metadata", out var metadata)
             || metadata.ValueKind != JsonValueKind.Object
-            || !string.Equals(ReadString(metadata, AccountStripeCheckoutClient.SchemaMetadataKey),
-                AccountStripeCheckoutClient.SchemaVersion, StringComparison.Ordinal)
+            || ReadString(metadata, AccountStripeCheckoutClient.SchemaMetadataKey) is not
+                (AccountStripeCheckoutClient.SchemaVersion or NativeAccountCheckoutScope.SchemaVersion)
             || !Guid.TryParse(ReadString(metadata, AccountStripeCheckoutClient.AttemptMetadataKey), out var attemptId))
             return null;
         return attemptId;
