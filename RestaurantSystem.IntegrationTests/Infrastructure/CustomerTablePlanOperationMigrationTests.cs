@@ -12,6 +12,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 public sealed class CustomerTablePlanOperationMigrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private const string Previous = "20261023015615_" + nameof(AddNativeTableCheckoutScope);
+    private const string ProtectedMigration = "20261023085828_" + nameof(AddCustomerTablePlanOperations);
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => MigrationTestSafety.RestoreCurrentSchemaAsync(fixture);
 
@@ -50,7 +51,8 @@ public sealed class CustomerTablePlanOperationMigrationTests(DatabaseFixture fix
         var downgrade = () => context.GetService<IMigrator>().MigrateAsync(Previous);
         (await downgrade.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
         (await context.Set<CustomerTablePlanOperation>().SingleAsync()).OperationId.Should().Be(operation.OperationId);
-        (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
+        // Newer empty migrations can legitimately roll back before this protected migration refuses.
+        (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(ProtectedMigration);
     }
 
     [Fact]
@@ -66,6 +68,6 @@ public sealed class CustomerTablePlanOperationMigrationTests(DatabaseFixture fix
         refusal.InnerException.Should().BeOfType<PostgresException>().Which.SqlState.Should().Be(PostgresErrorCodes.LockNotAvailable);
         await transaction.CommitAsync();
         (await context.Set<CustomerTablePlanOperation>().CountAsync()).Should().Be(1);
-        (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
+        (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(ProtectedMigration);
     }
 }
