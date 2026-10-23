@@ -110,7 +110,7 @@ public sealed partial class CloseTableServiceSessionCommandHandler
             if (orderFailure is not null) return orderFailure;
 
             await _guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
-            if (lockedRows.Table is not null)
+            if (lockedRows.Table is not null && !session.ReleasedAt.HasValue)
             {
                 lockedRows.Table.ReadinessState = TableReadinessState.NeedsReset;
                 lockedRows.Table.ReadinessVersion++;

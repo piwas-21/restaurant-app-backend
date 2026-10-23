@@ -21,7 +21,7 @@ public sealed record ReleaseTableServiceSessionCommand : ICommand<ApiResponse<Ta
     [JsonRequired]
     public int ExpectedVersion { get; init; }
 
-    /// <summary>Staff confirms the empty table has been cleaned for the next guests.</summary>
+    /// <summary>Freeing a table readies it for guests; false explicitly requests a separate reset.</summary>
     public bool? MarkReady { get; init; }
 }
 
@@ -83,7 +83,7 @@ public sealed class ReleaseTableServiceSessionCommandHandler
         await _guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
         if (locked.Table is not null)
         {
-            locked.Table.ReadinessState = command.MarkReady == true
+            locked.Table.ReadinessState = command.MarkReady != false
                 ? TableReadinessState.ReadyForGuests : TableReadinessState.NeedsReset;
             locked.Table.ReadinessVersion++;
         }
