@@ -2651,6 +2651,58 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("CustomerFormFieldConfigurations", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerNotificationEvent", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at")
+                        .HasDefaultValueSql("clock_timestamp()");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("SubjectKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("subject_kind");
+
+                    b.HasKey("EventId");
+
+                    b.HasIndex("OccurredAt", "EventId");
+
+                    b.HasIndex("SubjectKind", "SubjectId");
+
+                    b.ToTable("customer_notification_events", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerNotificationWatch", b =>
+                {
+                    b.Property<string>("SubjectKind")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.HasKey("SubjectKind", "SubjectId");
+
+                    b.ToTable("customer_notification_watches", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_notification_watches_subject", "subject_kind IN ('order', 'reservation') AND subject_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerOrderCancellationOperation", b =>
                 {
                     b.Property<Guid>("OperationId")
@@ -12477,6 +12529,15 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_customer_discount_rules_asp_net_users_user_id");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerNotificationEvent", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.CustomerNotificationWatch", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectKind", "SubjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerSocialChallenge", b =>
