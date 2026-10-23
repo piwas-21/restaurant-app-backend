@@ -25,7 +25,7 @@ public sealed class CustomerTablePaymentPreparation(ApplicationDbContext context
         var currency = await access.RequireNewAsync(owner, request.TenantId, cancellationToken);
         var participant = await participants.AuthorizeActiveAsync(request.ServiceSessionId, participantToken, cancellationToken);
         if (context.Database.CurrentTransaction is not null || context.ChangeTracker.HasChanges())
-            throw new InvalidOperationException("Native payment preparation requires an isolated clean context.");
+            throw new ConflictException("Native payment preparation requires an isolated clean context.");
         CustomerTablePaymentPreparedDto prepared;
         await using (var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken))
         {
