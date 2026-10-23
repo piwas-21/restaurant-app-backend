@@ -58,13 +58,19 @@ public sealed partial class AccountCheckoutJournalTests
         context.Set<CustomerTablePaymentOperation>().Add(operation);
         journal.NativeOperationId = operation.OperationId; journal.NativeTenantId = Guid.NewGuid();
         await context.SaveChangesAsync();
-        var downgrade = () => context.GetService<IMigrator>().MigrateAsync(BeforeNativeScope);
-        (await downgrade.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
-        (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
-        context.ChangeTracker.Clear();
-        var retained = await context.AccountCheckoutJournals.SingleAsync();
-        retained.NativeOperationId.Should().Be(operation.OperationId); retained.AmountMinor.Should().Be(334);
-        retained.CreatePayloadHash.Should().Be(journal.CreatePayloadHash);
+        try
+        {
+            var downgrade = () => context.GetService<IMigrator>().MigrateAsync(BeforeNativeScope);
+            (await downgrade.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+            // Restore any newer empty additive tables already removed before the guarded refusal.
+            await context.GetService<IMigrator>().MigrateAsync();
+            (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
+            context.ChangeTracker.Clear();
+            var retained = await context.AccountCheckoutJournals.SingleAsync();
+            retained.NativeOperationId.Should().Be(operation.OperationId); retained.AmountMinor.Should().Be(334);
+            retained.CreatePayloadHash.Should().Be(journal.CreatePayloadHash);
+        }
+        finally { await context.GetService<IMigrator>().MigrateAsync(); }
     }
 
     [Fact]
@@ -78,11 +84,17 @@ public sealed partial class AccountCheckoutJournalTests
         await using var transaction = await connection.BeginTransactionAsync();
         await using var update = new NpgsqlCommand("UPDATE account_checkout_journals SET last_failure_code = 'migration-race' WHERE id = @id", connection, transaction);
         update.Parameters.AddWithValue("id", journal.Id); await update.ExecuteNonQueryAsync();
-        var downgrade = () => context.GetService<IMigrator>().MigrateAsync(BeforeNativeScope);
-        var refusal = (await downgrade.Should().ThrowAsync<InvalidOperationException>()).Which;
-        refusal.InnerException.Should().BeOfType<PostgresException>().Which.SqlState.Should().Be(PostgresErrorCodes.LockNotAvailable);
-        await transaction.CommitAsync(); context.ChangeTracker.Clear();
-        (await context.AccountCheckoutJournals.SingleAsync()).LastFailureCode.Should().Be("migration-race");
-        (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
+        try
+        {
+            var downgrade = () => context.GetService<IMigrator>().MigrateAsync(BeforeNativeScope);
+            var refusal = (await downgrade.Should().ThrowAsync<InvalidOperationException>()).Which;
+            refusal.InnerException.Should().BeOfType<PostgresException>().Which.SqlState.Should().Be(PostgresErrorCodes.LockNotAvailable);
+            await transaction.CommitAsync(); context.ChangeTracker.Clear();
+            (await context.AccountCheckoutJournals.SingleAsync()).LastFailureCode.Should().Be("migration-race");
+            // Restore any newer empty additive tables already removed before the guarded refusal.
+            await context.GetService<IMigrator>().MigrateAsync();
+            (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(TestDatabaseCluster.CurrentSchemaMigration);
+        }
+        finally { await context.GetService<IMigrator>().MigrateAsync(); }
     }
 }

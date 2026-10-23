@@ -3066,6 +3066,51 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerTablePlanOperation", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<bool>("IsStopped")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_stopped");
+
+                    b.Property<string>("OwnerHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("owner_hash");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<Guid?>("PlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_id");
+
+                    b.HasKey("OperationId")
+                        .HasName("pk_customer_table_plan_operations");
+
+                    b.HasIndex("PlanId")
+                        .IsUnique()
+                        .HasFilter("plan_id IS NOT NULL");
+
+                    b.ToTable("customer_table_plan_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_table_plan_operations_outcome", "(is_stopped AND plan_id IS NULL) OR (NOT is_stopped AND plan_id IS NOT NULL AND plan_id <> '00000000-0000-0000-0000-000000000000'::uuid)");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.DeviceEvent", b =>
                 {
                     b.Property<Guid>("Id")

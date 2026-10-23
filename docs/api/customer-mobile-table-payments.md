@@ -2,8 +2,8 @@
 
 `POST /api/customer-mobile/table-payments/prepare` is a schema1 advisory read. It creates no
 quote, hold, operation receipt, provider journal or tender and makes no provider request.
-`table-payments` remains unknown in bootstrap; preparation alone does not enable the native
-payment journey. Native contribution submission and original decision recovery are additive below;
+`table-payments` stays unavailable without separate native readiness approval; preparation alone
+does not enable the payment journey. Native contribution submission and original decision recovery are additive below;
 hosted checkout, native return routing and activation remain separate gates.
 
 ## Request and authority
@@ -163,3 +163,31 @@ No tenant activation, frontend/printer contract change or production/provider/de
 included. Deploy the accepted source separately, verify disabled/enabled behavior
 against the served version, and complete signed-link and physical native journey acceptance
 before offering contributions.
+
+## Native split-plan operations
+
+`POST /api/customer-mobile/table-payments/plans/{prepare|submit|recover|stop}` uses separate
+schema1 intent and purpose-bound original proof. Preparation is read-only: review the original
+visit/revision, share count, ordered custom amounts (or an empty list for equal shares), and an
+optional explicitly superseded plan. It returns the exact server-owned total, currency, frozen
+allocation scope, cash rounding increment and individual share amounts. Each share must satisfy
+current online contribution limits. The native bound is100 shares and the existing configured
+segment bound; no quantity expansion is performed.
+
+Submit needs the current original participant/session/customer, native approval and current
+policy. It revalidates the frozen scope and distribution, calls the shared plan writer under a
+short visit→customer→native-operation transaction, then atomically retains the original decision.
+The server's internal guest-plan operation differs from the app's public operation. Existing
+supersession ownership and protected/captured-contribution refusal remain authoritative.
+
+Original-proof recovery discloses only schema, original operation, visit, outcome and nullable
+plan UUID. Outcomes are `unseen`, `applied` or `stopped`. Unseen is not proof that a late submit
+cannot arrive. Stop permanently seals unseen work; it never invalidates an applied shared plan,
+releases a contribution or performs provider I/O. Recovery/stopping keep the original authority
+after participant expiry or rollout withdrawal. Retained missing/changed plans fail closed.
+
+The separate permanent `customer_table_plan_operations` table stores only public operation UUID,
+owner/payload digests, nullable plan UUID, stopped flag and completion time. It has no erasure-
+cascading account/participant/plan FK. Its additive migration refuses downgrade while any decision
+or in-flight decision writer exists. Preserve original DataProtection keys for proof recovery.
+No signing, production activation, provider charge or installed acceptance is implied.
