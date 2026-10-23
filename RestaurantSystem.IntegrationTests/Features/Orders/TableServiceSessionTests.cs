@@ -998,7 +998,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         visits.Single(value => value.Id == sessionId).ReleasedAt.Should().NotBeNull();
         visits.Single(value => value.Id == opened.Data.ServiceSessionId).ReleasedAt.Should().BeNull();
         (await verify.Tables.SingleAsync(value => value.Id == tableId)).ReadinessState
-            .Should().Be(TableReadinessState.NeedsReset);
+            .Should().Be(TableReadinessState.ReadyForGuests);
     }
 
     [Fact]
@@ -1067,7 +1067,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         await using (var readiness = _fixture.CreateContext())
         {
             (await readiness.Tables.SingleAsync(value => value.Id == tableId)).ReadinessState
-                .Should().Be(TableReadinessState.NeedsReset);
+                .Should().Be(TableReadinessState.ReadyForGuests);
             await readiness.Tables.Where(value => value.Id == tableId).ExecuteUpdateAsync(setters =>
                 setters.SetProperty(value => value.ReadinessState, TableReadinessState.ReadyForGuests));
         }
@@ -1411,6 +1411,51 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
             PaymentMethod = PaymentMethod.Cash,
             Amount = 1m,
         }, CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Closing_a_released_visit_preserves_ready_state_and_any_new_visit(bool openNextVisit)
+    {
+        var tableId = await SeedTableAsync("FREE-READY");
+        var sessionId = await SeedStableSessionAsync(tableId);
+        TableServiceSessionDto released;
+        await using (var context = _fixture.CreateContext())
+        {
+            var result = await new ReleaseTableServiceSessionCommandHandler(
+                context, SessionReader(context),
+                new RestaurantSystem.Api.Features.TableGuestVisits.Services.TableGuestVisitRevoker(context),
+                Mock.Of<ICurrentUserService>(user => user.GetAuditIdentifier() == "free-table-test"))
+                .Handle(new ReleaseTableServiceSessionCommand
+                {
+                    ServiceSessionId = sessionId,
+                    ExpectedVersion = 1,
+                }, CancellationToken.None);
+            result.Success.Should().BeTrue();
+            released = result.Data!;
+            (await context.Tables.SingleAsync(value => value.Id == tableId)).ReadinessState
+                .Should().Be(TableReadinessState.ReadyForGuests);
+        }
+        Guid? nextVisitId = null;
+        if (openNextVisit)
+        {
+            var next = await OpenStableTableAsync(tableId, readinessEnabled: true);
+            next.Success.Should().BeTrue("freeing must make the next visit possible without a ready step");
+            nextVisitId = next.Data!.ServiceSessionId;
+        }
+        await using var before = _fixture.CreateContext();
+        var readinessVersion = (await before.Tables.AsNoTracking().SingleAsync(value => value.Id == tableId)).ReadinessVersion;
+        var resultClose = await CloseAsync(sessionId, released.Version);
+        resultClose.Success.Should().BeTrue();
+        resultClose.Data!.Status.Should().Be(nameof(TableServiceSessionStatus.Closed));
+        await using var verify = _fixture.CreateContext();
+        var table = await verify.Tables.AsNoTracking().SingleAsync(value => value.Id == tableId);
+        table.ReadinessState.Should().Be(TableReadinessState.ReadyForGuests);
+        table.ReadinessVersion.Should().Be(readinessVersion, "a released bill no longer owns table readiness");
+        if (nextVisitId.HasValue)
+            (await verify.TableServiceSessions.SingleAsync(value => value.Id == nextVisitId)).Status
+                .Should().Be(TableServiceSessionStatus.Open);
     }
 
     private async Task<ApiResponse<TableServiceSessionDto>> CloseAsync(
