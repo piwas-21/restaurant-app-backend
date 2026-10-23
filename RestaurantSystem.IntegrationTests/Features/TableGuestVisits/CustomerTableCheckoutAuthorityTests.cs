@@ -94,6 +94,7 @@ public sealed partial class CustomerTableCheckoutTests
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         AfterGet = null;
         await using var context = DatabaseFixture.CreateContext();
+        // soft-delete-bypass: prove permanent account erasure removed even soft-deleted PII.
         (await context.Users.IgnoreQueryFilters().AnyAsync(row => row.Id == customer)).Should().BeFalse();
         (await context.AccountCheckoutJournals.SingleAsync()).NativeOperationId.Should().Be(proof.OperationId);
         (await context.Set<CustomerTablePaymentOperation>().SingleAsync()).AttemptId.Should().NotBeNull();
