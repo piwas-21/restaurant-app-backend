@@ -35,6 +35,9 @@ public sealed class AccountCheckoutJournalStore(ApplicationDbContext context,
             .FromSqlInterpolated($"SELECT * FROM account_payment_attempts WHERE operation_id = {operationId} FOR UPDATE")
             .Include(value => value.Allocations).SingleOrDefaultAsync(cancellationToken) ?? throw Unavailable();
         RequireOwner(attempt, sessionId, actor);
+        // Native reservations require their original proof and separately approved native return rail.
+        if (await context.Set<CustomerTablePaymentOperation>().AnyAsync(row => row.AttemptId == attempt.Id, cancellationToken))
+            throw Unavailable();
         var journal = await context.AccountCheckoutJournals.SingleOrDefaultAsync(
             value => value.AttemptId == attempt.Id, cancellationToken);
         if (journal is not null)
