@@ -177,6 +177,10 @@ The existing configured segment bound also applies; no quantity expansion is per
 the native limit refuses a new submission prepared above it; original recovery/stop and replay of
 an already applied decision remain available.
 
+Schema1 uses the accepted contribution ingress ceiling of 128 KiB and the shared native decoder's
+4,096-character proof ceiling. These security bounds remain stable across tenant configuration
+changes so original proofs keep working. Changing them requires a server/client compatibility review.
+
 Submit needs the current original participant/session/customer, native approval and current
 policy. It revalidates the frozen scope and distribution, calls the shared plan writer under a
 short visit→customer→native-operation transaction, then atomically retains the original decision.

@@ -16,6 +16,7 @@ namespace RestaurantSystem.Api.Features.AccountPayments;
 [EnableRateLimiting(TableGuestVisitRateLimitPolicies.AccountPolicyName)]
 public sealed class CustomerMobileTablePlansController(CustomMediator mediator) : ControllerBase
 {
+    // Schema1 ingress ceiling in bytes, matching the accepted native contribution contract.
     private const int MaximumBodyBytes = 128 * 1024;
     [HttpPost("prepare")]
     [AllowAnonymous]

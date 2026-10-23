@@ -11,6 +11,7 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 public sealed class CustomerTablePlanProofs(IDataProtectionProvider protection) : ICustomerTablePlanProofs
 {
     internal const string Purpose = "customer-native-table-plan-v1";
+    // Schema1 character ceiling matches the native decoder and preserves issued-proof recovery.
     private const int MaximumProofLength = 4096;
     private IDataProtector Protector => protection.CreateProtector(Purpose);
 
