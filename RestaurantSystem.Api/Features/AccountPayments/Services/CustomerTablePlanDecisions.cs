@@ -8,8 +8,23 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
-public sealed class CustomerTablePlanDecisions(ApplicationDbContext context) : ICustomerTablePlanDecisions
+public sealed class CustomerTablePlanDecisions(ApplicationDbContext context, TimeProvider clock) : ICustomerTablePlanDecisions
 {
+    public async Task RecordAsync(CustomerTablePaymentOwner owner, CustomerTablePlanProofDto proof,
+        Guid? planId, bool stop, CancellationToken cancellationToken)
+    {
+        context.Set<CustomerTablePlanOperation>().Add(new()
+        {
+            OperationId = proof.OperationId,
+            OwnerHash = owner.OwnerHash,
+            PayloadHash = proof.PayloadHash,
+            PlanId = planId,
+            IsStopped = stop,
+            CompletedAt = clock.GetUtcNow().UtcDateTime
+        });
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<CustomerTablePlanResolutionDto?> ReadAsync(CustomerTablePaymentOwner owner, CustomerTablePlanProofDto proof,
         CustomerTablePlanBinding binding, CancellationToken cancellationToken)
     {

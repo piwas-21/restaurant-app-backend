@@ -8,14 +8,13 @@ using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Api.Features.User.Services;
 using RestaurantSystem.Api.Settings;
-using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
 public sealed class CustomerTablePlans(ApplicationDbContext context, ICustomerTablePaymentAccess access,
     ITableGuestParticipantPaymentAuthorization participants, IAccountEqualSharePlanService plans,
-    ICustomerTablePlanProofs proofs, ICustomerTablePlanDecisions decisions, TimeProvider clock,
+    ICustomerTablePlanProofs proofs, ICustomerTablePlanDecisions decisions,
     IOptions<AccountPaymentSettings> limits) : ICustomerTablePlans
 {
     public async Task<CustomerTablePlanPreparedDto> PrepareAsync(string sessionId, string? participantToken,
@@ -96,16 +95,7 @@ public sealed class CustomerTablePlans(ApplicationDbContext context, ICustomerTa
                     plans.RequireOnlineShares(reviewed);
                     planId = created.PlanId;
                 }
-                context.Set<CustomerTablePlanOperation>().Add(new()
-                {
-                    OperationId = proof.OperationId,
-                    OwnerHash = owner.OwnerHash,
-                    PayloadHash = proof.PayloadHash,
-                    PlanId = planId,
-                    IsStopped = stop,
-                    CompletedAt = clock.GetUtcNow().UtcDateTime
-                });
-                await context.SaveChangesAsync(cancellationToken);
+                await decisions.RecordAsync(owner, proof, planId, stop, cancellationToken);
                 result = await decisions.ReadAsync(owner, proof, binding, cancellationToken)
                     ?? throw new ConflictException("The original split decision was not retained.");
                 if (intent is not null) await RequireCurrentAsync(owner, proof, binding, token, cancellationToken);
