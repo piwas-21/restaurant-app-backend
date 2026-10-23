@@ -8,6 +8,8 @@ public sealed class CustomerHostedCheckoutSettings
     public const string SectionName = "CustomerHostedCheckout";
     public const int MaximumReconciliationBudgetSeconds = 30;
     public bool Enabled { get; set; }
+    // Separate native table rollout approval; existing hosted settings never opt tenants in.
+    public bool TablePaymentsEnabled { get; set; }
     public int ReconciliationBudgetSeconds { get; set; } = 5;
     public string[] HostedPageOrigins { get; set; } = [];
     public string LinkOrigin { get; set; } = string.Empty;

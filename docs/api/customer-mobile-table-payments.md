@@ -131,6 +131,20 @@ state or private proof; it only asks the customer to reopen the original contrib
 paths explicitly include this route. A URL or browser return never proves payment or cancellation.
 Actual OS link verification remains a signed/deployed acceptance gate.
 
+## Native readiness and rollback
+
+`CustomerHostedCheckout:TablePaymentsEnabled` is a separate approval switch and defaults to false.
+Existing configured hosted checkout never opts a tenant into native table payments. Bootstrap can
+report `table-payments: enabled` only when its existing capability/lifecycle/module/visit gates pass,
+hosted checkout and exact routing are valid, and the shared guest policy reports matching settlement
+currency and valid provider limits. This reads local configuration only; it neither probes nor creates
+provider sessions. Unknown/unproved readiness withholds new native preparation, submission and start.
+
+Withdrawal keeps the permanent operation and original financial scope. Original recovery and stopping
+remain available; a known capture still becomes canonical paid, and current approval withdrawal
+withholds a browser URL. An unseen proof can still be permanently stopped before later reactivation.
+No environment or tenant approval switch is changed by the source implementation.
+
 ## Release boundary
 
 The additive `20261023010734_AddCustomerTablePaymentOperations` migration adds a permanent

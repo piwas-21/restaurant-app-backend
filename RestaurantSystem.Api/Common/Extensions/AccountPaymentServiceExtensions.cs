@@ -1,3 +1,4 @@
+using RestaurantSystem.Api.Features.Tenant.Services;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 
 namespace RestaurantSystem.Api.Common.Extensions;
@@ -20,6 +21,7 @@ public static class AccountPaymentServiceExtensions
         services.AddScoped<IAccountPaymentAccountReader, AccountPaymentAccountReader>();
         services.AddScoped<ICustomerTablePaymentAccountReader, CustomerTablePaymentAccountReader>();
         services.AddScoped<ICustomerTablePaymentAccess, CustomerTablePaymentAccess>();
+        services.AddScoped<ICustomerNativeTablePaymentReadiness, CustomerNativeTablePaymentReadiness>();
         services.AddScoped<ICustomerTablePaymentProofs, CustomerTablePaymentProofs>();
         services.AddScoped<ICustomerTablePaymentPreparation, CustomerTablePaymentPreparation>();
         services.AddScoped<ICustomerTablePaymentOperations, CustomerTablePaymentOperations>();

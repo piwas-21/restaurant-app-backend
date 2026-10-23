@@ -21,6 +21,7 @@ public sealed class GetCustomerMobileBootstrapQueryHandler(
     ApplicationDbContext context,
     IOptions<CustomerMobileSettings> mobile,
     ICustomerNativeAuthenticationCapabilities authentication,
+    ICustomerNativeTablePaymentReadiness tablePayments,
     IOptions<LocalizationSettings> localization,
     ITenantModules modules,
     ITenantFeatures features,
@@ -38,7 +39,10 @@ public sealed class GetCustomerMobileBootstrapQueryHandler(
             .Select(info => info.Currency).FirstOrDefaultAsync(cancellationToken);
         var supported = query.ContractVersion == 1;
         var capabilities = MobileCapabilityPolicy.Resolve(settings, modules, features,
-            !string.IsNullOrWhiteSpace(currency), supported);
+            !string.IsNullOrWhiteSpace(currency), supported)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        if (capabilities.GetValueOrDefault("table-payments") == "unknown" && tablePayments.IsReady(currency))
+            capabilities["table-payments"] = "enabled";
         var native = authentication.Resolve(capabilities.GetValueOrDefault("accounts") == "enabled");
         var dto = new CustomerMobileBootstrapDto(1, settings.TenantId, currency,
             localization.Value.DefaultLanguage, clock.TimeZone.Id, settings.Lifecycle,
