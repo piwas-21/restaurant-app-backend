@@ -20,15 +20,7 @@ public sealed class AccountCheckoutEvidenceReader(IAccountStripeCheckoutClient p
             AccountCheckoutReplayPayload.Frozen(journal);
         if (provider.ReadContext() != new AccountStripeContext(journal.ProviderAccountId, journal.ProviderLiveMode))
             throw new ConflictException("Reconcile the original provider account and environment.");
-        AccountStripeSession session;
-        if (journal.ProviderSessionId is not null)
-            session = await provider.GetAsync(journal.ProviderSessionId, cancellationToken)
-                ?? throw new ConflictException("The original provider checkout is unavailable. Its reservation remains held.");
-        else if (allowOriginalCreateRetry)
-            session = await provider.CreateAsync(
-                AccountCheckoutReplayPayload.Read(journal, clock.GetUtcNow().UtcDateTime), cancellationToken);
-        else
-            throw new ConflictException("The original checkout requires bounded provider recovery.");
+        var session = await ReadSessionAsync(journal, allowOriginalCreateRetry, cancellationToken);
         AccountStripeEvidence.RequireSession(AccountCheckoutCanonicalEvidence.Expect(journal), session);
         if (journal.CancelRequestedAt.HasValue && session.Status == "open" && session.PaymentStatus == "unpaid")
             session = await ExpireAndReadAsync(session.Id, cancellationToken);
@@ -51,6 +43,19 @@ public sealed class AccountCheckoutEvidenceReader(IAccountStripeCheckoutClient p
         };
         evidence.Validate(journal);
         return evidence;
+    }
+
+    private async Task<AccountStripeSession> ReadSessionAsync(AccountCheckoutJournal journal,
+        bool allowOriginalCreateRetry, CancellationToken cancellationToken)
+    {
+        if (journal.ProviderSessionId is not null)
+            return await provider.GetAsync(journal.ProviderSessionId, cancellationToken)
+                ?? throw new ConflictException("The original provider checkout is unavailable. Its reservation remains held.");
+        else if (allowOriginalCreateRetry)
+            return await provider.CreateAsync(
+                AccountCheckoutReplayPayload.Read(journal, clock.GetUtcNow().UtcDateTime), cancellationToken);
+        else
+            throw new ConflictException("The original checkout requires bounded provider recovery.");
     }
 
     private async Task<IReadOnlyList<AmendmentRefundEvidence>> ReadChargeRefundsAsync(

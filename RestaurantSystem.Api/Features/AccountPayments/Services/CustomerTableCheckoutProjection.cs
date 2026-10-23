@@ -14,8 +14,8 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
 /// <summary>Recheck the original private owner after all provider/post-commit work.</summary>
 public sealed class CustomerTableCheckoutProjection(ApplicationDbContext context, ICustomerTablePaymentAccess access,
-    ICustomerTablePaymentProofs proofs, ICustomerTablePaymentDecisions decisions, IGuestAccountPaymentPolicy policy,
-    ITableGuestParticipantPaymentAuthorization participants, IOptions<CustomerHostedCheckoutSettings> hosted,
+    ICustomerTablePaymentProofs proofs, ICustomerTablePaymentDecisions decisions, ICustomerTableCheckoutAuthority authority,
+    IOptions<CustomerHostedCheckoutSettings> hosted,
     TimeProvider clock) : ICustomerTableCheckoutProjection
 {
     public async Task<CustomerTableCheckoutDto> ReadAsync(string sessionId, CustomerTablePaymentProofDto proof,
@@ -35,6 +35,17 @@ public sealed class CustomerTableCheckoutProjection(ApplicationDbContext context
         var journal = decision.AttemptId is Guid attempt
             ? await context.AccountCheckoutJournals.AsNoTracking().SingleOrDefaultAsync(row => row.AttemptId == attempt, cancellationToken)
             : null;
+        var (outcome, url) = await OutcomeAsync(decision, journal, original, proof, participantToken, canonicalUrl, cancellationToken);
+        if (access.Capture(sessionId, proof.SchemaVersion, proof.TenantId) != original.Owner) throw Unavailable();
+        await transaction.CommitAsync(cancellationToken);
+        return new(1, proof.TenantId, proof.OperationId, original.Binding.ServiceSessionId, decision.AttemptId,
+            outcome, original.Binding.AmountMinor, original.Binding.Currency, journal?.ExpiresAt, url);
+    }
+
+    private async Task<(string Outcome, string? Url)> OutcomeAsync(CustomerTablePaymentResolutionDto decision,
+        RestaurantSystem.Domain.Entities.AccountCheckoutJournal? journal, CustomerTableCheckoutIdentity original,
+        CustomerTablePaymentProofDto proof, string? participantToken, string? canonicalUrl, CancellationToken cancellationToken)
+    {
         var outcome = decision.Outcome == CustomerTablePaymentOutcome.Stopped ? "stopped" : "pending";
         string? url = null;
         if (journal is not null)
@@ -43,43 +54,35 @@ public sealed class CustomerTableCheckoutProjection(ApplicationDbContext context
             if (journal.AmountMinor != original.Binding.AmountMinor || journal.Currency != original.Binding.Currency)
                 throw Unavailable();
             if (!journal.ReconciliationRequired && journal.LastVerifiedAt is not null)
-            {
-                if (decision.State == AccountPaymentState.Captured && journal.ProviderCapturedMinor == journal.AmountMinor
-                    && journal.ProviderRefundedMinor == 0 && journal.ProviderChargeId is not null)
-                {
-                    // This independently verifies full tender/allocation accounting before a paid projection.
-                    await new AccountDebtSnapshotReader(context).ReadAsync(original.Binding.ServiceSessionId, cancellationToken);
-                    outcome = "paid";
-                }
-                else if (decision.State == AccountPaymentState.Released
-                    && journal.ProviderCapturedMinor == journal.ProviderRefundedMinor) outcome = "stopped";
-                else if (decision.State == AccountPaymentState.Processing && journal.CancelRequestedAt is null
-                    && journal.ProviderCapturedMinor == 0 && clock.GetUtcNow().UtcDateTime < journal.ExpiresAt
-                    && TrustedHostedCheckoutUrl.IsAllowed(canonicalUrl, hosted.Value.HostedPageOrigins)
-                    && await MayOpenAsync(original, proof, participantToken, cancellationToken))
-                { outcome = "ready"; url = canonicalUrl; }
-            }
+                return await VerifiedOutcomeAsync(decision, journal, original, proof, participantToken, canonicalUrl, cancellationToken);
         }
         else if (decision.State == AccountPaymentState.Released) outcome = "stopped";
         else if (decision.State == AccountPaymentState.Reserved) outcome = "reserved";
-        if (access.Capture(sessionId, proof.SchemaVersion, proof.TenantId) != original.Owner) throw Unavailable();
-        await transaction.CommitAsync(cancellationToken);
-        return new(1, proof.TenantId, proof.OperationId, original.Binding.ServiceSessionId, decision.AttemptId,
-            outcome, original.Binding.AmountMinor, original.Binding.Currency, journal?.ExpiresAt, url);
+        return (outcome, url);
     }
 
-    private async Task<bool> MayOpenAsync(CustomerTableCheckoutIdentity original, CustomerTablePaymentProofDto proof,
-        string? participantToken, CancellationToken cancellationToken)
+    private async Task<(string Outcome, string? Url)> VerifiedOutcomeAsync(CustomerTablePaymentResolutionDto decision,
+        RestaurantSystem.Domain.Entities.AccountCheckoutJournal journal, CustomerTableCheckoutIdentity original,
+        CustomerTablePaymentProofDto proof, string? participantToken, string? canonicalUrl, CancellationToken cancellationToken)
     {
-        try
+        var outcome = "pending";
+        string? url = null;
+        if (decision.State == AccountPaymentState.Captured && journal.ProviderCapturedMinor == journal.AmountMinor
+            && journal.ProviderRefundedMinor == 0 && journal.ProviderChargeId is not null)
         {
-            if (!TableGuestCredentialCrypto.TryHashParticipantToken(participantToken, out var hash)
-                || hash != original.Binding.ParticipantTokenHash) return false;
-            policy.RequireContribution(original.Binding.AmountMinor, original.Binding.Currency);
-            return await access.RequireNewAsync(original.Owner, proof.TenantId, cancellationToken) == original.Binding.Currency
-                && (await participants.AuthorizeActiveAsync(original.Binding.ServiceSessionId, participantToken, cancellationToken)).ActorId == original.Binding.ParticipantId;
+            // This independently verifies full tender/allocation accounting before a paid projection.
+            await new AccountDebtSnapshotReader(context).ReadAsync(original.Binding.ServiceSessionId, cancellationToken);
+            outcome = "paid";
         }
-        catch (Exception error) when (error is NotFoundException or BadRequestException or ConflictException) { return false; }
+        else if (decision.State == AccountPaymentState.Released
+            && journal.ProviderCapturedMinor == journal.ProviderRefundedMinor) outcome = "stopped";
+        else if (decision.State == AccountPaymentState.Processing && journal.CancelRequestedAt is null
+            && journal.ProviderCapturedMinor == 0 && clock.GetUtcNow().UtcDateTime < journal.ExpiresAt
+            && TrustedHostedCheckoutUrl.IsAllowed(canonicalUrl, hosted.Value.HostedPageOrigins)
+            && await authority.MayOpenAsync(original, proof, participantToken, cancellationToken))
+        { outcome = "ready"; url = canonicalUrl; }
+        return (outcome, url);
     }
+
     private static NotFoundException Unavailable() => new("The original native contribution is unavailable.");
 }

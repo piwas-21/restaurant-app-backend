@@ -7,5 +7,5 @@ public sealed class GetMobileTablePaymentReturnQueryHandler(IOptions<MobileLinkS
     IGetMobileDirectoryQueryHandler directory) : IGetMobileTablePaymentReturnQueryHandler
 {
     public bool Handle(MobileTablePaymentReturnQuery query) => MobileReturnNavigation.Allowed(settings.Value, directory,
-        query.Slug, query.AttemptReference, query.Operation, query.QueryKeyCount, query.OperationValueCount, query.RequestAuthority);
+        new(query.Slug, query.AttemptReference, query.Operation, query.QueryKeyCount, query.OperationValueCount, query.RequestAuthority));
 }
